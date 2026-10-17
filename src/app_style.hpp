@@ -6,17 +6,16 @@
 // paper canvas, white surfaces, chunky 2-3 px ink outlines, big radii, flat
 // state colour and hard offset shadows. No gradients, no glow. Colour is
 // reserved for live state (the accent, user-selectable) and the semantic
-// palette. Placeholders: %1 accent hex, %2 text on accent, %3 accent hover.
+// palette. Placeholders: %1 accent hex, %2 text on accent.
 inline QString applicationStyle(const QColor& accent){
     const QString accentHex=accent.name();
     const QString onAccent=kbtheme::readableOn(accent).name();
-    const QString accentHover=(kbtheme::readableOn(accent)==kbtheme::ink?accent.darker(112):accent.lighter(112)).name();
     return QString::fromUtf8(R"CSS(
         QWidget { color:#31204C; font-family:'Geist'; font-size:13px; font-weight:400; }
         QWidget#mainWindow { background:#FFFAEE; }
         QFrame#titleBar { background:#FFDD59; border:0; border-bottom:3px solid #31204C; }
 
-        QLabel#brand { font-family:'Consolas'; color:#31204C; }
+        QLabel#brand { font-family:'Press Start 2P'; color:#FFFFFF; }
         QLabel#pageTitle,QLabel#preferencesTitle { font-family:'Fredoka'; font-size:24px; font-weight:600; color:#31204C; }
         QLabel#sidebarTitle { font-family:'Fredoka'; font-size:16px; font-weight:600; color:#31204C; }
         QLabel#subtitle,QLabel#hint { color:#5D4973; font-size:12px; }
@@ -31,7 +30,6 @@ inline QString applicationStyle(const QColor& accent){
         /* Sections are cream cards outlined in ink; rows stay flat inside. */
         QFrame#settingCard { background:#FFFAEE; border:2px solid #31204C; border-radius:16px; }
         QWidget#settingRow { background:transparent; border:0; border-radius:10px; }
-        QWidget#settingRow:hover { background:#F6F0FF; }
 
         QLineEdit#search { background:#FFFFFF; color:#31204C; border:2px solid #31204C; border-radius:10px; padding:8px 10px; font-size:13px; }
         QLineEdit#search:focus { border-color:%1; }
@@ -47,19 +45,15 @@ inline QString applicationStyle(const QColor& accent){
         QListWidget { background:transparent; border:0; outline:0; }
 
         QPushButton#sectionHeading { text-align:left; padding:6px 0; border:0; background:transparent; color:#31204C; font-size:16px; font-weight:600; }
-        QPushButton#sectionHeading:hover { color:%1; }
         QPushButton#windowControl,QPushButton#saveControl,QPushButton#closeControl { background:transparent; border:0; padding:0; }
 
         QPushButton#status { background:#EBDEFF; border:2px solid #31204C; border-radius:10px; padding:6px 12px; color:#31204C; font-size:12px; font-weight:700; }
-        QPushButton#status:hover { background:#F6F0FF; }
         QPushButton#status[active="true"] { background:#CCF47F; border-color:#31204C; color:#31204C; }
 
         QPushButton#preferencesSave,QPushButton#save { background:%1; color:%2; border:2px solid #31204C; border-radius:12px; padding:8px 16px; font-weight:700; }
-        QPushButton#preferencesSave:hover,QPushButton#save:hover { background:%3; }
         QPushButton#preferencesSave:disabled,QPushButton#save:disabled { background:#EBDEFF; color:#5D4973; }
 
         QPushButton#keyButton,QPushButton#secondary,QPushButton#cancelClose,QPushButton#discardChanges { background:#FFFFFF; border:2px solid #31204C; border-radius:12px; padding:6px 12px; color:#31204C; font-size:13px; font-weight:600; }
-        QPushButton#keyButton:hover,QPushButton#secondary:hover,QPushButton#cancelClose:hover,QPushButton#discardChanges:hover { background:#F6F0FF; }
         QPushButton#keyButton:pressed,QPushButton#secondary:pressed,QPushButton#cancelClose:pressed,QPushButton#discardChanges:pressed { background:#EBDEFF; }
         QPushButton#cancelClose[keyboardFocus="true"],QPushButton#discardChanges[keyboardFocus="true"] { border-color:%1; }
         QPushButton#keyButton[keyboardFocus="true"],QPushButton#secondary[keyboardFocus="true"],QPushButton#weaponChoice[keyboardFocus="true"],QPushButton#status[keyboardFocus="true"],QPushButton#save[keyboardFocus="true"],QPushButton#preferencesSave[keyboardFocus="true"] { border-color:%1; }
@@ -68,10 +62,11 @@ inline QString applicationStyle(const QColor& accent){
         QDoubleSpinBox:focus,QSpinBox:focus { border-color:%1; }
         QDoubleSpinBox:disabled,QSpinBox:disabled { background:#EBDEFF; color:#5D4973; }
 
+        /* The 20 px minimum keeps the round handle inside the widget bounds. */
+        QSlider { min-height:20px; }
         QSlider::groove:horizontal { height:10px; border-radius:5px; background:#EBDEFF; }
         QSlider::sub-page:horizontal { background:%1; border-radius:5px; }
         QSlider::handle:horizontal { width:14px; margin:-4px 0; border:2px solid #31204C; border-radius:9px; background:#FFFFFF; }
-        QSlider::handle:horizontal:hover { background:#F6F0FF; }
 
         QComboBox { background:#FFFFFF; color:#31204C; border:2px solid #31204C; border-radius:10px; padding:6px 10px; min-width:120px; font-size:13px; font-weight:600; }
         QComboBox:focus { border-color:%1; }
@@ -83,12 +78,13 @@ inline QString applicationStyle(const QColor& accent){
         QScrollArea>QWidget>QWidget { background:transparent; }
         QScrollBar:vertical { background:transparent; width:8px; margin:2px 0; }
         QScrollBar::handle:vertical { background:rgba(49,32,76,0.22); min-height:36px; border-radius:4px; margin:0 2px; }
-        QScrollBar::handle:vertical:hover { background:rgba(49,32,76,0.38); }
         QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical { height:0; }
         QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical { background:transparent; }
 
         QDialog { background:#FFFAEE; }
+        QDialog#palestinePopup { background:#FFFAEE; border:3px solid #31204C; border-radius:24px; }
+        QLabel#palestineArabic { color:#31204C; font-size:24px; font-weight:900; }
         QToolTip { background:#FFFFFF; color:#31204C; border:2px solid #31204C; border-radius:10px; padding:6px 8px; font-size:12px; }
         QPushButton:focus { outline:0; }
-    )CSS").arg(accentHex,onAccent,accentHover);
+    )CSS").arg(accentHex,onAccent);
 }

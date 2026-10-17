@@ -1,13 +1,16 @@
 /.build/
 /*.exe
 /r6_config.bin
+/azec_ui.json
 /kingboss_ui.json
+/azec_weapons.json
 /kingboss_weapons.json
 /imgui.ini
 /dry-run-result.txt
 /runtime/
 /phone-info.json
 /ui-verification.json
+/azec.log*
 /kingboss.log*
 /r6_config.corrupt-*.bin
 /*.lock

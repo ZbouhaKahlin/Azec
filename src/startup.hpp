@@ -7,9 +7,9 @@
 #include "strings.hpp"
 
 class SingleInstance final : public QObject {
-    QLockFile lock_{QDir::current().filePath("kingboss.lock")};
+    QLockFile lock_{QDir::current().filePath("azec.lock")};
     QLocalServer server_;
-    QString name_="kingboss-"+QString::fromLatin1(QCryptographicHash::hash(QDir::current().canonicalPath().toCaseFolded().toUtf8(),QCryptographicHash::Sha256).toHex().left(32));
+    QString name_="azec-"+QString::fromLatin1(QCryptographicHash::hash(QDir::current().canonicalPath().toCaseFolded().toUtf8(),QCryptographicHash::Sha256).toHex().left(32));
 public:
     bool acquire(){
         lock_.setStaleLockTime(0);

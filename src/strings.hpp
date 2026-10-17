@@ -79,7 +79,7 @@ enum class UiText {
     EscCancelsBackspaceClears,
     PressAKeyNow,
     ThisKeyIsAlreadyAssignedChooseAnother,
-    KingBoss2004Help,
+    AzecHelp,
     CloseQuickGuide,
     Back,
     Next,
@@ -117,125 +117,34 @@ enum class UiText {
     UpKey,
     DownKey,
 };
+inline constexpr int UiTextCount=112;
 
+// One table per language, listed in exactly the enum order above.
+#include "lang_en.hpp"
+#include "lang_pt.hpp"
+#include "lang_fr.hpp"
+#include "lang_es.hpp"
+#include "lang_de.hpp"
+#include "lang_ar.hpp"
+#include "lang_he.hpp"
+#include "lang_zh.hpp"
+#include "lang_ja.hpp"
+static_assert(sizeof(lang_en)/sizeof(lang_en[0])==UiTextCount,"lang_en.hpp must cover every UiText value");
+static_assert(sizeof(lang_pt)/sizeof(lang_pt[0])==UiTextCount,"lang_pt.hpp must cover every UiText value");
+static_assert(sizeof(lang_fr)/sizeof(lang_fr[0])==UiTextCount,"lang_fr.hpp must cover every UiText value");
+static_assert(sizeof(lang_es)/sizeof(lang_es[0])==UiTextCount,"lang_es.hpp must cover every UiText value");
+static_assert(sizeof(lang_de)/sizeof(lang_de[0])==UiTextCount,"lang_de.hpp must cover every UiText value");
+static_assert(sizeof(lang_ar)/sizeof(lang_ar[0])==UiTextCount,"lang_ar.hpp must cover every UiText value");
+static_assert(sizeof(lang_he)/sizeof(lang_he[0])==UiTextCount,"lang_he.hpp must cover every UiText value");
+static_assert(sizeof(lang_zh)/sizeof(lang_zh[0])==UiTextCount,"lang_zh.hpp must cover every UiText value");
+static_assert(sizeof(lang_ja)/sizeof(lang_ja[0])==UiTextCount,"lang_ja.hpp must cover every UiText value");
+
+// Language ids: 0 Portuguese, 1 English (default), 2 French, 3 Spanish, 4 German,
+// 5 Arabic, 6 Hebrew (Palestine prank), 7 Simplified Chinese, 8 Japanese.
 inline QString uiText(UiText id,int language){
-    struct Entry {const char* english;const char* portuguese;};
-    static const Entry entries[]={
-        {"Open / hide window","Abrir / ocultar janela"},
-        {"Recoil active","Recoil ativo"},
-        {"Global rapid fire","Rapid fire global"},
-        {"Exit","Sair"},
-        {"Save configuration · Unsaved changes","Salvar configuracoes · Alteracoes nao salvas"},
-        {"Configuration saved","Configuracao salva"},
-        {"Could not save configuration","Nao foi possivel salvar"},
-        {"Save configuration","Salvar configuracoes"},
-        {"Could not save favorites","Nao foi possivel salvar favoritos"},
-        {"Remove favorite","Remover favorito"},
-        {"Favorite","Favoritar"},
-        {" value"," valor"},
-        {"Weapon profiles","Perfis de armas"},
-        {"Separate secondary profile","Perfil secundario separado"},
-        {"Use 1 and 2 to switch weapon profiles. Change the keys in Settings.","Use 1 e 2 para trocar perfis. Altere as teclas nas Configuracoes."},
-        {"Recoil control","Controle de recoil"},
-        {"Master enable","Habilitar global"},
-        {"Apply this operator's recoil settings.","Aplicar os ajustes deste operador."},
-        {"Vertical force","Forca vertical"},
-        {"Horizontal adjust","Ajuste horizontal"},
-        {"Humanize movement","Humanizar movimento"},
-        {"Vary movement slightly on both axes.","Variar o movimento nos dois eixos."},
-        {"Rapid fire","Disparo rapido"},
-        {"Master control for every operator.","Controle global para todos os operadores."},
-        {"Enable for this operator","Habilitar neste operador"},
-        {"Shot delay","Intervalo entre tiros"},
-        {"Delay between repeated shots.","Tempo entre os disparos repetidos."},
-        {" ms"," ms"},
-        {"System settings","Configuracoes"},
-        {"Feedback sound","Som de feedback"},
-        {"Beep when hotkey states change.","Sinal sonoro ao alternar atalhos."},
-        {"Language","Idioma"},
-        {"Recoil toggle","Alternar recoil"},
-        {"Rapid fire toggle","Alternar rapid fire"},
-        {"Panic / exit key","Tecla de saida"},
-        {"Primary weapon","Arma primaria"},
-        {"Secondary weapon","Arma secundaria"},
-        {"Phone control","Controle pelo celular"},
-        {"Enable phone access","Habilitar acesso pelo celular"},
-        {"Could not start phone server","Nao foi possivel iniciar o servidor"},
-        {"Pairing code: ","Codigo: "},
-        {"Copy link","Copiar link"},
-        {"Copied","Copiado"},
-        {"Open this address in Safari on the same Wi-Fi.","Abra o endereco no Safari usando o mesmo Wi-Fi."},
-        {"Click to reveal QR","Clique para revelar QR"},
-        {"Click to hide QR","Clique para ocultar QR"},
-        {"Appearance","Aparencia"},
-        {"Accent color","Cor de destaque"},
-        {"Used for switches and selected states.","Usada nos controles e na selecao."},
-        {"Reactive radius","Raio reativo"},
-        {"Mouse response in the background.","Resposta ao mouse no fundo."},
-        {"Reset appearance","Redefinir aparencia"},
-        {"Quick guide","Guia rapido"},
-        {"Profile backup","Backup de perfis"},
-        {"Export profiles","Exportar perfis"},
-        {"Import profiles","Importar perfis"},
-        {"All operators","Todos os operadores"},
-        {"Favorites","Favoritos"},
-        {"Search operators...","Pesquisar operadores..."},
-        {"Operator settings","Ajustes do operador"},
-        {"Settings","Configuracoes"},
-        {"Back to operators","Voltar aos operadores"},
-        {"Primary","Primaria"},
-        {"Secondary","Secundaria"},
-        {"Recoil on","Recoil ligado"},
-        {"Recoil off","Recoil desligado"},
-        {"Cancel","Cancelar"},
-        {"Apply color","Aplicar cor"},
-        {"Key binding","Atalho"},
-        {"Set a hotkey","Definir atalho"},
-        {"Cancel hotkey binding","Cancelar definicao de atalho"},
-        {"Release your keys. Waiting...","Solte as teclas. Aguarde..."},
-        {"Esc cancels · Backspace clears","Esc cancela · Backspace remove"},
-        {"Press a key now","Pressione uma tecla agora"},
-        {"This key is already assigned. Choose another.","Esta tecla ja esta em uso. Escolha outra."},
-        {"KingBoss2004 help","Ajuda do KingBoss2004"},
-        {"Close quick guide","Fechar guia rapido"},
-        {"Back","Voltar"},
-        {"Next","Proximo"},
-        {"Welcome","Bem-vindo"},
-        {"Choose an operator","Selecione um operador"},
-        {"Adjust recoil","Ajuste o recoil"},
-        {"Hotkeys and saving","Atalhos e configuracoes"},
-        {"Your operator profiles and controls, in one place.","Seus perfis e controles em um so lugar."},
-        {"Select a name in the sidebar, or search for an operator.","Selecione um nome na barra lateral ou pesquise um operador."},
-        {"Set vertical and horizontal force. Use arrow keys for fine adjustments.","Ajuste a forca vertical e horizontal. Use as setas para ajustes finos."},
-        {"Enable the global control, then enable rapid fire for the selected operator.","Habilite o controle global e depois o rapid fire do operador."},
-        {"Open the settings gear to change the accent color and reactive radius.","Abra a engrenagem para alterar a cor e o raio reativo."},
-        {"Set your hotkeys in System settings. Save configuration to keep your changes.","Defina os atalhos em Configuracoes. Salve para manter suas alteracoes."},
-        {"Done","Concluir"},
-        {"Unsaved changes","Alteracoes nao salvas"},
-        {"Save your changes before closing?","Salvar suas alteracoes antes de sair?"},
-        {"Discard","Descartar"},
-        {"Save","Salvar"},
-        {"Toggle recoil activity","Alternar atividade de recoil"},
-        {"Minimize","Minimizar"},
-        {"Close","Fechar"},
-        {"Search operators","Pesquisar operadores"},
-        {"Favorite operators","Operadores favoritos"},
-        {"Could not export profiles. Check the destination permissions.","Nao foi possivel exportar os perfis. Verifique as permissoes."},
-        {"Profiles exported.","Perfis exportados."},
-        {"Import failed. Check the backup format and file permissions. Existing profiles were kept.","A importacao falhou. Verifique o arquivo e as permissoes. Os perfis existentes foram mantidos."},
-        {"Profiles imported. Save to keep the changes.","Perfis importados. Salve para manter as alteracoes."},
-        {"Settings could not be read. Saving is blocked to protect the existing file. Check file permissions.","Nao foi possivel ler as configuracoes. O salvamento esta bloqueado para proteger o arquivo. Verifique as permissoes."},
-        {"The settings file is damaged and could not be preserved. Saving is blocked. Back up r6_config.bin and check file permissions.","As configuracoes estao danificadas e nao puderam ser preservadas. O salvamento esta bloqueado. Copie r6_config.bin e verifique as permissoes."},
-        {"Damaged settings were preserved as %1. Default primary settings are in use; your secondary profiles were retained.","As configuracoes danificadas foram preservadas em %1. Os ajustes primarios padrao estao em uso; os perfis secundarios foram mantidos."},
-        {"Some hotkeys conflict. Choose unique bindings in Settings.","Alguns atalhos estao em conflito. Escolha teclas diferentes nas Configuracoes."},
-        {"None","Nenhuma"},
-        {"Left","Esquerda"},
-        {"Right","Direita"},
-        {"Up","Cima"},
-        {"Down","Baixo"},
-    };
-    const auto& entry=entries[static_cast<size_t>(id)];
-    return QString::fromUtf8(language?entry.english:entry.portuguese);
+    static const char* const* const tables[]={lang_pt,lang_en,lang_fr,lang_es,lang_de,lang_ar,lang_he,lang_zh,lang_ja};
+    const int table=(language>=0&&language<=8)?language:1;
+    return QString::fromUtf8(tables[table][static_cast<size_t>(id)]);
 }
 
 // Translate bundled Qt color/file dialogs without external translation packs.
@@ -248,17 +157,17 @@ public:
         if(language_())return {};
         static const QHash<QString,QString> portuguese={
             {QString::fromUtf8("Hue:"),QString::fromUtf8("Matiz:")},
-            {QString::fromUtf8("Sat:"),QString::fromUtf8("Saturacao:")},
+            {QString::fromUtf8("Sat:"),QString::fromUtf8("Saturação:")},
             {QString::fromUtf8("Val:"),QString::fromUtf8("Valor:")},
             {QString::fromUtf8("Red:"),QString::fromUtf8("Vermelho:")},
             {QString::fromUtf8("Green:"),QString::fromUtf8("Verde:")},
             {QString::fromUtf8("Blue:"),QString::fromUtf8("Azul:")},
             {QString::fromUtf8("Alpha channel:"),QString::fromUtf8("Canal alfa:")},
             {QString::fromUtf8("HTML:"),QString::fromUtf8("HTML:")},
-            {QString::fromUtf8("Basic colors"),QString::fromUtf8("Cores basicas")},
+            {QString::fromUtf8("Basic colors"),QString::fromUtf8("Cores básicas")},
             {QString::fromUtf8("Custom colors"),QString::fromUtf8("Cores personalizadas")},
             {QString::fromUtf8("Pick Screen Color"),QString::fromUtf8("Selecionar cor da tela")},
-            {QString::fromUtf8("Add to Custom Colors"),QString::fromUtf8("Adicionar as cores personalizadas")},
+            {QString::fromUtf8("Add to Custom Colors"),QString::fromUtf8("Adicionar às cores personalizadas")},
             {QString::fromUtf8("Select Color"),QString::fromUtf8("Selecionar cor")},
             {QString::fromUtf8("Color"),QString::fromUtf8("Cor")},
             {QString::fromUtf8("Look in:"),QString::fromUtf8("Procurar em:")},
@@ -275,23 +184,23 @@ public:
             {QString::fromUtf8("Name"),QString::fromUtf8("Nome")},
             {QString::fromUtf8("Size"),QString::fromUtf8("Tamanho")},
             {QString::fromUtf8("Type"),QString::fromUtf8("Tipo")},
-            {QString::fromUtf8("Date Modified"),QString::fromUtf8("Data de modificacao")},
+            {QString::fromUtf8("Date Modified"),QString::fromUtf8("Data de modificação")},
             {QString::fromUtf8("New Folder"),QString::fromUtf8("Nova pasta")},
             {QString::fromUtf8("Back"),QString::fromUtf8("Voltar")},
-            {QString::fromUtf8("Forward"),QString::fromUtf8("Avancar")},
+            {QString::fromUtf8("Forward"),QString::fromUtf8("Avançar")},
             {QString::fromUtf8("Parent Directory"),QString::fromUtf8("Pasta superior")},
             {QString::fromUtf8("List View"),QString::fromUtf8("Lista")},
             {QString::fromUtf8("Detail View"),QString::fromUtf8("Detalhes")},
             {QString::fromUtf8("Show hidden files"),QString::fromUtf8("Mostrar arquivos ocultos")},
             {QString::fromUtf8("Directories"),QString::fromUtf8("Pastas")},
             {QString::fromUtf8("Computer"),QString::fromUtf8("Computador")},
-            {QString::fromUtf8("Home"),QString::fromUtf8("Inicio")},
+            {QString::fromUtf8("Home"),QString::fromUtf8("Início")},
             {QString::fromUtf8("Recent Places"),QString::fromUtf8("Locais recentes")},
-            {QString::fromUtf8("File not found.\nPlease verify the correct file name was given."),QString::fromUtf8("Arquivo nao encontrado.\nVerifique o nome do arquivo.")},
-            {QString::fromUtf8("%1 already exists.\nDo you want to replace it?"),QString::fromUtf8("%1 ja existe.\nDeseja substitui-lo?")},
+            {QString::fromUtf8("File not found.\nPlease verify the correct file name was given."),QString::fromUtf8("Arquivo não encontrado.\nVerifique o nome do arquivo.")},
+            {QString::fromUtf8("%1 already exists.\nDo you want to replace it?"),QString::fromUtf8("%1 já existe.\nDeseja substituí-lo?")},
             {QString::fromUtf8("Confirm Save As"),QString::fromUtf8("Confirmar salvamento")},
             {QString::fromUtf8("Yes"),QString::fromUtf8("Sim")},
-            {QString::fromUtf8("No"),QString::fromUtf8("Nao")},
+            {QString::fromUtf8("No"),QString::fromUtf8("Não")},
         };
         QString key=QString::fromUtf8(source);key.remove('&');return portuguese.value(key);
     }

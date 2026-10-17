@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "King Boss Phone Control",
-  "short_name": "King Boss",
+  "name": "Azec Phone Control",
+  "short_name": "Azec",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

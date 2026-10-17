@@ -29,7 +29,7 @@ checks['secondary_preserved']=abs(json.loads(call('/api/update',{'action':'selec
 checks['favorite_saves']=next(o for o in json.loads(call('/api/update',{'action':'setFavorite','operator':4,'enabled':True})[1])['operators'] if o['id']==4)['favorite']
 checks['save_succeeds']=call('/api/update',{'action':'save'})[0]==200
 checks['legacy_layout_unchanged']=(folder/'r6_config.bin').stat().st_size==3734
-saved=json.loads((folder/'kingboss_weapons.json').read_text())
+saved=json.loads((folder/'azec_weapons.json').read_text())
 checks['secondary_persists']=saved['operators']['Ash']['enabled'] and abs(saved['operators']['Ash']['vertical']-23.7)<.001
 checks['operator_icon_available']=call('/icons/ash.svg',auth=False)[0]==200
 checks['rejects_icon_traversal']=call('/icons/../phone_server.hpp',auth=False)[0]==404

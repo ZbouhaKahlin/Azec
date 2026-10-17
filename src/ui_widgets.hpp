@@ -21,32 +21,23 @@ inline void retargetAnimation(QVariantAnimation& animation,qreal from,qreal to,i
     animation.start();
 }
 
-// The hit target stays stationary; only the vector ink changes on hover and save.
+// The hit target stays stationary; only the vector ink shows save state and focus.
 class IconButton final : public QPushButton {
     QSvgRenderer renderer_;
     std::function<QColor()> accent_;
-    QVariantAnimation hover_;
-    qreal hoverAmount_=0;
     QPixmap mask_;
     qreal maskRatio_=0;
-    void hoverTo(qreal amount){hover_.stop();hover_.setStartValue(hoverAmount_);hover_.setEndValue(amount);hover_.start();}
 public:
     IconButton(const QString& path,std::function<QColor()> accent,QWidget* parent=nullptr):QPushButton(parent),renderer_(path),accent_(std::move(accent)){
         setIcon(QIcon(path));setIconSize(QSize(20,20));setFixedSize(34,34);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);
-        hover_.setDuration(140);hover_.setEasingCurve(QEasingCurve::OutCubic);
-        connect(&hover_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){hoverAmount_=value.toReal();update();});
     }
 protected:
-    void enterEvent(QEnterEvent* event) override {hoverTo(1);QPushButton::enterEvent(event);}
-    void leaveEvent(QEvent* event) override {hoverTo(0);QPushButton::leaveEvent(event);}
     void paintEvent(QPaintEvent*) override {
         const qreal ratio=devicePixelRatioF();
         if(mask_.isNull()||maskRatio_!=ratio){maskRatio_=ratio;mask_=QPixmap(QSize(20,20)*ratio);mask_.setDevicePixelRatio(ratio);mask_.fill(Qt::transparent);QPainter maskPainter(&mask_);renderer_.render(&maskPainter,QRectF(0,0,20,20));}
         const auto state=property("saveState").toString();
         const bool unsaved=state=="dirty"||property("unsaved").toBool();
         QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?kbtheme::danger:kbtheme::muted;
-        const QColor hoverColor=unsaved?mixColor(accent_(),Qt::white,.12):objectName()=="closeControl"?kbtheme::danger:kbtheme::ink;
-        color=mixColor(color,hoverColor,hoverAmount_);
         if(isDown())color=mixColor(color,kbtheme::ink,.25);
         QPixmap ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);tint.end();
         QPainter painter(this);if(!isEnabled())painter.setOpacity(.35);painter.drawPixmap(QPointF((width()-20)/2.0,(height()-20)/2.0),ink);
@@ -140,17 +131,14 @@ protected:
 
 class WeaponButton final : public QPushButton {
     QVariantAnimation selection_;
-    QVariantAnimation hover_;
-    qreal amount_=0,hoverAmount_=0;
+    qreal amount_=0;
     bool chosen_=false,initialized_=false;
     std::function<QColor()> accent_;
 public:
     explicit WeaponButton(std::function<QColor()> accent):accent_(std::move(accent)){
         setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);
         selection_.setEasingCurve(QEasingCurve::OutCubic);
-        hover_.setDuration(140);hover_.setEasingCurve(QEasingCurve::OutCubic);
         connect(&selection_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){amount_=value.toReal();update();});
-        connect(&hover_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){hoverAmount_=value.toReal();update();});
     }
     void setChosen(bool chosen){
         if(initialized_&&chosen_==chosen)return;
@@ -159,15 +147,12 @@ public:
         selection_.setDuration(160);selection_.setStartValue(amount_);selection_.setEndValue(chosen?1.0:0.0);selection_.start();
     }
 protected:
-    void enterEvent(QEnterEvent* event) override {hover_.stop();hover_.setStartValue(hoverAmount_);hover_.setEndValue(1);hover_.start();QPushButton::enterEvent(event);}
-    void leaveEvent(QEvent* event) override {hover_.stop();hover_.setStartValue(hoverAmount_);hover_.setEndValue(0);hover_.start();QPushButton::leaveEvent(event);}
     void paintEvent(QPaintEvent*) override{
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
         const QRectF pill=QRectF(rect()).adjusted(1,1,-1,-1);
-        const qreal amount=std::clamp(amount_,0.0,1.0),hoverAmount=std::clamp(hoverAmount_,0.0,1.0)*(1-amount);
+        const qreal amount=std::clamp(amount_,0.0,1.0);
         // GoofyUI pill: white surface with a 2 px ink outline; solid accent when chosen.
-        QColor fill=mixColor(kbtheme::surface,kbtheme::hover,hoverAmount);
-        fill=mixColor(fill,accent_(),amount);
+        const QColor fill=mixColor(kbtheme::surface,accent_(),amount);
         painter.setPen(QPen(kbtheme::ink,2));painter.setBrush(fill);painter.drawRoundedRect(pill,12,12);
         QColor ink=mixColor(kbtheme::ink,kbtheme::readableOn(accent_()),amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
         painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
@@ -177,7 +162,7 @@ protected:
 };
 
 inline QPixmap operatorPixmap(const QString& name,int size=32,qreal ratio=1) {
-    const QString key="kingboss/operator/"+name.toLower()+"/"+QString::number(size)+"/"+QString::number(ratio,'g',12);
+    const QString key="azec/operator/"+name.toLower()+"/"+QString::number(size)+"/"+QString::number(ratio,'g',12);
     QPixmap cached;if(QPixmapCache::find(key,&cached))return cached;
     QPixmap pixmap(QSize(size,size)*ratio);pixmap.setDevicePixelRatio(ratio);pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);painter.setRenderHint(QPainter::Antialiasing);
@@ -195,10 +180,9 @@ public:
     QSize sizeHint(const QStyleOptionViewItem&,const QModelIndex&) const override{return {200,operatorRowHeight};}
     void paint(QPainter* p,const QStyleOptionViewItem& option,const QModelIndex& index) const override {
         p->save();p->setRenderHint(QPainter::Antialiasing);p->setRenderHint(QPainter::TextAntialiasing);const QRect r=option.rect;
-        const bool selected=option.state&QStyle::State_Selected,hovered=option.state&QStyle::State_MouseOver;
+        const bool selected=option.state&QStyle::State_Selected;
         const QRectF pill=QRectF(r.adjusted(4,2,-4,-2));
         if(selected){p->setPen(QPen(kbtheme::ink,2));p->setBrush(kbtheme::lavender);p->drawRoundedRect(pill.adjusted(1,1,-1,-1),12,12);}
-        else if(hovered){p->setPen(Qt::NoPen);p->setBrush(kbtheme::hover);p->drawRoundedRect(pill,12,12);}
         qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(r.left()+12,r.top()+4,operatorIconSize,operatorIconSize));
         QFont f=option.font;f.setFamily("Geist");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(14);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(kbtheme::ink);
         const QRect textRect(r.left()+65,r.top(),r.width()-73,r.height());
@@ -218,27 +202,16 @@ public:
 };
 
 class BrandLabel final : public QLabel {
-    static QString artwork(){
-        const QMap<QChar,QStringList> letters={
-            {'K',{"#...#","#..#.","#.#..","##...","#.#..","#..#.","#...#"}},
-            {'I',{"#####","..#..","..#..","..#..","..#..","..#..","#####"}},
-            {'N',{"#...#","##..#","##..#","#.#.#","#..##","#..##","#...#"}},
-            {'G',{".###.","#...#","#....","#.###","#...#","#...#",".###."}},
-            {'B',{"####.","#...#","#...#","####.","#...#","#...#","####."}},
-            {'O',{".###.","#...#","#...#","#...#","#...#","#...#",".###."}},
-            {'S',{".####","#....","#....",".###.","....#","....#","####."}}
-        };
-        QStringList rows;for(int row=0;row<7;++row){QString line;for(QChar letter:QString("KING BOSS")){if(letter==' '){line+="  ";continue;}const auto pattern=letters.value(letter)[row];for(int col=0;col<pattern.size();++col)line+=pattern[col]=='#'?QChar(row==0||row==6?'+':'#'):QChar(' ');line+=' ';}rows<<line.chopped(1);}return rows.join('\n');
-    }
 public:
-    BrandLabel(){setText(artwork());setObjectName("brand");setAccessibleName("King Boss");setFixedSize(172,36);setTextFormat(Qt::PlainText);}
+    BrandLabel(){
+        setText("Azec");setObjectName("brand");setAccessibleName("Azec");setAlignment(Qt::AlignCenter);
+        QFont pixel("Press Start 2P");pixel.setPixelSize(21);setFixedSize(QFontMetrics(pixel).horizontalAdvance(text())+8,36);
+    }
 protected:
     void paintEvent(QPaintEvent*) override {
-        QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);QFont mono("Consolas");mono.setPixelSize(6);painter.setFont(mono);
-        const auto rows=text().split('\n');const qreal advance=QFontMetricsF(mono).horizontalAdvance('#'),lineHeight=4.6;
-        const qreal left=(width()-rows.front().size()*advance)/2,top=(height()-7*lineHeight)/2;
-        painter.setPen(kbtheme::ink);
-        for(int row=0;row<rows.size();++row)painter.drawText(QPointF(left,top+(row+1)*lineHeight),rows[row]);
+        QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);QFont pixel("Press Start 2P");pixel.setPixelSize(21);painter.setFont(pixel);
+        painter.setPen(kbtheme::ink);painter.drawText(rect().translated(2,2),Qt::AlignCenter,text());
+        painter.setPen(Qt::white);painter.drawText(rect(),Qt::AlignCenter,text());
     }
 };
 
@@ -406,17 +379,19 @@ protected:
 class StickerLabel final : public QLabel {
     QColor color_;
 public:
-    StickerLabel(const QString& text,const QColor& color,QWidget* parent=nullptr):QLabel(parent),color_(color){setText(text);setObjectName("sticker");}
-    QSize sizeHint() const override {const QFontMetrics metrics(stickerFont());return {metrics.horizontalAdvance(text().toUpper())+26,26};}
-    QSize minimumSizeHint() const override {return sizeHint();}
-    static QFont stickerFont(){QFont font("Geist");font.setPixelSize(11);font.setWeight(QFont::ExtraBold);font.setCapitalization(QFont::AllUppercase);font.setLetterSpacing(QFont::AbsoluteSpacing,1.0);return font;}
+    StickerLabel(const QString& text,const QColor& color,QWidget* parent=nullptr):QLabel(parent),color_(color){setText(text);setObjectName("sticker");setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Fixed);}
+    QSize sizeHint() const override {const QFontMetrics metrics(stickerFont());return {metrics.horizontalAdvance(text().toUpper())+22,26};}
+    // Long translations must never widen the 200 px sidebar: the chip elides instead.
+    QSize minimumSizeHint() const override {return {qMin(sizeHint().width(),96),26};}
+    static QFont stickerFont(){QFont font("Geist");font.setPixelSize(11);font.setWeight(QFont::ExtraBold);font.setCapitalization(QFont::AllUppercase);font.setLetterSpacing(QFont::AbsoluteSpacing,0.6);return font;}
 protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setRenderHint(QPainter::TextAntialiasing);
         const QRectF chip=QRectF(rect()).adjusted(2,2,-2,-2);
         painter.translate(chip.center());painter.rotate(-2.0);painter.translate(-chip.center());
         painter.setPen(QPen(kbtheme::ink,2));painter.setBrush(color_);painter.drawRoundedRect(chip.adjusted(1,1,-1,-1),9,9);
-        painter.setFont(stickerFont());painter.setPen(kbtheme::ink);painter.drawText(chip,Qt::AlignCenter,text().toUpper());
+        const QFontMetrics metrics(stickerFont());painter.setFont(stickerFont());painter.setPen(kbtheme::ink);
+        painter.drawText(chip,Qt::AlignCenter,metrics.elidedText(text().toUpper(),Qt::ElideRight,qMax(8.0,chip.width()-16.0)));
     }
 };
 // Stable per-heading colour so a language rebuild keeps the same stickers.

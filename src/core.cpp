@@ -88,7 +88,7 @@ bool Config::load(const std::filesystem::path& path) {
             op.horizontal > 50 || op.delay < 0 || op.delay > 60000) return false;
         op.rapid = !!op.rapid; op.humanize = !!op.humanize;
     }
-    if (next.language < 0 || next.language > 1 || !std::isfinite(next.radius) ||
+    if (next.language < 0 || next.language > 8 || !std::isfinite(next.radius) ||
         next.radius < 1 || next.radius > 10000) return false;
     for (auto c : next.neon) if (!std::isfinite(c) || c < 0 || c > 1) return false;
     for (auto key : {next.menu_key,next.recoil_key,next.panic_key,next.rapid_key})

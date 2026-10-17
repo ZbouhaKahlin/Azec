@@ -7,6 +7,7 @@
 #include "pairing_qr.hpp"
 #include "hotkeys.hpp"
 #include "strings.hpp"
+#include "flags.hpp"
 #include "diagnostics.hpp"
 #include <windows.h>
 #include <dwmapi.h>
@@ -64,7 +65,7 @@ class MainWindow final : public QWidget {
     bool unsaved_=false,force_close_=false,close_prompt_=false,save_blocked_=false;
     QPoint last_cursor_{-10000,-10000};
     QDoubleSpinBox *vertical_=nullptr,*horizontal_=nullptr;QSpinBox* delay_=nullptr;
-    QSlider *vertical_slider_=nullptr,*horizontal_slider_=nullptr;QComboBox* language_=nullptr;
+    QSlider *vertical_slider_=nullptr,*horizontal_slider_=nullptr;QComboBox* language_=nullptr;QPointer<QDialog> palestine_popup_;
     std::array<QPushButton*,6> key_buttons_{};
     QTimer poll_,paint_,save_feedback_;QElapsedTimer clock_;
     bool was_menu_=false,was_recoil_=false,was_rapid_=false,was_primary_=false,was_secondary_=false,refreshing_=false,native_ready_=false;
@@ -86,7 +87,7 @@ class MainWindow final : public QWidget {
         tray_window_->setText(text(UiText::OpenHideWindow));
         tray_recoil_->setText(text(UiText::RecoilActive));tray_recoil_->setChecked(engine_.recoil_active);
         tray_rapid_->setText(text(UiText::GlobalRapidFire));tray_rapid_->setChecked(engine_.rapid_master);
-        tray_exit_->setText(text(UiText::Exit));tray_->setToolTip("KingBoss2004");
+        tray_exit_->setText(text(UiText::Exit));tray_->setToolTip("Azec");
     }
     void buildTray(){
         tray_=new QSystemTrayIcon(QIcon(":/ui/app-icon.svg"),this);tray_menu_=new QMenu(this);
@@ -110,9 +111,10 @@ class MainWindow final : public QWidget {
     }
     void dirty(){if(!refreshing_){unsaved_=true;save_feedback_.stop();updateSavePresentation("dirty");update();}}
     void editOperator(const std::function<void(r6::Operator&)>& change){engine_.edit([&](r6::Config& c){change(c.active_operator());});dirty();}
-    std::filesystem::path favoritesPath() const{return config_path_.parent_path()/L"kingboss_ui.json";}
+    std::filesystem::path favoritesPath() const{return config_path_.parent_path()/L"azec_ui.json";}
     QSet<QString> readFavorites() const {
         QFile file(QString::fromStdWString(favoritesPath().wstring()));QSet<QString> result;
+        if(!file.exists()){const auto legacy=config_path_.parent_path()/L"kingboss_ui.json";if(std::filesystem::exists(legacy))file.setFileName(QString::fromStdWString(legacy.wstring()));}
         if(!file.open(QIODevice::ReadOnly))return result;
         if(file.size()>1024*1024){diagnostic("load favorites","File too large; ignored");return result;}
         QJsonParseError error;const auto document=QJsonDocument::fromJson(file.readAll(),&error);const auto root=document.object();
@@ -167,7 +169,7 @@ class MainWindow final : public QWidget {
     QHBoxLayout* settingRow(Section* section,const QString& title,const QString& description={},int height=44){
         auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(description.isEmpty()?height:56);auto* row=new QHBoxLayout(widget);row->setContentsMargins(14,8,12,8);row->setSpacing(12);
         auto* text=new QWidget;auto* column=new QVBoxLayout(text);column->setContentsMargins(0,0,0,0);column->setSpacing(2);column->addWidget(label(title));
-        if(!description.isEmpty()){column->addWidget(label(description,"rowHint"));widget->setToolTip(description);}
+        if(!description.isEmpty()){auto* hint=label(description,"rowHint");hint->setWordWrap(true);column->addWidget(hint);widget->setToolTip(description);}
         row->addWidget(text,1);section->body->addWidget(widget);return row;
     }
     Toggle* toggle(QHBoxLayout* row,const QString& title,bool checked,const std::function<void(bool)>& callback){
@@ -211,8 +213,10 @@ class MainWindow final : public QWidget {
         auto* preferencesLayout=new QVBoxLayout(content);preferencesLayout->setContentsMargins(2,0,10,0);preferencesLayout->setSpacing(14);
         auto* system=new Section(text(UiText::SystemSettings),false,true,kbtheme::lime);system_=system;preferencesLayout->addWidget(system);
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::BeepWhenHotkeyStatesChange)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
-        auto* langRow=settingRow(system,text(UiText::Language));language_=new QComboBox;language_->setAccessibleName(text(UiText::Language));language_->addItem("English (US)",1);language_->addItem("Portugues (BR)",0);language_->setCurrentIndex(c.language?0:1);langRow->addWidget(language_);
-        connect(language_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){engine_.edit([=](r6::Config& c){c.language=index==0?1:0;});dirty();QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});});
+        auto* langRow=settingRow(system,text(UiText::Language));language_=new QComboBox;language_->setAccessibleName(text(UiText::Language));language_->setIconSize(QSize(22,15));
+        for(const auto& entry:languageEntries())language_->addItem(languageFlag(entry.value),QString::fromUtf8(entry.label),entry.value);
+        language_->setCurrentIndex(qMax(0,language_->findData(c.language)));langRow->addWidget(language_);
+        connect(language_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){const int value=language_->itemData(index).toInt();engine_.edit([=](r6::Config& c){c.language=value;});dirty();if(value==6)QTimer::singleShot(0,this,[this]{showPalestineSurprise();});QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});});
         const QString titles[]={text(UiText::OpenHideWindow),text(UiText::RecoilToggle),text(UiText::RapidFireToggle),text(UiText::PanicExitKey),text(UiText::PrimaryWeapon),text(UiText::SecondaryWeapon)};const int keys[]={c.menu_key,c.recoil_key,c.rapid_key,c.panic_key,c.primary_key,c.secondary_key};
         for(int i=0;i<6;++i){auto* row=settingRow(system,titles[i],{},44);auto* button=new QPushButton(bindingName(keys[i]));button->setObjectName("keyButton");button->setFixedWidth(108);button->setAccessibleName(titles[i]);row->addWidget(button);key_buttons_[i]=button;connect(button,&QPushButton::clicked,this,[this,i]{bindKey(i);});}
         auto* phoneSection=new Section(text(UiText::PhoneControl),false,true,kbtheme::yellow);phoneSection->body->setSpacing(0);preferencesLayout->addWidget(phoneSection);
@@ -304,8 +308,21 @@ class MainWindow final : public QWidget {
         QElapsedTimer started;started.start();QTimer timer;timer.setInterval(16);connect(&timer,&QTimer::timeout,&dialog,[&]{if(started.elapsed()<1200)return;hint->setText(text(UiText::PressAKeyNow));for(int key=3;key<256;++key)if(keyDown(key)){if(key!=VK_ESCAPE){const auto existing=engine_.snapshot();if(key!=VK_BACK&&hotkeyConflict(existing,index,key)>=0){hint->setText(text(UiText::ThisKeyIsAlreadyAssignedChooseAnother));return;}engine_.edit([=](r6::Config& c){int* keys[]={&c.menu_key,&c.recoil_key,&c.rapid_key,&c.panic_key,&c.primary_key,&c.secondary_key};*keys[index]=key==VK_BACK?0:key;});dirty();save();}release_key_=key;blocked_until_=clock_.elapsed()+250;dialog.accept();break;}});
         timer.start();roundWindow(&dialog);dialog.exec();binding_=0;const auto c=engine_.snapshot();const int keys[]={c.menu_key,c.recoil_key,c.rapid_key,c.panic_key,c.primary_key,c.secondary_key};if(key_buttons_[index])key_buttons_[index]->setText(bindingName(keys[index]));syncSelection();updateStatus();
     }
+    void showPalestineSurprise(){
+        // The Hebrew picker entry is bait: the reveal is a Free Palestine popup.
+        if(palestine_popup_&&palestine_popup_->isVisible()){palestine_popup_->raise();palestine_popup_->activateWindow();return;}
+        auto* popup=new QDialog(this,Qt::Dialog|Qt::FramelessWindowHint);popup->setObjectName("palestinePopup");popup->setAttribute(Qt::WA_DeleteOnClose);popup->setWindowTitle("Free Palestine");
+        auto* layout=new QVBoxLayout(popup);layout->setContentsMargins(22,16,22,18);layout->setSpacing(6);
+        auto* flag=new QLabel;flag->setPixmap(palestineFlagPixmap(120,80));flag->setAlignment(Qt::AlignCenter);layout->addWidget(flag,0,Qt::AlignCenter);
+        auto* title=label("Free Palestine","cardTitle");title->setAlignment(Qt::AlignCenter);layout->addWidget(title);
+        auto* arabic=label(QString::fromUtf8("فلسطين حرة"),"palestineArabic");arabic->setAlignment(Qt::AlignCenter);layout->addWidget(arabic);
+        auto* hint=label(QString::fromUtf8("Palestine will be free · فلسطين حرة"),"hint");hint->setAlignment(Qt::AlignCenter);layout->addWidget(hint);
+        auto* close=new QPushButton("Free Palestine");close->setObjectName("save");layout->addWidget(close,0,Qt::AlignCenter);connect(close,&QPushButton::clicked,popup,&QDialog::close);
+        popup->setFixedWidth(340);popup->adjustSize();popup->move(mapToGlobal(rect().center())-popup->rect().center());roundWindow(popup);
+        palestine_popup_=popup;popup->show();popup->raise();popup->activateWindow();
+    }
     void help(){
-        QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setFixedSize(410,230);dialog.setWindowTitle(text(UiText::KingBoss2004Help));auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(24,18,24,22);
+        QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setFixedSize(410,230);dialog.setWindowTitle(text(UiText::AzecHelp));auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(24,18,24,22);
         auto* header=new QHBoxLayout;auto* title=label("","cardTitle");header->addWidget(title,1);auto* close=new IconButton(":/ui/close.svg",[this]{return accent();});close->setObjectName("closeControl");close->setAccessibleName(text(UiText::CloseQuickGuide));header->addWidget(close);layout->addLayout(header);connect(close,&QPushButton::clicked,&dialog,&QDialog::accept);
         auto* description=label("");description->setWordWrap(true);layout->addWidget(description,1);auto* row=new QHBoxLayout;auto* back=new QPushButton(text(UiText::Back));back->setObjectName("secondary");auto* next=new QPushButton(text(UiText::Next));next->setObjectName("save");auto* count=label("","hint");row->addWidget(back);row->addWidget(count,1,Qt::AlignCenter);row->addWidget(next);layout->addLayout(row);
         const QStringList titles={text(UiText::Welcome),text(UiText::ChooseAnOperator),text(UiText::AdjustRecoil),text(UiText::RapidFire),text(UiText::Appearance),text(UiText::HotkeysAndSaving)};
@@ -357,7 +374,7 @@ protected:
     }
 public:
     explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path):engine_(engine),config_path_(std::move(config_path)){
-        setObjectName("mainWindow");setWindowTitle("KingBoss2004");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setWindowIcon(operatorIcon("Ash"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(650,area.height()-48));move(area.center()-rect().center());
+        setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setWindowIcon(operatorIcon("Ash"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(650,area.height()-48));move(area.center()-rect().center());
         auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(46);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,10,0);top->setSpacing(5);
         top->addWidget(new BrandLabel);top->addStretch();status_=new QPushButton;status_->setObjectName("status");status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
         save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save();});
@@ -403,7 +420,7 @@ public:
     void closeUsingControl(){close_->click();}
     void setStartupNotice(const QString& message,bool blockSaving){save_blocked_=blockSaving;if(!message.isEmpty()){notice_->setText(message);notice_->show();}else if(!uniqueHotkeys(engine_.snapshot())){notice_->setText(text(UiText::ConflictingHotkeys));notice_->show();}}
     void closeForTimeout(){if(engine_.dry_run())force_close_=true;close();}
-#ifdef KINGBOSS_UI_TESTS
+#ifdef AZEC_UI_TESTS
     void finishVerification(){force_close_=true;close();}
     QJsonObject selfTest(const QString& output);
 #endif

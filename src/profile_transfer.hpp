@@ -14,7 +14,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
         {"secondaryEnabled",config.secondary_enabled[i]},{"secondaryInitialized",config.secondary_initialized[i]}});
     QJsonArray keys;for(const auto key:hotkeys(config))keys.append(key);
     QStringList names(favorites.begin(),favorites.end());names.sort();
-    return {{"application","KingBoss2004"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
+    return {{"application","Azec"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
         {"settings",QJsonObject{{"keys",keys},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
             {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",config.radius},
             {"accent",QJsonArray{config.neon[0],config.neon[1],config.neon[2]}}}}};
@@ -22,7 +22,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
 inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>& favorites){
     const auto number=[](const QJsonValue& value,double lo,double hi){return value.isDouble()&&std::isfinite(value.toDouble())&&value.toDouble()>=lo&&value.toDouble()<=hi;};
     const auto integer=[&](const QJsonValue& value,int lo,int hi){return number(value,lo,hi)&&std::floor(value.toDouble())==value.toDouble();};
-    if(root["application"]!="KingBoss2004"||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
+    if((root["application"]!="Azec"&&root["application"]!="KingBoss2004")||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
     const auto records=root["operators"].toArray();const auto settings=root["settings"].toObject();r6::Config next;
     if(records.size()!=r6::operator_count)return false;
     const auto profile=[&](const QJsonValue& record,r6::Operator& op){
@@ -40,7 +40,7 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
         if(next.secondary_enabled[id]&&!next.secondary_initialized[id])return false;
         seen.insert(name);
     }
-    if(!integer(settings["language"],0,1)||!integer(settings["selected"],0,r6::operator_count-1)||!number(settings["radius"],1,10000)||!settings["sound"].isBool()||!settings["rapidMaster"].isBool()||!settings["phoneEnabled"].isBool())return false;
+    if(!integer(settings["language"],0,8)||!integer(settings["selected"],0,r6::operator_count-1)||!number(settings["radius"],1,10000)||!settings["sound"].isBool()||!settings["rapidMaster"].isBool()||!settings["phoneEnabled"].isBool())return false;
     const auto keys=settings["keys"].toArray();const auto accent=settings["accent"].toArray();
     if(keys.size()!=6||accent.size()!=3)return false;
     int* destinations[]={&next.menu_key,&next.recoil_key,&next.rapid_key,&next.panic_key,&next.primary_key,&next.secondary_key};

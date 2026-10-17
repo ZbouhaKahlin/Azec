@@ -2,7 +2,7 @@
 
 ## Scope and architecture
 
-KingBoss2004 is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded local-network phone interface. Read `README.md` before changing behavior or packaging.
+Azec is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded local-network phone interface. Read `README.md` before changing behavior or packaging.
 
 - `src/app.cpp` / `src/startup.hpp`: startup, single-instance activation, configuration recovery, and verification dispatch.
 - `src/main_window.hpp`: desktop UI, settings, hotkeys, favorites, tray, and dialogs.
@@ -15,7 +15,7 @@ KingBoss2004 is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embed
 - `src/profile_store.hpp`: secondary weapon profiles and additional preferences in JSON.
 - `src/phone_server.hpp`: paired HTTP server and request validation.
 - `assets/phone.html`: self-contained mobile UI, embedded by `assets/operators.qrc`.
-- `src/launcher.cpp`: root launcher; runs `runtime/KingBoss2004.exe` with the launcher directory as its working directory.
+- `src/launcher.cpp`: root launcher; runs `runtime/Azec.exe` with the launcher directory as its working directory.
 - `tests/phone_test.py`: HTTP integration checks against an isolated dry-run instance.
 - `tests/core_checks.cpp` / `tests/ui_checks.cpp`: separate verification code, excluded from the release executable.
 
@@ -27,14 +27,14 @@ Use PowerShell from the project root. Requires Visual Studio 2022 C++ tools, a W
 .\build.cmd test
 ```
 
-This builds and deploys the app, creates the root launcher and separate verification executable, and runs core plus isolated HTTP/restart checks. Build intermediates belong in `.build/`; deployed binaries belong in `runtime/`. Exclude `runtime/KingBoss2004-checks.exe` from runnable releases.
+This builds and deploys the app, creates the root launcher and separate verification executable, and runs core plus isolated HTTP/restart checks. Build intermediates belong in `.build/`; deployed binaries belong in `runtime/`. Exclude `runtime/Azec-checks.exe` from runnable releases.
 
 Run UI checks in an isolated working directory because the checks write fixture configurations:
 
 ```powershell
 New-Item -ItemType Directory -Force .build\verification | Out-Null
 Push-Location .build\verification
-& '..\..\runtime\KingBoss2004.exe' --ui-self-test
+& '..\..\runtime\Azec.exe' --ui-self-test
 Pop-Location
 ```
 
@@ -47,7 +47,7 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 ## Data and behavior contracts
 
 - Preserve the original 3,734-byte primary configuration layout in `r6_config.bin`. Keep backward compatibility when adding features.
-- Store secondary profiles, weapon hotkeys, and the phone-access preference in `kingboss_weapons.json`. Favorites use `kingboss_ui.json`.
+- Store secondary profiles, weapon hotkeys, and the phone-access preference in `azec_weapons.json`. Favorites use `azec_ui.json`. Pre-rename `kingboss_*.json` files still load once and are superseded on the next save.
 - Each operator has a primary profile and an optional independent secondary profile. First enable copies primary settings; disabling preserves secondary edits. Character selection starts on primary.
 - Default weapon keys are 1 and 2 and are configurable. Weapon shortcuts must not interrupt text/number editing or Ctrl/Alt/Windows-key shortcuts.
 - Preserve fractional accumulation, timing, and SendInput behavior unless the requested change concerns them. Reset fractional movement when the active operator/weapon changes.
@@ -57,10 +57,10 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 ## UI contracts
 
 - The interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): chunky 2-3 px ink outlines, flat colour, hard offset ink shadows without blur, no gradients or glow. Retain the compact window, 200 px sidebar, custom window controls, rounded corners, the cream `#FFFAEE` canvas with white surfaces, the yellow `#FFDD59` header band, the GoofyUI purple default accent (`#7248D7`), and the stationary raised right panel.
-- Use bundled Geist for controls, operator names, and body text, and bundled Fredoka for display headings. The top-left King Boss wordmark is seven lines of ink ASCII artwork rendered with Consolas inside the existing header.
-- Header icons share 34 px hit targets and centered 20 px vector artwork. Hover changes only their ink subtly, without background tiles. Keep Save flat, without a glow, pulse, or checkmark swap; its tooltip confirms success. Keyboard focus draws a 2 px accent outline, not a background tile.
+- Use bundled Geist for controls, operator names, and body text, and bundled Fredoka for display headings. The top-left Azec wordmark uses the bundled Press Start 2P pixel font (white pixel lettering with a hard ink shadow) inside the existing header.
+- Header icons share 34 px hit targets and centered 20 px vector artwork. Controls never react to mouse hover anywhere (header icons, rows, buttons, sliders, scrollbars, and the phone page stay flat until pressed, focused, or selected; only context-menu items still highlight on hover). Keep Save flat, without a glow, pulse, or checkmark swap; its tooltip confirms success. Keyboard focus draws a 2 px accent outline, not a background tile.
 - Save stays neutral ink while saved and uses the current accent while unsaved, including after a failed save; text on the accent is chosen by luminance so it stays readable. Keep unsaved data state independent of temporary feedback. Pairing QR starts obscured, reveals on explicit click/keyboard activation, and conceals on leaving Settings, hiding the window, or changing the link.
-- Use 24 px outer window corners, 24 px panel corners, and 10-18 px button/input/card corners. Numbers are yellow mono chips, sliders have lavender pill tracks with white ink-rimmed handles, and switches are GoofyUI face toggles (lavender off, accent on, white knob showing `-` or `:)`). Preserve the existing layout and hit targets.
+- Use 24 px outer window corners, 24 px panel corners, and 10-18 px button/input/card corners. Numbers are yellow mono chips, sliders have lavender pill tracks with fully round white ink-rimmed handles (the slider keeps a 20 px minimum height so the handle is never clipped top or bottom), and switches are GoofyUI face toggles (lavender off, accent on, white knob showing `-` or `:)`). Preserve the existing layout and hit targets.
 - Sidebar groups and section headings render as GoofyUI stickers: slightly tilted colour chips (yellow, blue, pink, lime) with 2 px ink outlines.
 - Operator rows are 52 px tall with 44 px icons and 14 px Geist names; the selected row is a lavender pill with an ink outline. Keep long names readable within the existing sidebar width.
 - Favorites appear only when nonempty and matching search. Favorited operators are hidden from All operators, so each operator appears once. Removing a favorite returns it to All operators.
@@ -68,10 +68,13 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
 - Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds.
 - Reactive radius remains a supported setting. Do not remove it as a typography cleanup.
+- Nine language entries ship in the picker with painted flags: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` and every `phoneTexts` map in `assets/phone.html` must keep the full 112 / 80 keys in enum order; the `static_assert`s enforce the desktop count.
+- Localized text must never widen the fixed 200 px sidebar: sticker chips elide (`StickerLabel`), setting hints word-wrap, and `tests/ui_checks.cpp` asserts the sidebar fits for every language.
 
 ## Phone interface
 
 - Serve the self-contained phone page from the desktop app; keep it usable without external fonts, scripts, or internet access.
+- The phone page reuses the desktop GoofyUI materials: cream canvas, white cards with 3 px ink outlines and hard offset shadows, tilted sticker section chips, yellow number chips, embedded Fredoka, and face toggles. It has no hover effects either.
 - The phone uses the PC's LAN address, not its own localhost. Show the actual address and pairing code in desktop Settings.
 - Preserve session-token authorization, pairing rate limits, host/origin checks, request-size limits, and server disable behavior.
 - Validate values before applying them. Profile edits must carry explicit operator and weapon identifiers to avoid updating a different profile after concurrent selection changes.

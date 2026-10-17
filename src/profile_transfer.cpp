@@ -2,7 +2,7 @@
 #include "profile_transfer.hpp"
 
 void MainWindow::exportProfiles(){
-    const auto path=QFileDialog::getSaveFileName(this,text(UiText::ExportProfiles),"kingboss-profiles.json","JSON (*.json)",nullptr,QFileDialog::DontUseNativeDialog);
+    const auto path=QFileDialog::getSaveFileName(this,text(UiText::ExportProfiles),"azec-profiles.json","JSON (*.json)",nullptr,QFileDialog::DontUseNativeDialog);
     if(path.isEmpty())return;
     const auto bytes=QJsonDocument(makeBackup(engine_.snapshot(),favorites_)).toJson();QSaveFile file(path);
     if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){

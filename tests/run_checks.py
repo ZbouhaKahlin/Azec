@@ -9,7 +9,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / 'runtime' / 'KingBoss2004.exe'
+APP = ROOT / 'runtime' / 'Azec.exe'
 
 def start(folder):
     process = subprocess.Popen([str(APP), '--dry-run', '--phone-info=phone-info.json'], cwd=folder,
@@ -59,7 +59,7 @@ def run_http(parent):
         ash = next(op for op in state['operators'] if op['name'] == 'Ash')
         if not ash['dual'] or not ash['favorite'] or old_token == info['token']:
             raise RuntimeError('Restart did not preserve profiles/favorites and rotate session token')
-        weapons = json.loads((folder / 'kingboss_weapons.json').read_text())
+        weapons = json.loads((folder / 'azec_weapons.json').read_text())
         if abs(weapons['operators']['Ash']['vertical'] - 23.7) > .001:
             raise RuntimeError('Restart lost the secondary profile')
         (folder / 'restart-verification.json').write_text(json.dumps({'passed': True,
@@ -81,7 +81,7 @@ def run(ui=False,ui_only=False):
             fixture = Path(tempfile.mkdtemp(prefix='ui-' + scale + '-', dir=parent))
             env = os.environ.copy()
             env['QT_SCALE_FACTOR'] = scale
-            subprocess.run([str(ROOT / 'runtime' / 'KingBoss2004-checks.exe'), '--ui-self-test'], cwd=fixture, env=env, check=True, timeout=150)
+            subprocess.run([str(ROOT / 'runtime' / 'Azec-checks.exe'), '--ui-self-test'], cwd=fixture, env=env, check=True, timeout=150)
             report = json.loads((fixture / 'ui-verification.json').read_text())
             if not report['passed']:
                 raise RuntimeError('UI report failed at scale ' + scale)

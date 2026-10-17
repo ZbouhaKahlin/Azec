@@ -1,3 +1,2 @@
 @echo off
-cd /d "%~dp0"
-start "" "%~dp0KingBoss2004.exe"
+start "" "%~dp0Azec.exe"

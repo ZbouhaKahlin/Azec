@@ -1,10 +1,10 @@
-# KingBoss2004
+# Azec
 
 Private Windows x64 desktop application with operator profiles, optional primary/secondary weapon settings, favorites, and paired phone controls.
 
 ## Quick start
 
-- **Run:** download and extract the Windows package from [Releases](https://github.com/Azec-Zuckerberg/KingBoss2004/releases/latest), then open `KingBoss2004.exe`. Keep its `runtime` directory alongside it.
+- **Run:** download and extract the Windows package from [Releases](https://github.com/Azec-Zuckerberg/KingBoss2004/releases/latest), then open `Azec.exe`. Keep its `runtime` directory alongside it.
 - **Build from source:** clone this repository, install Visual Studio 2022 C++ tools and the Windows SDK, run `setup-qt.ps1`, then run `.\build.cmd test`.
 - **Phone:** open desktop Settings → Phone control and use the displayed address and pairing code in Safari on the same Wi-Fi.
 - **Contributing agents:** read [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports the same instructions.
@@ -15,11 +15,21 @@ The repository contains source, embedded assets, tests, scripts, and licenses. G
 
 C++ / Qt 6 desktop interface for the recovered R6 behavior. The window is 864 × 650 at 100% display scale, with screen-fit sizing at higher scales, rounded outer corners, a custom title bar, a 200 px operator sidebar, and Settings inside the main window.
 
-The interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): a cream `#FFFAEE` canvas under a yellow `#FFDD59` header band, white surfaces with chunky ink (`#31204C`) outlines, flat colour, and hard offset ink shadows instead of blur. Live state uses the user-selectable accent, which ships as GoofyUI purple (`#7248D7`). Both pages live inside one stationary rounded white panel with a 3 px ink outline. Settings navigation crossfades over 180 ms. Controls use bundled Geist (13 px base, 14 px rows) with Fredoka display headings; operator rows are 52 px tall with 14 px Geist names and 44 px icons, and selection is a lavender pill with an ink outline. Group and section headings are GoofyUI stickers: slightly tilted colour chips with ink outlines. The King Boss wordmark is actual seven-line ink ASCII artwork, rendered with Consolas inside the yellow header. All header controls use centered 20 px vector icons inside matching 34 px hit targets, with a subtle 140 ms ink-only hover fade. Clicking switches does not add an outer focus ring; keyboard navigation keeps a 2 px accent outline. Switches are GoofyUI face toggles — lavender when off, accent when on, with a white knob showing `-` or `:)`. Sliders use lavender pill tracks with white ink-rimmed handles, and numeric fields are yellow mono chips. Window corners have a 24 px radius, panel corners 24 px, and buttons and inputs use 10-18 px corners. Reactive radius remains available in Appearance. Operator changes apply a gentle 120 ms fade only to the new icon and name; the selected profile and controls update immediately, including during rapid switching.
+The interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): a cream `#FFFAEE` canvas under a yellow `#FFDD59` header band, white surfaces with chunky ink (`#31204C`) outlines, flat colour, and hard offset ink shadows instead of blur. Live state uses the user-selectable accent, which ships as GoofyUI purple (`#7248D7`). Both pages live inside one stationary rounded white panel with a 3 px ink outline. Settings navigation crossfades over 180 ms. Controls use bundled Geist (13 px base, 14 px rows) with Fredoka display headings; operator rows are 52 px tall with 14 px Geist names and 44 px icons, and selection is a lavender pill with an ink outline. Group and section headings are GoofyUI stickers: slightly tilted colour chips with ink outlines. The Azec wordmark is rendered in the bundled Press Start 2P pixel font — chunky white pixel lettering with a hard ink shadow inside the yellow header. All header controls use centered 20 px vector icons inside matching 34 px hit targets and stay flat until pressed, focused, or selected. Clicking switches does not add an outer focus ring; keyboard navigation keeps a 2 px accent outline. Switches are GoofyUI face toggles — lavender when off, accent when on, with a white knob showing `-` or `:)`. Sliders use lavender pill tracks with white ink-rimmed handles, and numeric fields are yellow mono chips. Window corners have a 24 px radius, panel corners 24 px, and buttons and inputs use 10-18 px corners. Reactive radius remains available in Appearance. Operator changes apply a gentle 120 ms fade only to the new icon and name; the selected profile and controls update immediately, including during rapid switching.
+
+## Screenshots
+
+![Azec desktop interface](docs/ui-desktop.png)
+
+The desktop window: a yellow header band with the pixel-font Azec wordmark, the 200 px operator sidebar, and operator settings with GoofyUI sticker headings and fully round slider handles.
+
+![Azec phone page](docs/ui-phone.png)
+
+The paired phone page reuses the same GoofyUI materials: cream canvas, white cards with chunky ink outlines and hard offset shadows, sticker section chips, yellow number chips, and face toggles.
 
 ## Run
 
-Double-click **KingBoss2004.exe**, or **Run.cmd**.
+Double-click **Azec.exe**, or **Run.cmd**.
 
 Keep the **runtime** directory alongside the launcher. It contains the actual application and the Qt libraries it needs; Qt does not need to be installed to run this packaged copy on this computer. The standard Visual C++ runtime is required on another computer.
 
@@ -30,13 +40,13 @@ Keep the **runtime** directory alongside the launcher. It contains the actual ap
 - **1 / 2:** select primary / secondary weapon when separate profiles are enabled for that operator. Both keys can be changed in Settings.
 - Arrow keys make 0.1-step recoil adjustments while this window is active and a text/number field is not being edited.
 
-Click an operator's icon/name to edit its profile. Right-click an operator for a compact Favorite / Remove favorite context-menu action with an outlined star. There is no nested push button; the action's quiet hover stays inset from the menu edge. Favorited operators move out of All operators into Favorites and return when unfavorited; each operator appears once. Both groups share one scrolling sidebar and follow the search field. The entire Favorites group is hidden when empty or when none match the search, with no placeholder or reserved space. Favorites save automatically to `kingboss_ui.json` beside the launcher and reload on startup.
+Click an operator's icon/name to edit its profile. Right-click an operator for a compact Favorite / Remove favorite context-menu action with an outlined star. There is no nested push button; the action's quiet hover stays inset from the menu edge. Favorited operators move out of All operators into Favorites and return when unfavorited; each operator appears once. Both groups share one scrolling sidebar and follow the search field. The entire Favorites group is hidden when empty or when none match the search, with no placeholder or reserved space. Favorites save automatically to `azec_ui.json` beside the launcher and reload on startup.
 
 Enable **Separate secondary profile** on an operator to add independent secondary recoil, humanization, rapid-fire, and delay settings. The first secondary profile starts as a copy of that operator's primary settings. Use the Primary / Secondary buttons or the configurable 1 / 2 keys to switch. Disabling secondary mode restores the primary profile and keeps the secondary edits for later. Selecting another operator starts on primary. Weapon shortcuts ignore number/text editing and Ctrl/Alt/Windows-key combinations.
 
 The weapon tabs expand/collapse with a 220 ms height and opacity transition, and their selection highlights fade over 160 ms. Profile changes apply immediately. Repeated toggles reverse from the displayed position and settle on the last choice.
 
-The Save button stores primary settings in the original compatible `r6_config.bin` and secondary profiles, weapon keys, and the phone-access preference in `kingboss_weapons.json`. Primary saves write and flush a temporary file before replacing the destination. Rejected primary configurations are preserved as `r6_config.corrupt-<timestamp>.bin` with a visible notice. Read/preservation failures block saving to protect the existing file.
+The Save button stores primary settings in the original compatible `r6_config.bin` and secondary profiles, weapon keys, and the phone-access preference in `azec_weapons.json`. Files written before the rename (`kingboss_weapons.json`, `kingboss_ui.json`) still load once and are superseded on the next save. Primary saves write and flush a temporary file before replacing the destination. Rejected primary configurations are preserved as `r6_config.corrupt-<timestamp>.bin` with a visible notice. Read/preservation failures block saving to protect the existing file.
 
 Only one instance may use a configuration directory. Launching another copy brings the existing window forward. Separate fixture directories remain independent. A tray icon offers Open/hide, Recoil active, Global rapid fire, and Exit. Ordinary closing asks Save / Discard / Cancel when changes are unsaved; failed saves keep the app open. Every nonempty hotkey must be unique across all six actions.
 
@@ -54,7 +64,7 @@ The phone page edits the same in-memory profiles and global settings as the desk
 
 Phone access can be disabled in Settings. Pairing codes and tokens change when the app restarts. API calls require the session token, pairing attempts are rate-limited, and foreign origins/hosts are rejected. The app does not configure router forwarding or expose a public service. This HTTP control page is intended for a trusted local network.
 
-Pairing throttling uses a bounded, expiring per-IP table and a monotonic 60-second window. It does not block correctly authenticated requests. Pairing codes and bearer tokens use a fixed-work comparison for equal-length values. The phone page follows the selected English/Portuguese language and retains its token only in browser session storage.
+Pairing throttling uses a bounded, expiring per-IP table and a monotonic 60-second window. It does not block correctly authenticated requests. Pairing codes and bearer tokens use a fixed-work comparison for equal-length values. The phone page follows the selected desktop language (English, Portuguese, French, Spanish, German, Arabic, Hebrew, Chinese, Japanese) and retains its token only in browser session storage.
 
 The page includes a manifest, standalone-mode hints, and locally generated home-screen icons. Use your browser's Add to Home Screen action where available. Full PWA installation/promotion depends on the browser and its HTTPS requirements; a LAN HTTP address cannot guarantee it. The PC app and local network are still required, even when opening a home-screen shortcut.
 
@@ -66,9 +76,9 @@ Settings use `r6_config.bin` in the launcher directory. Existing valid files rem
 
 The supplied operator folder provides 70 matching icons. Ace uses its real icon from [r6operators](https://github.com/marcopixel/r6operators/tree/master/operators/ace). All 71 SVG icons are embedded, without generated tiles or initials placeholders; the Downloads folder is not needed at runtime. All 71 operators support an optional secondary weapon profile.
 
-Desktop text uses embedded Geist fonts with Fredoka display headings, and Windows Consolas for ASCII artwork and connection details. Fonts work without installation or internet access. Font and additional icon licenses are retained in `licenses/Geist`, `licenses/Fredoka`, and `licenses/r6operators`.
+Desktop text uses embedded Geist fonts with Fredoka display headings, the bundled Press Start 2P pixel font for the Azec wordmark, and Windows Consolas for connection details. Fonts work without installation or internet access. Font and additional icon licenses are retained in `licenses/Geist`, `licenses/Fredoka`, `licenses/PressStart2P`, and `licenses/r6operators`.
 
-Desktop application strings live in `src/strings.hpp`, including Portuguese labels for bundled Qt color/file dialogs. Favorites now include schema version 1 while still accepting existing unversioned files. Save/server/profile-load diagnostics go to `kingboss.log`, capped at 256 KiB with one rotated backup. Request bodies and pairing secrets are never logged. Background dots repaint only after cursor or appearance changes; operator pixmaps share a bounded Qt cache.
+Desktop application strings live in `src/strings.hpp` (lookup and enum), one table per language in `src/lang_*.hpp` (English, Portuguese, French, Spanish, German, Arabic, the Arabic "Free Palestine" prank behind the Hebrew picker entry, Simplified Chinese, Japanese), and painted flag icons in `src/flags.hpp`; picking Hebrew shows the Israel flag, then reveals a Free Palestine popup with the Palestine flag and switches every label to Arabic prank text. Portuguese labels for bundled Qt color/file dialogs stay in `strings.hpp`. The phone dictionary in `assets/phone.html` covers the same languages, with RTL layout for Arabic. Favorites now include schema version 1 while still accepting existing unversioned files. Save/server/profile-load diagnostics go to `azec.log`, capped at 256 KiB with one rotated backup. Request bodies and pairing secrets are never logged. Background dots repaint only after cursor or appearance changes; operator pixmaps share a bounded Qt cache.
 
 ## Mouse output
 
@@ -103,13 +113,13 @@ The second command runs core checks, builds a separate UI verification executabl
 - `src/launcher.cpp`: starts the packaged app with the correct working directory.
 - `tests/core_checks.cpp`, `tests/ui_checks.cpp`, and `tests/run_checks.py`: verification code and isolated runners.
 
-Project Nayuki QR-Code-generator v1.8.0 is vendored under `third_party/qrcodegen`; its MIT notice is retained in `licenses/qrcodegen`. Runnable releases include the root launcher, `runtime/`, and licenses, excluding the developer-only `runtime/KingBoss2004-checks.exe` and local settings/logs/credentials.
+Project Nayuki QR-Code-generator v1.8.0 is vendored under `third_party/qrcodegen`; its MIT notice is retained in `licenses/qrcodegen`. Runnable releases include the root launcher, `runtime/`, and licenses, excluding the developer-only `runtime/Azec-checks.exe` and local settings/logs/credentials.
 
 Qt is dynamically linked. Its license texts are in `licenses/Qt`; upstream source for the pinned release is available from [Qt Base](https://code.qt.io/cgit/qt/qtbase.git/tree/?h=v6.8.3) and [Qt SVG](https://code.qt.io/cgit/qt/qtsvg.git/tree/?h=v6.8.3). Deployment uses [windeployqt](https://doc.qt.io/qt-6/windows-deployment.html).
 
 ## Verification
 
-The current verification passed 19 core checks, 119 UI checks at both 100% and 150% display scaling, 37 HTTP checks, 10 recovery checks, and restart/single-instance checks. Separate motion captures verify continuous phone reversals, fixed toggle-row height, and transparent transition backgrounds at both scales; timing-only runs omit capture overhead. Core coverage includes malformed/truncated/random input and preservation of the previous file after a failed atomic replacement. UI coverage includes the existing layout/interaction contracts plus QR conceal/reveal and animation reversal, smooth weapon tabs, in-place phone toggles with anchored or bottom-clamped scrolling, custom-accent Save states and save failures, close cancellation, backup validation, hotkey collisions, and stationary-cursor repaint suppression.
+The current verification passed 19 core checks, 122 UI checks at both 100% and 150% display scaling, 37 HTTP checks, 11 recovery checks, and restart/single-instance checks. Separate motion captures verify continuous phone reversals, fixed toggle-row height, and transparent transition backgrounds at both scales; timing-only runs omit capture overhead. Core coverage includes malformed/truncated/random input and preservation of the previous file after a failed atomic replacement. UI coverage includes the existing layout/interaction contracts plus QR conceal/reveal and animation reversal, smooth weapon tabs, in-place phone toggles with anchored or bottom-clamped scrolling, custom-accent Save states and save failures, close cancellation, backup validation, hotkey collisions, and stationary-cursor repaint suppression.
 
 Phone checks cover pairing, authorization, invalid values/types/slots/hosts/origins, body limits, profile isolation, global round-trips, icons/manifest, persistence, lockout isolation, and rate-limit recovery. A browser at phone width exercised pairing, secondary edits, saving, language switching, and 71 unique operator options without horizontal overflow. Revealed QR screenshots decoded successfully in software at both scales, while concealed screenshots did not decode. A physical phone scan, actual network-address change, and real mouse output/in-game behavior were not tested.
 
@@ -120,11 +130,11 @@ UI verification disables all SendInput calls:
 ```powershell
 New-Item -ItemType Directory -Force .build\verification | Out-Null
 Push-Location .build\verification
-& '..\..\runtime\KingBoss2004.exe' --ui-self-test
+& '..\..\runtime\Azec.exe' --ui-self-test
 Pop-Location
 ```
 
-Run `build.cmd test` first to create `runtime/KingBoss2004-checks.exe`. The normal runtime delegates `--ui-self-test` to that separate executable; verification code is absent from the release application. To automate both isolated display-scale runs, use `python tests/run_checks.py --ui-only`.
+Run `build.cmd test` first to create `runtime/Azec-checks.exe`. The normal runtime delegates `--ui-self-test` to that separate executable; verification code is absent from the release application. To automate both isolated display-scale runs, use `python tests/run_checks.py --ui-only`.
 
 For animation inspection, run `--ui-self-test --motion-only` in a fresh fixture directory. It records local frame sequences and timing/geometry samples for phone toggles, reversals, and QR reveal/conceal. Add `--motion-timing-only` to measure GUI responsiveness without frame-capture overhead. Keep these captures local because they include temporary pairing details.
 

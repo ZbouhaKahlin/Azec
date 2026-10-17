@@ -6,7 +6,7 @@
 inline void diagnostic(const QString& operation, const QString& detail) {
     static std::mutex mutex;
     const std::lock_guard guard(mutex);
-    const QString path=QDir::current().filePath("kingboss.log");
+    const QString path=QDir::current().filePath("azec.log");
     if(QFileInfo(path).size()>256*1024){QFile::remove(path+".1");QFile::rename(path,path+".1");}
     QFile file(path);
     if(file.open(QIODevice::WriteOnly|QIODevice::Append|QIODevice::Text)){

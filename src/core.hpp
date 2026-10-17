@@ -33,7 +33,7 @@ struct Config {
     std::uint8_t rapid_master = 1;
     float neon[3] = {0.0f, 1.0f, 0.4f};
     float radius = 130.0f;
-    // Extensions live in kingboss_weapons.json; bytes() retains the original layout.
+    // Extensions live in azec_weapons.json; bytes() retains the original layout.
     std::array<Operator, operator_count> secondary;
     std::array<bool, operator_count> secondary_enabled{}, secondary_initialized{};
     int weapon_slot = 0, primary_key = '1', secondary_key = '2';

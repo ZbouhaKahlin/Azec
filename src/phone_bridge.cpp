@@ -45,7 +45,7 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
             for(auto it=values.begin();it!=values.end();++it){const auto key=it.key();const auto value=it.value();
                 if((key=="recoilMaster"||key=="rapidMaster"||key=="recoilActive"||key=="sound")&&value.isBool()){
                     if(key=="recoilMaster")master=value.toBool();else if(key=="rapidMaster")rapid=value.toBool();else if(key=="recoilActive")active=value.toBool();else {next.sound=value.toBool();rebuild=true;}
-                }else if(key=="language"&&validInteger(value,0,1)){next.language=value.toInt();rebuild=true;}
+                }else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
                 else if(key=="radius"&&validNumber(value,50,400)){next.radius=float(value.toDouble());rebuild=true;}
                 else if(key=="accent"&&value.isString()&&QRegularExpression("^#[0-9a-fA-F]{6}$").match(value.toString()).hasMatch()){const QColor color(value.toString());next.neon[0]=color.redF();next.neon[1]=color.greenF();next.neon[2]=color.blueF();rebuild=true;}
                 else if(key.startsWith("key")&&key.size()==4&&key[3]>='0'&&key[3]<='5'&&validInteger(value,0,255)){int* keys[]={&next.menu_key,&next.recoil_key,&next.rapid_key,&next.panic_key,&next.primary_key,&next.secondary_key};*keys[key[3].digitValue()]=value.toInt();rebuild=keysChanged=true;}

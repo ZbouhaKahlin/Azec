@@ -18,18 +18,18 @@ cd /d "%~dp0"
 set "PATH=%NEON_QT_ROOT%\bin;%PATH%"
 if not exist .build\qt mkdir .build\qt
 pushd .build\qt
-"%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0KingBoss2004.pro" -o Makefile
+"%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0Azec.pro" -o Makefile
 if errorlevel 1 exit /b 1
 nmake /nologo
 if errorlevel 1 exit /b 1
 popd
 if not exist runtime mkdir runtime
-copy /y ".build\qt\release\KingBoss2004.exe" "runtime\KingBoss2004.exe" > nul
+copy /y ".build\qt\release\Azec.exe" "runtime\Azec.exe" > nul
 if errorlevel 1 exit /b 1
-"%NEON_QT_ROOT%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-compiler-runtime --skip-plugin-types generic,networkinformation,tls,styles --dir "%~dp0runtime" "%~dp0runtime\KingBoss2004.exe"
+"%NEON_QT_ROOT%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-compiler-runtime --skip-plugin-types generic,networkinformation,tls,styles --dir "%~dp0runtime" "%~dp0runtime\Azec.exe"
 if errorlevel 1 exit /b 1
 pushd .build
-cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp /Fe:"..\KingBoss2004.exe" /link /SUBSYSTEM:WINDOWS user32.lib
+cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp /Fe:"..\Azec.exe" /link /SUBSYSTEM:WINDOWS user32.lib
 if errorlevel 1 exit /b 1
 if /I "%~1"=="test" (
     cl /nologo /std:c++17 /O2 /EHsc /MT /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS ..\tests\core_test.cpp ..\tests\core_checks.cpp ..\src\core.cpp /Fe:core-tests.exe
@@ -41,14 +41,14 @@ popd
 if /I "%~1"=="test" (
     if not exist .build\verification-build mkdir .build\verification-build
     pushd .build\verification-build
-    "%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0KingBoss2004.pro" CONFIG+=verification -o Makefile
+    "%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0Azec.pro" CONFIG+=verification -o Makefile
     if errorlevel 1 exit /b 1
     nmake /nologo
     if errorlevel 1 exit /b 1
     popd
-    copy /y ".build\verification-build\release\KingBoss2004-checks.exe" "runtime\KingBoss2004-checks.exe" > nul
+    copy /y ".build\verification-build\release\Azec-checks.exe" "runtime\Azec-checks.exe" > nul
     if errorlevel 1 exit /b 1
     python tests\run_checks.py
     if errorlevel 1 exit /b 1
 )
-echo Build complete: KingBoss2004.exe
+echo Build complete: Azec.exe
