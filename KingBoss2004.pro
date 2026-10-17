@@ -1,0 +1,13 @@
+QT += core gui widgets svg network
+CONFIG += c++17 release
+CONFIG -= debug debug_and_release
+TEMPLATE = app
+TARGET = KingBoss2004
+DESTDIR = $$OUT_PWD/release
+SOURCES += src/app.cpp src/engine.cpp src/core.cpp
+HEADERS += src/engine.hpp src/core.hpp src/ui_widgets.hpp src/profile_store.hpp src/phone_server.hpp
+RESOURCES += assets/operators.qrc
+DEFINES += NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS
+LIBS += -luser32 -lgdi32 -ldwmapi
+QMAKE_CXXFLAGS += /utf-8
+QMAKE_LFLAGS += /MANIFEST:EMBED
