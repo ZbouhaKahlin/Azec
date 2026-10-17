@@ -219,6 +219,12 @@ QJsonObject MainWindow::selfTest(const QString& output){
         editOperator([](r6::Operator& op){op.vertical=13.1f;});
         QTimer::singleShot(80,this,[this,output]{if(auto* modal=QApplication::activeModalWidget()){modal->grab().save(output+"/unsaved-close.png");if(auto* cancel=modal->findChild<QPushButton*>("cancelClose"))cancel->click();}});
         close();checks["cancel_close_keeps_unsaved_app_running"]=isVisible()&&engine_.running&&unsaved_;
+        bool repeat_surfaced=false,repeat_kept_app=false;
+        QTimer::singleShot(80,this,[this]{close();});
+        QTimer::singleShot(130,this,[&]{repeat_surfaced=close_alert_!=nullptr&&QApplication::activeModalWidget()==close_alert_;});
+        QTimer::singleShot(180,this,[]{if(auto* modal=QApplication::activeModalWidget())if(auto* cancel=modal->findChild<QPushButton*>("cancelClose"))cancel->click();});
+        close();repeat_kept_app=isVisible()&&engine_.running&&unsaved_;
+        checks["repeat_close_surfaces_prompt_again"]=repeat_surfaced&&repeat_kept_app;
         save_blocked_=true;QTimer::singleShot(80,this,[]{if(auto* modal=QApplication::activeModalWidget())if(auto* button=modal->findChild<QPushButton*>("save"))button->click();});
         close();checks["failed_save_during_close_keeps_window_open"]=isVisible()&&engine_.running&&unsaved_;save_blocked_=false;
         engine_.edit([&](r6::Config& config){config=baseline;});applyStyle();syncSelection();dirty();save();wait(1800);

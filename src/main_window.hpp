@@ -67,6 +67,7 @@ class MainWindow final : public QWidget {
     QSystemTrayIcon* tray_=nullptr;
     QMenu* tray_menu_=nullptr;
     QAction *tray_window_=nullptr,*tray_recoil_=nullptr,*tray_rapid_=nullptr,*tray_exit_=nullptr;
+    QDialog* close_alert_=nullptr;
     bool unsaved_=false,force_close_=false,close_prompt_=false,save_blocked_=false;
     QPoint last_cursor_{-10000,-10000};
     QDoubleSpinBox *vertical_=nullptr,*horizontal_=nullptr;QSpinBox* delay_=nullptr;
@@ -391,15 +392,17 @@ protected:
     }
     void hideEvent(QHideEvent* event) override {if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);}
     void closeEvent(QCloseEvent* event) override {
-        if(close_prompt_){event->ignore();return;}
+        if(close_prompt_){if(!isVisible())showNormal();raise();activateWindow();QApplication::alert(this,0);if(close_alert_&&close_alert_->isVisible()){close_alert_->raise();close_alert_->activateWindow();}event->ignore();return;}
         if(unsaved_&&!force_close_){
             close_prompt_=true;const bool recoil=engine_.recoil_active.exchange(false),rapid=engine_.rapid_master.exchange(false);
+            if(!isVisible())showNormal();
+            raise();activateWindow();QApplication::alert(this,0);
             QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setObjectName("unsavedDialog");dialog.setWindowTitle(text(UiText::UnsavedChanges));dialog.setFixedWidth(390);
             auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(22,20,22,20);layout->setSpacing(18);
             layout->addWidget(label(text(UiText::SaveYourChangesBeforeClosing),"rowTitle"));
             auto* row=new QHBoxLayout;int choice=0;
             for(int i=0;i<3;++i){const QString titles[]={text(UiText::Cancel),text(UiText::Discard),text(UiText::Save)};auto* button=new QPushButton(titles[i]);button->setObjectName(i==2?"save":i==1?"discardChanges":"cancelClose");row->addWidget(button);connect(button,&QPushButton::clicked,&dialog,[&,i]{choice=i;dialog.accept();});}
-            layout->addLayout(row);dialog.adjustSize();roundWindow(&dialog);dialog.exec();
+            layout->addLayout(row);dialog.adjustSize();roundWindow(&dialog);close_alert_=&dialog;dialog.exec();close_alert_=nullptr;
             engine_.recoil_active=recoil;engine_.rapid_master=rapid;close_prompt_=false;
             if(choice==0||(choice==2&&!save())){event->ignore();return;}
         }
