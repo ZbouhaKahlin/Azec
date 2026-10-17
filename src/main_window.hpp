@@ -165,9 +165,9 @@ class MainWindow final : public QWidget {
     }
     QLabel* label(const QString& text,const char* role="rowTitle"){auto* result=new QLabel(text);result->setObjectName(role);return result;}
     QHBoxLayout* settingRow(Section* section,const QString& title,const QString& description={},int height=44){
-        auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(height);auto* row=new QHBoxLayout(widget);row->setContentsMargins(14,5,12,5);row->setSpacing(12);
-        auto* text=new QWidget;auto* column=new QVBoxLayout(text);column->setContentsMargins(0,0,0,0);column->setSpacing(3);column->addWidget(label(title));
-        if(!description.isEmpty())widget->setToolTip(description);
+        auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(description.isEmpty()?height:56);auto* row=new QHBoxLayout(widget);row->setContentsMargins(14,8,12,8);row->setSpacing(12);
+        auto* text=new QWidget;auto* column=new QVBoxLayout(text);column->setContentsMargins(0,0,0,0);column->setSpacing(2);column->addWidget(label(title));
+        if(!description.isEmpty()){column->addWidget(label(description,"rowHint"));widget->setToolTip(description);}
         row->addWidget(text,1);section->body->addWidget(widget);return row;
     }
     Toggle* toggle(QHBoxLayout* row,const QString& title,bool checked,const std::function<void(bool)>& callback){
@@ -186,11 +186,11 @@ class MainWindow final : public QWidget {
     void applyStyle(){setStyleSheet(applicationStyle(accent()));operators_->viewport()->update();favorites_list_->viewport()->update();update();}
     void buildSettings(){
         refreshing_=true;const auto c=engine_.snapshot();if(settings_){scroll_->takeWidget();delete settings_;}
-        settings_=new QWidget;settings_->setObjectName("settingsContent");cards_=new QVBoxLayout(settings_);cards_->setContentsMargins(0,0,8,10);cards_->setSpacing(10);
+        settings_=new QWidget;settings_->setObjectName("settingsContent");cards_=new QVBoxLayout(settings_);cards_->setContentsMargins(2,0,10,12);cards_->setSpacing(10);
         auto* weapons=new Section(text(UiText::WeaponProfiles),false,true);weapons->body->setSpacing(0);cards_->addWidget(weapons);
         dual_=toggle(settingRow(weapons,text(UiText::SeparateSecondaryProfile),text(UiText::Use1And2ToSwitchWeaponProfilesChangeTheKeysInSettings)),"Separate secondary profile",c.secondary_enabled[c.selected],[this](bool on){engine_.edit([&](r6::Config& c){c.enable_secondary(c.selected,on);c.weapon_slot=on?1:0;});dirty();syncSelection();});
-        auto* weaponChoices=new QWidget;auto* choices=new QHBoxLayout(weaponChoices);choices->setContentsMargins(0,8,0,2);choices->setSpacing(6);
-        primary_=new WeaponButton([this]{return accent();});secondary_=new WeaponButton([this]{return accent();});for(auto* button:{primary_,secondary_})choices->addWidget(button);choices->addStretch();weapon_selector_=new ExpandingContent(weaponChoices);weapons->body->addWidget(weapon_selector_);
+        auto* weaponChoices=new QWidget;auto* choices=new QHBoxLayout(weaponChoices);choices->setContentsMargins(0,0,0,0);choices->setSpacing(6);
+        primary_=new WeaponButton([this]{return accent();});secondary_=new WeaponButton([this]{return accent();});for(auto* button:{primary_,secondary_})choices->addWidget(button);choices->addStretch();auto* weaponBox=new QWidget;auto* weaponBoxLayout=new QVBoxLayout(weaponBox);weaponBoxLayout->setContentsMargins(0,8,0,0);weaponBoxLayout->setSpacing(0);weaponBoxLayout->addWidget(weaponChoices);weapon_selector_=new ExpandingContent(weaponBox);weapons->body->addWidget(weapon_selector_);
         connect(primary_,&QPushButton::clicked,this,[this]{chooseWeapon(0);});connect(secondary_,&QPushButton::clicked,this,[this]{chooseWeapon(1);});
         auto* recoil=new Section(text(UiText::RecoilControl),false,true);cards_->addWidget(recoil);
         recoil_master_=toggle(settingRow(recoil,text(UiText::MasterEnable),text(UiText::ApplyThisOperatorSRecoilSettings)),"Master recoil enable",engine_.recoil_master,[this](bool on){engine_.recoil_master=on;});
@@ -208,7 +208,7 @@ class MainWindow final : public QWidget {
         if(!preferences_)return;
         refreshing_=true;const auto c=engine_.snapshot();
         delete preferences_scroll_->takeWidget();auto* content=new QWidget;
-        auto* preferencesLayout=new QVBoxLayout(content);preferencesLayout->setContentsMargins(0,0,8,0);preferencesLayout->setSpacing(16);
+        auto* preferencesLayout=new QVBoxLayout(content);preferencesLayout->setContentsMargins(2,0,10,0);preferencesLayout->setSpacing(14);
         auto* system=new Section(text(UiText::SystemSettings),false,true);system_=system;preferencesLayout->addWidget(system);
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::BeepWhenHotkeyStatesChange)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         auto* langRow=settingRow(system,text(UiText::Language));language_=new QComboBox;language_->setAccessibleName(text(UiText::Language));language_->addItem("English (US)",1);language_->addItem("Portugues (BR)",0);language_->setCurrentIndex(c.language?0:1);langRow->addWidget(language_);
@@ -236,7 +236,7 @@ class MainWindow final : public QWidget {
         auto* colorRow=settingRow(appearance,text(UiText::AccentColor),text(UiText::UsedForSwitchesAndSelectedStates));auto* color=new QPushButton(accent().name().toUpper());color->setObjectName("secondary");color->setAccessibleName(text(UiText::AccentColor));colorRow->addWidget(color);
         connect(color,&QPushButton::clicked,this,[this,color]{const auto next=chooseColor();if(next.isValid()){engine_.edit([=](r6::Config& c){c.neon[0]=next.redF();c.neon[1]=next.greenF();c.neon[2]=next.blueF();});color->setText(next.name().toUpper());applyStyle();dirty();}});
         auto* radiusRow=settingRow(appearance,text(UiText::ReactiveRadius),text(UiText::MouseResponseInTheBackground));auto* radius=new QSlider(Qt::Horizontal);radius->setRange(50,400);radius->setValue(qRound(c.radius));radius->setAccessibleName(text(UiText::ReactiveRadius));radiusRow->addWidget(radius,1);connect(radius,&QSlider::valueChanged,this,[this](int n){engine_.edit([=](r6::Config& c){c.radius=float(n);});dirty();});
-        auto* reset=new QPushButton(text(UiText::ResetAppearance));reset->setObjectName("secondary");appearance->body->addWidget(reset,0,Qt::AlignLeft);connect(reset,&QPushButton::clicked,this,[this]{engine_.edit([](r6::Config& c){c.neon[0]=1;c.neon[1]=91.f/255;c.neon[2]=99.f/255;c.radius=130;});applyStyle();dirty();QTimer::singleShot(0,this,[this]{buildPreferences();});});
+        auto* reset=new QPushButton(text(UiText::ResetAppearance));reset->setObjectName("secondary");appearance->body->addWidget(reset,0,Qt::AlignLeft);connect(reset,&QPushButton::clicked,this,[this]{engine_.edit([](r6::Config& c){c.neon[0]=210.f/255;c.neon[1]=210.f/255;c.neon[2]=210.f/255;c.radius=130;});applyStyle();dirty();QTimer::singleShot(0,this,[this]{buildPreferences();});});
         auto* guide=new QPushButton(text(UiText::QuickGuide));guide->setObjectName("secondary");preferencesLayout->addWidget(guide,0,Qt::AlignLeft);connect(guide,&QPushButton::clicked,this,[this]{help();});
         auto* transfer=new Section(text(UiText::ProfileBackup),false,true);preferencesLayout->addWidget(transfer);
         auto* transfers=new QHBoxLayout;auto* exportButton=new QPushButton(text(UiText::ExportProfiles));auto* importButton=new QPushButton(text(UiText::ImportProfiles));
@@ -260,7 +260,7 @@ class MainWindow final : public QWidget {
     void syncSelection(){
         const auto c=engine_.snapshot();const auto& op=c.active_operator();refreshing_=true;operator_name_->setText(QString::fromUtf8(op.name));operator_icon_->setPixmap(operatorPixmap(QString::fromUtf8(op.name),44,devicePixelRatioF()));
         dual_->syncChecked(c.secondary_enabled[c.selected]);weapon_selector_->setExpanded(c.secondary_enabled[c.selected]);
-        primary_->setText(text(UiText::Primary)+"  ·  "+bindingName(c.primary_key));secondary_->setText(text(UiText::Secondary)+"  ·  "+bindingName(c.secondary_key));
+        primary_->setText(text(UiText::Primary));secondary_->setText(text(UiText::Secondary));
         primary_->setChosen(c.active_slot()==0);secondary_->setChosen(c.active_slot()==1);
         subtitle_->setText(c.secondary_enabled[c.selected]?(c.active_slot()?text(UiText::SecondaryWeapon):text(UiText::PrimaryWeapon)):text(UiText::OperatorSettings));
         vertical_->setValue(op.vertical);horizontal_->setValue(op.horizontal);vertical_slider_->setValue(qRound(op.vertical*10));horizontal_slider_->setValue(qRound(op.horizontal*10));humanize_->syncChecked(op.humanize);operator_rapid_->syncChecked(op.rapid);delay_->setValue(std::clamp(op.delay,30,150));delay_->setEnabled(op.rapid);for(auto* control:{humanize_,operator_rapid_,dual_}){auto* surface=control->parentWidget();surface->setProperty("enabledSetting",control->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}refreshing_=false;
@@ -315,7 +315,7 @@ class MainWindow final : public QWidget {
     }
 protected:
     void paintEvent(QPaintEvent*) override {
-        ++paint_count_;QPainter p(this);p.fillRect(rect(),QColor("#141416"));const auto c=engine_.snapshot();const QPoint mouse=mapFromGlobal(QCursor::pos());QColor color=accent();p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);
+        ++paint_count_;QPainter p(this);p.fillRect(rect(),QColor("#141414"));const auto c=engine_.snapshot();const QPoint mouse=mapFromGlobal(QCursor::pos());QColor color=accent();p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);
         static const QPixmap image("titio.png");if(!image.isNull()){p.setOpacity(.035);p.drawPixmap(rect(),image);p.setOpacity(1);}
         for(int x=18;x<width();x+=45)for(int y=90;y<height()-12;y+=45){const auto delta=QPoint(x,y)-mouse;const qreal distance=std::hypot(delta.x(),delta.y());QColor dot=color;dot.setAlpha(8);p.setBrush(dot);p.drawEllipse(QPointF(x,y),1.1,1.1);if(distance<c.radius){const qreal strength=1-distance/c.radius;dot.setAlpha(qRound(strength*15));p.setBrush(dot);p.drawEllipse(QPointF(x,y),1.5+strength*1.4,1.5+strength*1.4);}}
     }
@@ -364,25 +364,25 @@ public:
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
         gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
-        notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);notice_->setContentsMargins(18,8,18,8);notice_->setStyleSheet("color:#e8b1b4;background:#292125;");notice_->hide();layout->addWidget(notice_);
+        notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);notice_->setContentsMargins(18,8,18,8);notice_->setStyleSheet("color:#eab6ba;background:#2a2327;");notice_->hide();layout->addWidget(notice_);
         auto* body=new QWidget;auto* columns=new QHBoxLayout(body);columns->setContentsMargins(0,0,0,0);columns->setSpacing(0);
         auto* sidebar=new QWidget;sidebar->setObjectName("operatorSidebar");sidebar->setFixedWidth(200);auto* sidebarLayout=new QVBoxLayout(sidebar);sidebarLayout->setContentsMargins(10,18,2,12);sidebarLayout->setSpacing(8);
         search_=new QLineEdit;search_->setObjectName("search");search_->setClearButtonEnabled(true);search_->setAccessibleName(text(UiText::SearchOperators4c533));sidebarLayout->addWidget(search_);
         sidebar_scroll_=new QScrollArea;sidebar_scroll_->setObjectName("sidebarScroll");sidebar_scroll_->setWidgetResizable(true);sidebar_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);sidebarLayout->addWidget(sidebar_scroll_,1);
         auto* sidebarContent=new QWidget;auto* groups=new QVBoxLayout(sidebarContent);groups->setContentsMargins(0,0,0,0);groups->setSpacing(8);
-        const auto sectionHeader=[&](QVBoxLayout* column,QLabel* title,const char* dividerName){auto* row=new QHBoxLayout;row->setContentsMargins(10,8,8,0);row->setSpacing(8);row->addWidget(title);auto* line=new QFrame;line->setObjectName(dividerName);line->setFixedHeight(1);row->addWidget(line,1);column->addLayout(row);};
+        const auto sectionHeader=[&](QVBoxLayout* column,QLabel* title,const char* dividerName){QFont eyebrow=title->font();eyebrow.setCapitalization(QFont::AllUppercase);eyebrow.setLetterSpacing(QFont::AbsoluteSpacing,1.2);title->setFont(eyebrow);auto* row=new QHBoxLayout;row->setContentsMargins(10,8,8,0);row->setSpacing(8);row->addWidget(title);auto* line=new QFrame;line->setObjectName(dividerName);line->setFixedHeight(1);row->addWidget(line,1);column->addLayout(row);};
         favorites_group_=new QWidget;favorites_group_->setObjectName("favoritesGroup");auto* favoriteRows=new QVBoxLayout(favorites_group_);favoriteRows->setContentsMargins(0,0,0,0);favoriteRows->setSpacing(8);groups->addWidget(favorites_group_);
-        favorites_title_=label("Favorites","favoritesTitle");sectionHeader(favoriteRows,favorites_title_,"favoritesDivider");
+        favorites_title_=label("Favorites","groupLabel");sectionHeader(favoriteRows,favorites_title_,"favoritesDivider");
         favorites_list_=new OperatorList(sidebar_scroll_);favorites_list_->setObjectName("favorites");favorites_list_->setAccessibleName(text(UiText::FavoriteOperators));favoriteRows->addWidget(favorites_list_);
-        operators_title_=label("All operators","hint");sectionHeader(groups,operators_title_,"operatorsDivider");
-        operators_=new OperatorList(sidebar_scroll_);operators_->setObjectName("operators");operators_->setAccessibleName(text(UiText::AllOperators));groups->addWidget(operators_);groups->addStretch();sidebar_scroll_->setWidget(sidebarContent);FadingScrollBar::install(sidebar_scroll_);
+        operators_title_=label("All operators","groupLabel");sectionHeader(groups,operators_title_,"operatorsDivider");
+        operators_=new OperatorList(sidebar_scroll_);operators_->setObjectName("operators");operators_->setAccessibleName(text(UiText::AllOperators));groups->addWidget(operators_);groups->addStretch();sidebar_scroll_->setWidget(sidebarContent);FadingScrollBar::install(sidebar_scroll_);new ScrollFade(sidebar_scroll_,QColor("#141414"));new ScrollFade(sidebar_scroll_,QColor("#141414"),true);
         for(auto* list:{operators_,favorites_list_}){list->setMouseTracking(true);list->setUniformItemSizes(true);list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);list->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);list->setItemDelegate(new OperatorDelegate([this]{return accent();},list));list->setContextMenuPolicy(Qt::CustomContextMenu);connect(list,&QWidget::customContextMenuRequested,this,[this,list](const QPoint& point){showOperatorMenu(list,point);});}
         const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+name.toLower()+".svg");if(!renderer.isValid())icon_failures_<<name;}
         operators_->setCurrentRow(c.selected);columns->addWidget(sidebar);
         pages_=new PageStack;pages_->setObjectName("contentPages");operator_page_=new QWidget;operator_page_->setObjectName("operatorPage");auto* rightLayout=new QVBoxLayout(operator_page_);rightLayout->setContentsMargins(20,20,16,14);rightLayout->setSpacing(10);
         auto* selected=new QHBoxLayout;selected->setContentsMargins(2,0,0,0);selected->setSpacing(10);operator_icon_=new FadeLabel;operator_icon_->setFixedSize(46,46);selected->addWidget(operator_icon_);auto* titles=new QVBoxLayout;titles->setSpacing(2);operator_name_=new FadeLabel;operator_name_->setObjectName("pageTitle");subtitle_=label("","subtitle");titles->addWidget(operator_name_);titles->addWidget(subtitle_);selected->addLayout(titles,1);rightLayout->addLayout(selected);
         name_opacity_=static_cast<FadeLabel*>(operator_name_);icon_opacity_=static_cast<FadeLabel*>(operator_icon_);
-        scroll_=new QScrollArea;scroll_->setWidgetResizable(true);scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(scroll_);rightLayout->addWidget(scroll_,1);pages_->addWidget(operator_page_);
+        scroll_=new QScrollArea;scroll_->setWidgetResizable(true);scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(scroll_);new ScrollFade(scroll_,QColor("#1f1f1f"));new ScrollFade(scroll_,QColor("#1f1f1f"),true);rightLayout->addWidget(scroll_,1);pages_->addWidget(operator_page_);
         preferences_=new QWidget;preferences_->setObjectName("preferencesPage");auto* preferenceLayout=new QVBoxLayout(preferences_);preferenceLayout->setContentsMargins(20,20,16,14);preferenceLayout->setSpacing(10);auto* preferenceHeader=new QHBoxLayout;preferenceHeader->setSpacing(10);
         back_=new IconButton(":/ui/back.svg",[this]{return accent();});back_->setObjectName("windowControl");back_->setAccessibleName(text(UiText::BackToOperators));connect(back_,&QPushButton::clicked,this,[this]{showOperators();});preferenceHeader->addWidget(back_);preferences_title_=label("Settings","pageTitle");preferenceHeader->addWidget(preferences_title_,1);preferenceLayout->addLayout(preferenceHeader);
         preferences_scroll_=new QScrollArea;preferences_scroll_->setWidgetResizable(true);preferences_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(preferences_scroll_);preferenceLayout->addWidget(preferences_scroll_,1);pages_->addWidget(preferences_);

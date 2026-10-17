@@ -43,8 +43,8 @@ protected:
         if(mask_.isNull()||maskRatio_!=ratio){maskRatio_=ratio;mask_=QPixmap(QSize(20,20)*ratio);mask_.setDevicePixelRatio(ratio);mask_.fill(Qt::transparent);QPainter maskPainter(&mask_);renderer_.render(&maskPainter,QRectF(0,0,20,20));}
         const auto state=property("saveState").toString();
         const bool unsaved=state=="dirty"||property("unsaved").toBool();
-        QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?QColor("#ff8a91"):QColor("#909099");
-        const QColor hoverColor=unsaved?mixColor(accent_(),Qt::white,.12):objectName()=="closeControl"?QColor("#e87980"):QColor("#bdbdc7");
+        QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?QColor("#ff6b6e"):QColor("#8a8a8a");
+        const QColor hoverColor=unsaved?mixColor(accent_(),Qt::white,.12):objectName()=="closeControl"?QColor("#ff6b6e"):QColor("#b4b4b4");
         color=mixColor(color,hoverColor,hoverAmount_);
         if(isDown())color=mixColor(color,QColor("#60606b"),.3);
         QPixmap ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);tint.end();
@@ -60,7 +60,9 @@ class Toggle final : public QAbstractButton {
 public:
     explicit Toggle(std::function<QColor()> accent,QWidget* parent=nullptr):QAbstractButton(parent),accent_(std::move(accent)) {
         setCheckable(true);setCursor(Qt::PointingHandCursor);setFixedSize(42,26);setFocusPolicy(Qt::StrongFocus);
-        animation_.setDuration(160);animation_.setEasingCurve(QEasingCurve::OutCubic);
+        // A light spring on the knob travel; colours stay clamped while painting.
+        QEasingCurve spring(QEasingCurve::OutBack);spring.setOvershoot(1.05);
+        animation_.setDuration(240);animation_.setEasingCurve(spring);
         connect(&animation_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){position_=value.toReal();update();});
         connect(this,&QAbstractButton::toggled,this,[this](bool on){animation_.stop();if(!isVisible()){position_=on?1:0;update();return;}animation_.setStartValue(position_);animation_.setEndValue(on?1.0:0.0);animation_.start();});
     }
@@ -69,11 +71,20 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
         const qreal position=animation_.state()==QAbstractAnimation::Running?position_:(isChecked()?1.0:0.0);
-        const QColor track=mixColor(QColor("#35353c"),mixColor(QColor("#29292f"),accent_(),.24),position);
+        const qreal clamped=std::clamp(position,0.0,1.0);
         if(!isEnabled())p.setOpacity(.38);
-        p.setPen(Qt::NoPen);p.setBrush(track);p.drawRoundedRect(QRectF(4,5,34,16),8,8);
-        p.setBrush(mixColor(QColor("#71717d"),accent_(),position));p.drawEllipse(QPointF(12+18*position,13),6,6);
-        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setPen(QPen(accent_(),1));p.drawLine(12,25,30,25);}
+        const QColor accent=accent_();
+        const QRectF track(4,5,34,16);
+        // Flat recessed well when off; the accent fill fades in over it when on.
+        p.setPen(QPen(QColor(255,255,255,22),1));p.setBrush(QColor(0,0,0,66));p.drawRoundedRect(track.adjusted(.5,.5,-.5,-.5),8,8);
+        if(clamped>0.001){
+            QColor fill=accent;fill.setAlphaF(clamped);
+            p.setPen(QPen(QColor(255,255,255,qRound(153*clamped)),1));p.setBrush(fill);p.drawRoundedRect(track.adjusted(.5,.5,-.5,-.5),8,8);
+        }
+        // Knob: flat ink-muted off, on-solid on.
+        const qreal knobX=11.5+19.0*position;
+        p.setPen(Qt::NoPen);p.setBrush(mixColor(QColor("#b4b4b4"),QColor("#141414"),clamped));p.drawEllipse(QPointF(knobX,13),6.5,6.5);
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setPen(QPen(accent,1));p.drawLine(12,25,30,25);}
     }
 };
 
@@ -145,10 +156,18 @@ public:
 protected:
     void paintEvent(QPaintEvent*) override{
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
-        QColor background("#29292f");background.setAlphaF(amount_);painter.setPen(Qt::NoPen);painter.setBrush(background);painter.drawRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),13,13);
-        QColor ink=mixColor(QColor("#90909c"),accent_(),amount_);if(underMouse())ink=mixColor(ink,QColor("#e9e9ef"),.3);if(isDown())ink=mixColor(ink,Qt::white,.15);
+        const QRectF pill=QRectF(rect()).adjusted(.5,.5,-.5,-.5);
+        // The chosen segment is the Atelier selection pill: flat accent tint,
+        // accent border, one bevel line on the top edge.
+        if(amount_>0.002){
+            const QColor accent=accent_();
+            painter.setPen(Qt::NoPen);painter.setBrush(QColor(accent.red(),accent.green(),accent.blue(),qRound(31*amount_)));painter.drawRoundedRect(pill,8,8);
+            painter.setPen(QPen(QColor(accent.red(),accent.green(),accent.blue(),qRound(178*amount_)),1));painter.setBrush(Qt::NoBrush);painter.drawRoundedRect(pill,8,8);
+            painter.setPen(QPen(QColor(255,255,255,qRound(31*amount_)),1));painter.drawLine(QPointF(pill.left()+9,pill.top()+1.5),QPointF(pill.right()-9,pill.top()+1.5));
+        }
+        QColor ink=mixColor(QColor("#8a8a8a"),QColor("#e6e6e6"),amount_);if(isDown())ink=mixColor(ink,QColor("#000000"),.15);
         painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
-        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QColor("#686875"));painter.drawRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),13,13);}
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QColor("#8a8a8a"));painter.drawRoundedRect(pill,8,8);}
     }
     void hideEvent(QHideEvent* event) override{selection_.stop();amount_=chosen_?1:0;QPushButton::hideEvent(event);}
 };
@@ -173,10 +192,10 @@ public:
     void paint(QPainter* p,const QStyleOptionViewItem& option,const QModelIndex& index) const override {
         p->save();p->setRenderHint(QPainter::Antialiasing);p->setRenderHint(QPainter::TextAntialiasing);const QRect r=option.rect;
         const bool selected=option.state&QStyle::State_Selected,hovered=option.state&QStyle::State_MouseOver;
-        if(selected||hovered){p->setPen(Qt::NoPen);p->setBrush(QColor(selected?"#26262b":"#1d1d21"));p->drawRoundedRect(r.adjusted(4,2,-4,-2),12,12);}
-        if(selected){p->setPen(Qt::NoPen);p->setBrush(accent_());p->drawRoundedRect(QRectF(r.left()+4,r.top()+16,2,20),1,1);}
+        if(selected||hovered){p->setPen(Qt::NoPen);p->setBrush(QColor(255,255,255,selected?28:20));p->drawRoundedRect(r.adjusted(4,2,-4,-2),8,8);}
+        if(selected){p->setPen(QPen(QColor(255,255,255,41),1));p->setBrush(Qt::NoBrush);p->drawRoundedRect(QRectF(r.adjusted(4,2,-4,-2)).adjusted(.5,.5,-.5,-.5),8,8);}
         qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(r.left()+12,r.top()+4,operatorIconSize,operatorIconSize));
-        QFont f=option.font;f.setFamily("Inter");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(16);f.setWeight(selected?QFont::Medium:QFont::Normal);p->setFont(f);p->setPen(QColor(selected?"#f2f2f5":"#bdbdc6"));
+        QFont f=option.font;f.setFamily("Geist");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(14);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(QColor(selected?"#e6e6e6":"#b4b4b4"));
         const QRect textRect(r.left()+65,r.top(),r.width()-73,r.height());
         p->drawText(textRect,Qt::AlignVCenter|Qt::AlignLeft,QFontMetrics(f).elidedText(index.data().toString(),Qt::ElideRight,textRect.width()));p->restore();
     }
@@ -213,7 +232,8 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);QFont mono("Consolas");mono.setPixelSize(6);painter.setFont(mono);
         const auto rows=text().split('\n');const qreal advance=QFontMetricsF(mono).horizontalAdvance('#'),lineHeight=4.6;
         const qreal left=(width()-rows.front().size()*advance)/2,top=(height()-7*lineHeight)/2;
-        for(int row=0;row<rows.size();++row){painter.setPen(mixColor(QColor("#ff777e"),QColor("#ff5b63"),row/6.0));painter.drawText(QPointF(left,top+(row+1)*lineHeight),rows[row]);}
+        painter.setPen(QColor("#38ccff"));
+        for(int row=0;row<rows.size();++row)painter.drawText(QPointF(left,top+(row+1)*lineHeight),rows[row]);
     }
 };
 
@@ -252,12 +272,11 @@ protected:
         const auto surface=surfaceRect();
         // Several translucent contours make a soft, low shadow without an outline.
         for(int spread=11;spread>=1;--spread){
-            painter.setBrush(QColor(0,0,0,spread>6?2:4));
+            painter.setBrush(QColor(0,0,0,spread>6?3:5));
             painter.drawRoundedRect(surface.adjusted(-spread*.65,-spread*.45,spread*.65,spread*.65).translated(0,3),24+spread*.6,24+spread*.6);
         }
-        painter.setBrush(QColor("#1c1c1f"));painter.drawRoundedRect(surface,24,24);
-        QLinearGradient edge(surface.topLeft(),surface.bottomLeft());edge.setColorAt(0,QColor(255,255,255,13));edge.setColorAt(.45,QColor(255,255,255,3));edge.setColorAt(1,QColor(255,255,255,0));
-        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(edge,.7));painter.drawRoundedRect(surface.adjusted(.35,.35,-.35,-.35),24,24);
+        painter.setBrush(QColor(255,255,255,12));painter.drawRoundedRect(surface,24,24);
+        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(QColor(255,255,255,20),1));painter.drawRoundedRect(surface.adjusted(.45,.45,-.45,-.45),24,24);
     }
 };
 
@@ -284,7 +303,7 @@ public:
         if(page==currentWidget())return;
         QPixmap previous;
         if(isVisible()){
-            previous=QPixmap(size()*devicePixelRatioF());previous.setDevicePixelRatio(devicePixelRatioF());previous.fill(QColor("#1c1c1f"));
+            previous=QPixmap(size()*devicePixelRatioF());previous.setDevicePixelRatio(devicePixelRatioF());previous.fill(QColor("#1f1f1f"));
             QPainter painter(&previous);render(&painter,QPoint(),QRegion(),QWidget::DrawChildren);
         }
         settle();setCurrentWidget(page);
@@ -333,6 +352,48 @@ protected:
         style()->drawComplexControl(QStyle::CC_ScrollBar,&option,&painter,this);
     }
 };
+
+// A soft edge over a scroll viewport: rows dissolve into the surface instead
+// of being cut, matching the reference's clipped-list fade. Mirrored variants
+// cover the top edge when the list is scrolled away from its start.
+class ScrollFade final : public QWidget {
+    QAbstractScrollArea* area_;
+    QColor color_;
+    bool top_;
+    int strip_=46;
+public:
+    ScrollFade(QAbstractScrollArea* area,const QColor& color,bool top=false,QWidget* parent=nullptr):QWidget(parent?parent:area),area_(area),color_(color),top_(top){
+        setAttribute(Qt::WA_TransparentForMouseEvents);setAttribute(Qt::WA_NoSystemBackground);
+        area_->viewport()->installEventFilter(this);
+        if(auto* bar=area_->verticalScrollBar()){connect(bar,&QScrollBar::valueChanged,this,[this]{refresh();});connect(bar,&QScrollBar::rangeChanged,this,[this]{refresh();});}
+        refresh();
+    }
+    void refresh(){
+        auto* bar=area_->verticalScrollBar();const QRect viewport=area_->viewport()->geometry();
+        const bool overflow=bar&&bar->maximum()>bar->minimum();
+        const bool active=overflow&&(top_?bar->value()>bar->minimum():bar->value()<bar->maximum());
+        setVisible(active);
+        if(!active)return;
+        if(top_){const int bottom=std::min(viewport.bottom(),viewport.top()+strip_-1);setGeometry(viewport.left(),viewport.top(),viewport.width(),bottom-viewport.top()+1);}
+        else{const int top=std::max(viewport.top(),viewport.bottom()-strip_+1);setGeometry(viewport.left(),top,viewport.width(),viewport.bottom()-top+1);}
+        raise();
+    }
+protected:
+    bool eventFilter(QObject* object,QEvent* event) override {
+        if(event->type()==QEvent::Resize&&object==area_->viewport())refresh();
+        return QWidget::eventFilter(object,event);
+    }
+    void showEvent(QShowEvent* event) override {QWidget::showEvent(event);refresh();}
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);QLinearGradient fade(0,0,0,height());
+        QColor clear=color_;clear.setAlpha(0);
+        QColor soft=color_;soft.setAlpha(150);
+        if(top_){fade.setColorAt(0.0,color_);fade.setColorAt(0.25,soft);fade.setColorAt(0.65,clear);fade.setColorAt(1.0,clear);}
+        else{fade.setColorAt(0.0,clear);fade.setColorAt(0.35,clear);fade.setColorAt(0.75,soft);fade.setColorAt(1.0,color_);}
+        painter.fillRect(rect(),fade);
+    }
+};
+
 class DragHeader final : public QFrame {
 public:using QFrame::QFrame;
 protected:
@@ -342,12 +403,12 @@ class Section final : public QFrame {
 public:
     QVBoxLayout* body;QWidget* content;QPushButton* heading=nullptr;
     explicit Section(const QString& title,bool collapsible,bool expanded,QWidget* parent=nullptr):QFrame(parent) {
-        setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);
-        auto* header=new QWidget;auto* row=new QHBoxLayout(header);row->setContentsMargins(0,0,0,0);header->setMinimumHeight(30);
+        setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(12,11,12,12);layout->setSpacing(0);
+        auto* header=new QWidget;auto* row=new QHBoxLayout(header);row->setContentsMargins(2,0,2,0);header->setMinimumHeight(24);
         if(collapsible){heading=new QPushButton(title);heading->setObjectName("sectionHeading");heading->setCursor(Qt::PointingHandCursor);row->addWidget(heading,1);
             auto* arrow=new QLabel(expanded?QString::fromUtf8("⌄"):QString::fromUtf8("›"));arrow->setObjectName("sectionArrow");row->addWidget(arrow);
-            layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,0,0,0);body->setSpacing(6);content->setVisible(expanded);layout->addWidget(content);if(!expanded)layout->setContentsMargins(18,0,18,0);
-            connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));layout->setContentsMargins(18,0,18,open?12:0);});
-        }else{auto* label=new QLabel(title);label->setObjectName("cardTitle");row->addWidget(label,1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,0,0,0);body->setSpacing(6);layout->addWidget(content);}
+            layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);content->setVisible(expanded);layout->addWidget(content);if(!expanded)layout->setContentsMargins(12,4,12,4);
+            connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));layout->setContentsMargins(12,open?11:4,12,open?12:4);});
+        }else{auto* label=new QLabel(title);label->setObjectName("panelTitle");row->addWidget(label,1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);layout->addWidget(content);}
     }
 };

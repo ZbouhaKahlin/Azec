@@ -3,9 +3,9 @@
 
 int main(int argc,char** argv){
     QApplication app(argc,argv);QApplication::setApplicationName("KingBoss2004");QApplication::setOrganizationName("KingBoss2004");QApplication::setStyle("Fusion");
-    for(const auto* weight:{"Regular","Medium","SemiBold","Bold"})QFontDatabase::addApplicationFont(QString(":/fonts/Inter-%1.otf").arg(weight));
-    QFont font("Inter");font.setPixelSize(14);font.setWeight(QFont::Normal);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
-    QPalette palette;palette.setColor(QPalette::Window,QColor("#141416"));palette.setColor(QPalette::WindowText,QColor("#dedee5"));palette.setColor(QPalette::Base,QColor("#222225"));palette.setColor(QPalette::AlternateBase,QColor("#2a2a30"));palette.setColor(QPalette::Text,QColor("#dedee5"));palette.setColor(QPalette::Button,QColor("#2a2a30"));palette.setColor(QPalette::ButtonText,QColor("#dedee5"));palette.setColor(QPalette::Highlight,QColor("#ff5b63"));palette.setColor(QPalette::HighlightedText,Qt::white);palette.setColor(QPalette::Disabled,QPalette::Text,QColor("#6e6e7a"));app.setPalette(palette);
+    for(const auto* weight:{"Regular","Medium","SemiBold","Bold"})QFontDatabase::addApplicationFont(QString(":/fonts/Geist-%1.ttf").arg(weight));
+    QFont font("Geist");font.setPixelSize(13);font.setWeight(QFont::Normal);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
+    QPalette palette;palette.setColor(QPalette::Window,QColor("#141414"));palette.setColor(QPalette::WindowText,QColor("#e6e6e6"));palette.setColor(QPalette::Base,QColor("#212121"));palette.setColor(QPalette::AlternateBase,QColor("#252525"));palette.setColor(QPalette::Text,QColor("#e6e6e6"));palette.setColor(QPalette::Button,QColor("#252525"));palette.setColor(QPalette::ButtonText,QColor("#e6e6e6"));palette.setColor(QPalette::Highlight,QColor("#d2d2d2"));palette.setColor(QPalette::HighlightedText,QColor("#141414"));palette.setColor(QPalette::Disabled,QPalette::Text,QColor("#707070"));app.setPalette(palette);
     const auto arguments=app.arguments();const bool selftest=arguments.contains("--ui-self-test"),dryrun=selftest||arguments.contains("--dry-run");QString output,phoneInfo;int duration=0;for(const auto& argument:arguments){if(argument.startsWith("--phone-info="))phoneInfo=argument.mid(13);if(argument.startsWith("--output="))output=argument.mid(9);if(argument.startsWith("--exit-after-ms="))duration=argument.mid(16).toInt();}if(output.isEmpty())output=QDir::currentPath();QDir().mkpath(output);
 #ifndef KINGBOSS_UI_TESTS
     if(selftest){

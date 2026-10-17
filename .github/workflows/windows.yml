@@ -1,0 +1,41 @@
+name: Windows verification
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/NeonManagerR6/Qt
+          key: qt-6.8.3-msvc2022-x64
+      - name: Install pinned Qt kit
+        shell: pwsh
+        run: |
+          if (!(Test-Path "$env:LOCALAPPDATA/NeonManagerR6/Qt/6.8.3/msvc2022_64/bin/qmake.exe")) { ./setup-qt.ps1 }
+      - name: Build and check core, HTTP, restart, and single-instance behavior
+        shell: pwsh
+        run: ./build.cmd test
+      - name: Verify desktop at 100% and 150%
+        shell: pwsh
+        run: python tests/run_checks.py --ui-only
+      - name: Upload verification reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification
+          include-hidden-files: true
+          path: |
+            .build/verification/**/ui-verification.json
+            .build/verification/**/http-verification.json
+            .build/verification/**/restart-verification.json
+            .build/verification/**/recovery-verification.json
+            .build/verification/**/*.png
+            !.build/verification/**/qr-revealed.png
+          if-no-files-found: ignore

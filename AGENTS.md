@@ -4,7 +4,11 @@
 
 KingBoss2004 is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded local-network phone interface. Read `README.md` before changing behavior or packaging.
 
-- `src/app.cpp`: desktop UI, settings, hotkeys, favorites, mobile API callbacks, and integrated UI checks.
+- `src/app.cpp` / `src/startup.hpp`: startup, single-instance activation, configuration recovery, and verification dispatch.
+- `src/main_window.hpp`: desktop UI, settings, hotkeys, favorites, tray, and dialogs.
+- `src/app_style.hpp` / `src/strings.hpp`: styles and localized strings.
+- `src/phone_bridge.cpp`: mobile API callbacks and state building.
+- `src/profile_transfer.hpp` / `src/profile_transfer.cpp`: complete profile backup validation and import/export.
 - `src/ui_widgets.hpp`: custom controls, operator rows, title animation, popup, raised panel, page transitions, and fading scrollbars.
 - `src/core.hpp` / `src/core.cpp`: primary binary configuration layout, weapon profiles, and movement arithmetic.
 - `src/engine.hpp` / `src/engine.cpp`: synchronized configuration, active weapon selection, and input worker threads.
@@ -13,6 +17,7 @@ KingBoss2004 is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embed
 - `assets/phone.html`: self-contained mobile UI, embedded by `assets/operators.qrc`.
 - `src/launcher.cpp`: root launcher; runs `runtime/KingBoss2004.exe` with the launcher directory as its working directory.
 - `tests/phone_test.py`: HTTP integration checks against an isolated dry-run instance.
+- `tests/core_checks.cpp` / `tests/ui_checks.cpp`: separate verification code, excluded from the release executable.
 
 ## Build and verification
 
@@ -22,7 +27,7 @@ Use PowerShell from the project root. Requires Visual Studio 2022 C++ tools, a W
 .\build.cmd test
 ```
 
-This builds and deploys the app, creates the root launcher, and runs core checks. Build intermediates belong in `.build/`; deployed binaries belong in `runtime/`.
+This builds and deploys the app, creates the root launcher and separate verification executable, and runs core plus isolated HTTP/restart checks. Build intermediates belong in `.build/`; deployed binaries belong in `runtime/`. Exclude `runtime/KingBoss2004-checks.exe` from runnable releases.
 
 Run UI checks in an isolated working directory because the checks write fixture configurations:
 
@@ -34,6 +39,8 @@ Pop-Location
 ```
 
 Use separate fixture directories and `QT_SCALE_FACTOR=1` / `1.5` for both display scales. Inspect the JSON report and screenshots. Match testing to the change; UI changes require visual inspection, and profile/network changes require behavior checks. Use `--dry-run` for interactive inspection and browser tests so no mouse events or beeps are generated. Do not run fixture tests from the project root or use them against the user's live configuration.
+
+`python tests/run_checks.py --ui-only` creates fresh fixture directories and runs both scales. Build with `build.cmd test` first; the normal `--ui-self-test` command delegates to the separate verification executable.
 
 For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json` in a fresh fixture directory, then run `python tests/phone_test.py <fixture-directory>`. The info file contains temporary session credentials and must remain local. Shut down test processes started by your work after verification.
 
@@ -49,11 +56,12 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 
 ## UI contracts
 
-- Retain the compact window, 200 px sidebar, custom window controls, rounded corners, charcoal palette, coral-red default accent (`#FF5B63`), and stationary raised right panel.
-- Use bundled Inter for controls and operator names. The top-left King Boss wordmark is seven lines of red ASCII artwork rendered with Consolas inside the existing header.
+- Retain the compact window, 200 px sidebar, custom window controls, rounded corners, the Atelier charcoal palette, the neutral chrome default accent (`#D2D2D2`), and stationary raised right panel.
+- Use bundled Geist for controls and operator names. The top-left King Boss wordmark is seven lines of Atelier-cyan ASCII artwork rendered with Consolas inside the existing header.
 - Header icons share 34 px hit targets and centered 20 px vector artwork. Hover changes only their ink subtly, without background tiles. Keep Save flat, without a glow, pulse, or checkmark swap; its tooltip confirms success.
+- Save stays neutral gray while saved and uses the current accent while unsaved, including after a failed save. Keep unsaved data state independent of temporary feedback. Pairing QR starts obscured, reveals on explicit click/keyboard activation, and conceals on leaving Settings, hiding the window, or changing the link.
 - Use 22 px outer window corners, 24 px panel corners, and soft 10-14 px button/input corners. Sliders have pill tracks and circular handles. Preserve the existing layout and hit targets.
-- Operator rows are 52 px tall with 44 px icons and 16 px Inter names. Keep long names readable within the existing sidebar width.
+- Operator rows are 52 px tall with 44 px icons and 14 px Geist names. Keep long names readable within the existing sidebar width.
 - Favorites appear only when nonempty and matching search. Favorited operators are hidden from All operators, so each operator appears once. Removing a favorite returns it to All operators.
 - Right-click favorites use a compact context-menu action, without a nested push button; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
