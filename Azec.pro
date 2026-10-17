@@ -13,7 +13,9 @@ contains(CONFIG, verification) {
     SOURCES += tests/ui_checks.cpp
 }
 RESOURCES += assets/operators.qrc
+RC_ICONS = assets/app.ico
 DEFINES += NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS
-LIBS += -luser32 -lgdi32 -ldwmapi
+HEADERS += src/lan_address.hpp
+LIBS += -luser32 -lgdi32 -ldwmapi -liphlpapi -lws2_32
 QMAKE_CXXFLAGS += /utf-8
 QMAKE_LFLAGS += /MANIFEST:EMBED

@@ -74,7 +74,7 @@ def run_http(parent):
         # Session credentials must never be uploaded as verification artifacts.
         (folder / 'phone-info.json').unlink(missing_ok=True)
 
-def run(ui=False,ui_only=False):
+def run(ui=False,ui_only=False,qr_scan=False):
     parent = ROOT / '.build' / 'verification'
     parent.mkdir(parents=True, exist_ok=True)
     if not ui_only:
@@ -90,11 +90,16 @@ def run(ui=False,ui_only=False):
             report = json.loads((fixture / 'ui-verification.json').read_text())
             if not report['passed']:
                 raise RuntimeError('UI report failed at scale ' + scale)
+            if qr_scan:
+                from qr_scan import verify
+                if not verify(fixture):
+                    raise RuntimeError('QR decoding failed at scale ' + scale)
     print('Verification artifacts: ' + str(parent))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ui', action='store_true')
     parser.add_argument('--ui-only', action='store_true')
+    parser.add_argument('--qr-scan', action='store_true', help='Decode UI QR captures (requires opencv-python-headless)')
     args=parser.parse_args()
-    run(args.ui or args.ui_only,args.ui_only)
+    run(args.ui or args.ui_only or args.qr_scan,args.ui_only,args.qr_scan)

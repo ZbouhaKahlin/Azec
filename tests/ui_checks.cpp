@@ -73,6 +73,9 @@ QJsonObject MainWindow::selfTest(const QString& output){
         wait(80);capture(output+"/settings-transition.png");wait(140);checks["settings_crossfade_finishes_without_moving_panel"]=!pages_->transitioning()&&panel_->geometry()==stationaryPanel;
         back_->click();wait(35);gear_->click();wait(35);back_->click();wait(220);checks["rapid_settings_navigation_finishes_on_last_page"]=pages_->currentWidget()==operator_page_&&!pages_->transitioning()&&panel_->geometry()==stationaryPanel;gear_->click();wait(220);
         checks["settings_exposes_hotkeys"]=language_&&key_buttons_[0]&&key_buttons_[0]->accessibleName()=="Open / hide window";
+        language_->showPopup();wait(40);auto* languagePopup=findChild<QFrame*>("languagePopup");
+        checks["language_popup_uses_ink_frame"]=languagePopup&&languagePopup->isVisible()&&(languagePopup->windowFlags()&Qt::FramelessWindowHint)&&languagePopup->findChild<QListWidget*>()->count()==9;
+        if(languagePopup){languagePopup->grab().save(output+"/language-popup.png");auto* list=languagePopup->findChild<QListWidget*>();const auto before=list->grab().toImage();QEnterEvent enterChoice(QPointF(5,5),QPointF(5,5),list->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(list,&enterChoice);checks["language_popup_hover_stays_flat"]=before==list->grab().toImage();}language_->hidePopup();
         language_->setCurrentIndex(1);QApplication::processEvents();checks["portuguese_labels"]=operators_title_->text()=="Todos os operadores"&&save_->toolTip().startsWith("Salvar configurações");language_->setCurrentIndex(0);QApplication::processEvents();
         bool localizedSidebarFits=true,hebrewPrankVisible=true;int frenchIndex=-1,prankIndex=-1;
         for(int i=0;i<language_->count();++i){language_->setCurrentIndex(i);QApplication::processEvents();if(auto* popup=findChild<QDialog*>("palestinePopup"))popup->close();const int id=language_->itemData(i).toInt();localizedSidebarFits&=sidebar_scroll_->widget()->width()<=sidebar_scroll_->viewport()->width();localizedSidebarFits&=operators_title_->width()<=sidebar_scroll_->viewport()->width();if(id==2)frenchIndex=i;if(id==6)prankIndex=i;}
@@ -120,6 +123,9 @@ QJsonObject MainWindow::selfTest(const QString& output){
         selectOperator(4);checks["character_selection_starts_on_primary"]=engine_.snapshot().active_slot()==0&&vertical_->value()==12.3;dual_->click();save_->click();
         const auto unmodified=engine_.snapshot().bytes();checks["phone_rejects_invalid_values"]=mobileUpdate({{"action","setProfile"},{"operator",4},{"slot",0},{"values",QJsonObject{{"vertical",-3}}}}).contains("error")&&engine_.snapshot().bytes()==unmodified;
         checks["phone_server_listens_and_provides_pairing"]=phone_->listening()&&phone_->port()>0&&phone_->code().size()==6&&phone_->token().size()==32;
+        const lan::Adapter virtualSwitch{QHostAddress("172.28.176.1"),false,false,false,1},ethernet{QHostAddress("192.168.11.103"),true,true,false,25},wifi{QHostAddress("10.0.0.8"),true,true,true,50},vpn{QHostAddress("10.9.0.2"),false,true,false,1};
+        checks["phone_prefers_lan_over_virtual_adapters"]=lan::selectAddress({virtualSwitch,ethernet})=="192.168.11.103"&&lan::selectAddress({ethernet,virtualSwitch})=="192.168.11.103"&&lan::selectAddress({vpn,ethernet})=="192.168.11.103"&&lan::selectAddress({ethernet,wifi})=="10.0.0.8";
+        checks["phone_handles_isolated_or_missing_lan"]=lan::selectAddress({virtualSwitch})=="127.0.0.1"&&lan::selectAddress({virtualSwitch,{QHostAddress("192.168.8.1"),true,false,false,10}})=="192.168.8.1"&&lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}})=="127.0.0.1";
         checks["phone_state_matches_desktop"]=mobileState()["operatorId"].toInt()==4&&mobileState()["profile"].toObject()["vertical"].toDouble()==12.3;
         // Exercise timing and drag behavior on all three production scrollbars.
         settings_->setMinimumHeight(scroll_->viewport()->height()+300);QApplication::processEvents();gear_->click();QApplication::processEvents();
@@ -137,18 +143,41 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["scrollbars_fade_after_drag_release"]=sidebarBar->opacity()==0&&operatorBar->opacity()==0&&preferenceBar->opacity()==0;
         settings_->setMinimumHeight(0);back_->click();sidebarBar->setValue(0);scroll_->verticalScrollBar()->setValue(0);showNormal();raise();activateWindow();wait(3400);capture(output+"/finished.png");
         const auto unchanged=engine_.snapshot().bytes();QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/color.png");modal->reject();}});chooseColor();checks["cancel_color_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
-        QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/binding.png");modal->reject();}});bindKey(0);checks["cancel_key_binding_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
+        bool bindingFits=true;
+        QTimer::singleShot(80,this,[&]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/binding.png");bindingFits&=modal->objectName()=="hotkeyDialog"&&modal->width()>=380&&modal->findChild<QLabel*>("bindingHint")->wordWrap();for(auto* label:modal->findChildren<QLabel*>())bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));modal->reject();}});bindKey(0);checks["cancel_key_binding_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
+        for(int language=0;language<9;++language){engine_.edit([=](r6::Config& c){c.language=language;});QTimer::singleShot(40,this,[&,language]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(!modal){bindingFits=false;return;}auto* hint=modal->findChild<QLabel*>("bindingHint");hint->setText(text(UiText::ThisKeyIsAlreadyAssignedChooseAnother));modal->adjustSize();QApplication::processEvents();for(auto* label:modal->findChildren<QLabel*>()){bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));if(label->wordWrap())bindingFits&=label->height()>=label->heightForWidth(label->width());}if(language==0)modal->grab().save(output+"/binding-portuguese-conflict.png");modal->reject();});bindKey(0);}engine_.edit([](r6::Config& c){c.language=1;});checks["binding_instructions_fit_all_languages"]=bindingFits;
         QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/help.png");modal->reject();}});help();checks["help_dialog_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
         // New reliability/UI behavior uses the same production paths as the real window.
         showPreferences();wait(220);buildPreferences();
+        checks["brand_logo_asset_valid"]=QSvgRenderer(QStringLiteral(":/ui/logo.svg")).isValid()&&findChild<QLabel*>("brandLogo");
         checks["qr_is_obscured_by_default"]=pairing_qr_&&!pairing_qr_->revealed();
         if(pairing_qr_){
             preferences_scroll_->ensureWidgetVisible(pairing_qr_);for(int attempt=0;attempt<200&&!pairing_qr_->framesReady();++attempt)wait(10);wait(120);checks["qr_frames_ready_before_reveal"]=pairing_qr_->framesReady();pairing_qr_->grab().save(output+"/qr-hidden.png");
             pairing_qr_->click();checks["qr_click_reveals"]=pairing_qr_->revealed()&&pairing_qr_->transitioning();wait(120);checks["qr_reveal_has_intermediate_frames"]=pairing_qr_->revealProgress()>0&&pairing_qr_->revealProgress()<1;pairing_qr_->grab().save(output+"/qr-revealing.png");
             const qreal beforeQrReverse=pairing_qr_->revealProgress();pairing_qr_->click();checks["qr_retarget_preserves_displayed_progress"]=pairing_qr_->revealProgress()==beforeQrReverse;wait(30);pairing_qr_->click();wait(460);checks["rapid_qr_reversal_settles_revealed"]=pairing_qr_->revealed()&&pairing_qr_->revealProgress()==1&&!pairing_qr_->transitioning();pairing_qr_->grab().save(output+"/qr-revealed.png");
+            capture(output+"/phone-branded.png");
+            // Decode these production-rendered images independently with qr_scan.py.
+            // Only the current session's hash is retained; sample URLs are fixtures.
+            const auto scanCase=[](const QString& file,const QString& link){return QJsonObject{{"file",file},{"sha256",QString::fromLatin1(QCryptographicHash::hash(link.toUtf8(),QCryptographicHash::Sha256).toHex())}};};
+            QJsonArray qrCases;qrCases.append(scanCase("qr-revealed.png",phone_->pairingLink()));
             pairing_qr_->click();wait(100);checks["qr_conceal_has_intermediate_frames"]=!pairing_qr_->revealed()&&pairing_qr_->revealProgress()>0&&pairing_qr_->revealProgress()<1;pairing_qr_->grab().save(output+"/qr-concealing.png");wait(250);
             pairing_qr_->setPairingLink(phone_->pairingLink()+"&refresh=1");checks["changed_qr_link_conceals"]=!pairing_qr_->revealed();
             pairing_qr_->setPairingLink(phone_->pairingLink());pairing_qr_->click();showOperators();wait(220);checks["leaving_settings_conceals_qr"]=!pairing_qr_->revealed();
+            const QStringList sampleLinks={
+                "http://127.0.0.1:18764/#token=0123456789abcdef0123456789abcdef",
+                "http://192.168.1.23:18764/#token=ffeeddccbbaa99887766554433221100",
+                "http://10.0.0.8:65535/#token=6be3872124af49ccac9c76bdbccdae94",
+                "http://172.31.255.254:18764/#token=4bbdc4dca77d42e0a61f8da225ac028e",
+                "https://github.com/Azec-Zuckerberg/Azec"};
+            int sampleIndex=0;bool samplesReady=true;
+            for(const auto& link:sampleLinks){
+                PairingQr sample(QStringLiteral("Reveal QR"),QStringLiteral("Hide QR"));sample.setPairingLink(link);
+                for(int attempt=0;attempt<200&&!sample.framesReady();++attempt)wait(10);
+                samplesReady&=sample.framesReady();sample.click();wait(460);
+                const auto name=QString("qr-sample-%1.png").arg(++sampleIndex);samplesReady&=sample.grab().save(output+"/"+name);qrCases.append(scanCase(name,link));
+            }
+            checks["branded_qr_samples_rendered"]=samplesReady;
+            QFile scanManifest(output+"/qr-scan-cases.json");scanManifest.open(QIODevice::WriteOnly);scanManifest.write(QJsonDocument(qrCases).toJson());
         }
         showPreferences();wait(220);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
         auto* stablePreferences=preferences_scroll_->widget();auto* stablePhoneSwitch=phone_enabled_.data();auto* stableBar=preferences_scroll_->verticalScrollBar();
@@ -190,9 +219,12 @@ QJsonObject MainWindow::selfTest(const QString& output){
         save_blocked_=true;QTimer::singleShot(80,this,[]{if(auto* modal=QApplication::activeModalWidget())if(auto* button=modal->findChild<QPushButton*>("save"))button->click();});
         close();checks["failed_save_during_close_keeps_window_open"]=isVisible()&&engine_.running&&unsaved_;save_blocked_=false;
         engine_.edit([&](r6::Config& config){config=baseline;});applyStyle();syncSelection();dirty();save();wait(1800);
-        // A longer settle absorbs machine-delayed one-shot repaints; the measured window stays strict.
-        QCursor::setPos(mapToGlobal(QPoint(-20,-20)));wait(750);const int idlePaints=paint_count_;wait(350);
-        checks["stationary_cursor_does_not_repaint_window"]=paint_count_==idlePaints;
+        // Wait for delayed feedback (including the three-second scrollbar fade)
+        // to finish, then require the same strict 350 ms without a repaint.
+        // Continuous repainting still fails after the bounded settle period.
+        QCursor::setPos(mapToGlobal(QPoint(-20,-20)));QElapsedTimer idleClock;idleClock.start();qint64 quietSince=0;int idlePaints=paint_count_;
+        while(idleClock.elapsed()<6000&&idleClock.elapsed()-quietSince<350){wait(25);if(paint_count_!=idlePaints){idlePaints=paint_count_;quietSince=idleClock.elapsed();}}
+        checks["stationary_cursor_does_not_repaint_window"]=idleClock.elapsed()-quietSince>=350;
         capture(output+"/save-neutral.png");editOperator([](r6::Operator& op){op.vertical=13.2f;});capture(output+"/save-unsaved.png");save();
         // Load previous default themes and a custom theme through the production loader.
         // The fixture lives in its own directory so no azec_weapons.json sidecar applies.

@@ -2,7 +2,7 @@
 #include "startup.hpp"
 
 int main(int argc,char** argv){
-    QApplication app(argc,argv);QApplication::setApplicationName("Azec");QApplication::setOrganizationName("Azec");QApplication::setStyle("Fusion");
+    QApplication app(argc,argv);QApplication::setApplicationName("Azec");QApplication::setOrganizationName("Azec");QApplication::setStyle("Fusion");app.setWindowIcon(QIcon(":/ui/app-icon.svg"));
     for(const auto* weight:{"Regular","Medium","SemiBold","Bold"})QFontDatabase::addApplicationFont(QString(":/fonts/Geist-%1.ttf").arg(weight));
     QFontDatabase::addApplicationFont(":/fonts/Fredoka.ttf");
     QFontDatabase::addApplicationFont(":/fonts/PressStart2P-Regular.ttf");

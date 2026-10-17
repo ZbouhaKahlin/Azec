@@ -14,6 +14,7 @@ Azec is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded loca
 - `src/engine.hpp` / `src/engine.cpp`: synchronized configuration, active weapon selection, and input worker threads.
 - `src/profile_store.hpp`: secondary weapon profiles and additional preferences in JSON.
 - `src/phone_server.hpp`: paired HTTP server and request validation.
+- `src/lan_address.hpp`: Windows adapter discovery and LAN pairing-address selection.
 - `assets/phone.html`: self-contained mobile UI, embedded by `assets/operators.qrc`.
 - `src/launcher.cpp`: root launcher; runs `runtime/Azec.exe` with the launcher directory as its working directory.
 - `tests/phone_test.py`: HTTP integration checks against an isolated dry-run instance.
@@ -44,12 +45,15 @@ Use separate fixture directories and `QT_SCALE_FACTOR=1` / `1.5` for both displa
 
 For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json` in a fresh fixture directory, then run `python tests/phone_test.py <fixture-directory>`. The info file contains temporary session credentials and must remain local. Shut down test processes started by your work after verification.
 
+Optional browser checks use `python tests/phone_browser_test.py` with Python Playwright and Google Chrome installed. The runner creates an isolated dry-run instance, checks all nine languages at four widths, and stops its own process. Keep physical-phone testing distinct from browser emulation.
+
 ## Data and behavior contracts
 
 - Preserve the original 3,734-byte primary configuration layout in `r6_config.bin`. Keep backward compatibility when adding features.
 - The operator roster covers all 72 operators in id order: Ace, Alibi, Amaru, Aruni, Ash, Azami, Bandit, Blackbeard, Blitz, Brava, Buck, Capitao, Castle, Caveira, Clash, Deimos, Doc, Dokkaebi, Echo, Ela, Fenrir, Finka, Flores, Frost, Fuze, Glaz, Goyo, Gridlock, Grim, Hibana, Iana, IQ, Jackal, Jager, Kaid, Kali, Kapkan, Lesion, Lion, Maestro, Maverick, Melusi, Mira, Montagne, Mozzie, Mute, Nokk, Osa, Oryx, Pulse, Ram, Rook, Sens, Sentry, Skopos, Smoke, Solis, Striker, Sledge, Tachanka, Thatcher, Thermite, Thorn, Thunderbird, Tubarao, Twitch, Valkyrie, Vigil, Wamai, Warden, Ying, Noor. Keep this order: extend at the end only so existing records never shift.
 - `r6_config.bin` serializes only the original 71 records. Primary profiles for operators past the original list (Noor, id 71) and the selected operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`); the binary `selected` field still rejects indexes past the original list. Backups with 71 or 72 records import by name.
 - Store secondary profiles, weapon hotkeys, and the phone-access preference in `azec_weapons.json`. Favorites use `azec_ui.json`.
+- Fresh configurations and the unpaired phone page default to English. Preserve saved language IDs: Portuguese is 0 and English is 1; pairing follows the desktop's saved language.
 - Each operator has a primary profile and an optional independent secondary profile. First enable copies primary settings; disabling preserves secondary edits. Character selection starts on primary.
 - Default weapon keys are 1 and 2 and are configurable. Weapon shortcuts must not interrupt text/number editing or Ctrl/Alt/Windows-key shortcuts.
 - Preserve fractional accumulation, timing, and SendInput behavior unless the requested change concerns them. Reset fractional movement when the active operator/weapon changes.

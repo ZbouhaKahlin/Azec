@@ -29,7 +29,9 @@ if errorlevel 1 exit /b 1
 "%NEON_QT_ROOT%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-compiler-runtime --skip-plugin-types generic,networkinformation,tls,styles --dir "%~dp0runtime" "%~dp0runtime\Azec.exe"
 if errorlevel 1 exit /b 1
 pushd .build
-cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp /Fe:"..\Azec.exe" /link /SUBSYSTEM:WINDOWS user32.lib
+rc /nologo /I "..\assets" /fo azec-icon.res "..\assets\app.rc"
+if errorlevel 1 exit /b 1
+cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp azec-icon.res /Fe:"..\Azec.exe" /link /SUBSYSTEM:WINDOWS user32.lib
 if errorlevel 1 exit /b 1
 if /I "%~1"=="test" (
     cl /nologo /std:c++17 /O2 /EHsc /MT /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS ..\tests\core_test.cpp ..\tests\core_checks.cpp ..\src\core.cpp /Fe:core-tests.exe

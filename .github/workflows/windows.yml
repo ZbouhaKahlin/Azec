@@ -24,7 +24,9 @@ jobs:
         run: ./build.cmd test
       - name: Verify desktop at 100% and 150%
         shell: pwsh
-        run: python tests/run_checks.py --ui-only
+        run: |
+          python -m pip install opencv-python-headless
+          python tests/run_checks.py --ui-only --qr-scan
       - name: Upload verification reports and screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -36,6 +38,8 @@ jobs:
             .build/verification/**/http-verification.json
             .build/verification/**/restart-verification.json
             .build/verification/**/recovery-verification.json
+            .build/verification/**/qr-scan-verification.json
             .build/verification/**/*.png
             !.build/verification/**/qr-revealed.png
+            !.build/verification/**/phone-branded.png
           if-no-files-found: ignore

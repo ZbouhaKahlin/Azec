@@ -1,5 +1,6 @@
 #pragma once
 #include <QtWidgets>
+#include <QSvgRenderer>
 #include <algorithm>
 #include <cmath>
 #include "theme.hpp"
@@ -37,12 +38,12 @@ class PairingQr final : public QPushButton {
         for(int pass=0;pass<3;++pass){
             for(int y=0;y<h;++y){
                 const auto* row=pixels+y*stride;auto* output=temporary+y*scratchStride;
-                int sum=0;for(int offset=-radius;offset<=radius;++offset)sum+=qRed(row[std::clamp(offset,0,w-1)]);
-                for(int x=0;x<w;++x){const int gray=sum/span;output[x]=qRgb(gray,gray,gray);sum+=qRed(row[std::min(w-1,x+radius+1)])-qRed(row[std::max(0,x-radius)]);}
+                int red=0,green=0,blue=0;for(int offset=-radius;offset<=radius;++offset){const auto pixel=row[std::clamp(offset,0,w-1)];red+=qRed(pixel);green+=qGreen(pixel);blue+=qBlue(pixel);}
+                for(int x=0;x<w;++x){output[x]=qRgb(red/span,green/span,blue/span);const auto add=row[std::min(w-1,x+radius+1)],remove=row[std::max(0,x-radius)];red+=qRed(add)-qRed(remove);green+=qGreen(add)-qGreen(remove);blue+=qBlue(add)-qBlue(remove);}
             }
             for(int x=0;x<w;++x){
-                int sum=0;for(int offset=-radius;offset<=radius;++offset)sum+=qRed(temporary[std::clamp(offset,0,h-1)*scratchStride+x]);
-                for(int y=0;y<h;++y){const int gray=sum/span;pixels[y*stride+x]=qRgb(gray,gray,gray);sum+=qRed(temporary[std::min(h-1,y+radius+1)*scratchStride+x])-qRed(temporary[std::max(0,y-radius)*scratchStride+x]);}
+                int red=0,green=0,blue=0;for(int offset=-radius;offset<=radius;++offset){const auto pixel=temporary[std::clamp(offset,0,h-1)*scratchStride+x];red+=qRed(pixel);green+=qGreen(pixel);blue+=qBlue(pixel);}
+                for(int y=0;y<h;++y){pixels[y*stride+x]=qRgb(red/span,green/span,blue/span);const auto add=temporary[std::min(h-1,y+radius+1)*scratchStride+x],remove=temporary[std::max(0,y-radius)*scratchStride+x];red+=qRed(add)-qRed(remove);green+=qGreen(add)-qGreen(remove);blue+=qBlue(add)-qBlue(remove);}
             }
         }
         return source;
@@ -51,15 +52,31 @@ class PairingQr final : public QPushButton {
         const qreal ratio=devicePixelRatioF();if(image_.isNull()||raster_ratio_==ratio)return;
         raster_ratio_=ratio;const auto generation=++generation_;const int side=qRound(184*ratio);
         QImage raster(side,side,QImage::Format_RGB32);raster.fill(Qt::white);
-        // Use the whole card with just the four-module scan margin. Align module
-        // boundaries to physical pixels, including at fractional display scales.
-        QPainter painter(&raster);painter.setPen(Qt::NoPen);painter.setBrush(Qt::black);
+        // Keep a four-module quiet zone and snap data modules to physical pixels.
+        const int modules=image_.width()-8;const qreal unit=qreal(side)/image_.width();
+        const auto finder=[modules](int x,int y){x-=4;y-=4;return (x>=0&&x<7&&y>=0&&y<7)||(x>=modules-7&&x<modules&&y>=0&&y<7)||(x>=0&&x<7&&y>=modules-7&&y<modules);};
+        const QColor ink("#242128");QPainter painter(&raster);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);painter.setBrush(ink);
         for(int y=0;y<image_.height();++y)for(int x=0;x<image_.width();++x)if(qRed(image_.pixel(x,y))==0){
+            if(finder(x,y))continue;
             const int left=qRound(qreal(x)*side/image_.width()),top=qRound(qreal(y)*side/image_.height());
-            painter.drawRect(QRect(left,top,qRound(qreal(x+1)*side/image_.width())-left,qRound(qreal(y+1)*side/image_.height())-top));
+            painter.drawRoundedRect(QRectF(left,top,qRound(qreal(x+1)*side/image_.width())-left,qRound(qreal(y+1)*side/image_.height())-top),unit*.12,unit*.12);
         }
+        for(const auto origin:{QPoint(4,4),QPoint(modules-3,4),QPoint(4,modules-3)}){
+            const QRectF outer(origin.x()*unit,origin.y()*unit,7*unit,7*unit);
+            painter.setBrush(ink);painter.drawRoundedRect(outer,unit*.35,unit*.35);
+            painter.setBrush(Qt::white);painter.drawRoundedRect(outer.adjusted(unit,unit,-unit,-unit),unit*.4,unit*.4);
+            painter.setBrush(kbtheme::purple);painter.drawRoundedRect(outer.adjusted(2*unit,2*unit,-2*unit,-2*unit),unit*.3,unit*.3);
+        }
+        // A small logo window consumes less than 6% of the symbol's modules.
+        // The highest ECC level protects the obscured data. The finder and
+        // timing patterns stay clear of the logo window.
+        const qreal center=side/2.0,logoModules=std::min(8.0,modules*.2);
+        const qreal half=(logoModules+1)*unit/2;
+        painter.setBrush(Qt::white);painter.drawRoundedRect(QRectF(center-half,center-half,half*2,half*2),unit*.7,unit*.7);
+        QSvgRenderer logo(QStringLiteral(":/ui/logo.svg"));const qreal logoSide=logoModules*unit;
+        logo.render(&painter,QRectF(center-logoSide/2,center-logoSide/2,logoSide,logoSide));
         painter.end();
-        auto placeholder=image_.scaled(9,9,Qt::IgnoreAspectRatio,Qt::SmoothTransformation).scaled(side,side,Qt::IgnoreAspectRatio,Qt::SmoothTransformation);
+        auto placeholder=raster.scaled(9,9,Qt::IgnoreAspectRatio,Qt::SmoothTransformation).scaled(side,side,Qt::IgnoreAspectRatio,Qt::SmoothTransformation);
         obscured_=QPixmap::fromImage(placeholder);obscured_.setDevicePixelRatio(ratio);
         QPointer<PairingQr> receiver(this);
         QThreadPool::globalInstance()->start([receiver,generation,ratio,raster=std::move(raster)]{
@@ -88,7 +105,7 @@ public:
     void setPairingLink(const QString& link){
         if(link==link_)return;conceal();link_=link;image_=QImage();frames_.clear();obscured_=QPixmap();raster_ratio_=0;++generation_;
         if(!link.isEmpty()){
-            const auto qr=qrcodegen::QrCode::encodeText(link.toUtf8().constData(),qrcodegen::QrCode::Ecc::MEDIUM);
+            const auto qr=qrcodegen::QrCode::encodeText(link.toUtf8().constData(),qrcodegen::QrCode::Ecc::HIGH);
             const int extent=qr.getSize()+8;image_=QImage(extent,extent,QImage::Format_RGB32);image_.fill(Qt::white);
             for(int y=0;y<qr.getSize();++y)for(int x=0;x<qr.getSize();++x)if(qr.getModule(x,y))image_.setPixelColor(x+4,y+4,Qt::black);
         }

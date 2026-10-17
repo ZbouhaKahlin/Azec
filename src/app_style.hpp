@@ -82,6 +82,7 @@ inline QString applicationStyle(const QColor& accent){
         QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical { background:transparent; }
 
         QDialog { background:#FFFAEE; }
+        QDialog#hotkeyDialog { background:#FFFAEE; border:3px solid #31204C; border-radius:24px; }
         QDialog#palestinePopup { background:#FFFAEE; border:3px solid #31204C; border-radius:24px; }
         QLabel#palestineArabic { color:#31204C; font-size:24px; font-weight:900; }
         QToolTip { background:#FFFFFF; color:#31204C; border:2px solid #31204C; border-radius:10px; padding:6px 8px; font-size:12px; }

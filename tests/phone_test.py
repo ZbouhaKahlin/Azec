@@ -14,6 +14,9 @@ def call(path,data=None,auth=True,extra=None):
  except urllib.error.HTTPError as e:return e.code,e.read()
 checks={}
 checks['page_available']=call('/',auth=False)[0]==200
+checks['fresh_default_language_is_english']=json.loads(call('/api/state')[1])['globals']['language']==1
+with urllib.request.urlopen(info['address']+'/',timeout=5) as response:
+ checks['advertised_lan_page_available']=response.status==200 and b'pairForm' in response.read()
 checks['requires_pairing']=call('/api/state',auth=False)[0]==401
 checks['bad_pairing_code']=call('/api/pair',{'code':'000000'},False)[0]==401
 checks['pairing_returns_token']=json.loads(call('/api/pair',{'code':info['code']},False)[1])['token']==info['token']

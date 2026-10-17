@@ -30,7 +30,7 @@ constexpr int legacy_operator_count = 71;
 struct Config {
     std::array<Operator, operator_count> operators;
     std::int32_t menu_key = 0x2d, recoil_key = 0x75, panic_key = 0x23;
-    std::int32_t selected = 0, language = 0;
+    std::int32_t selected = 0, language = 1;
     std::uint8_t sound = 1;
     std::int32_t rapid_key = 0x77;
     std::uint8_t rapid_master = 1;

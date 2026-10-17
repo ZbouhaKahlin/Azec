@@ -9,6 +9,45 @@
 inline constexpr int operatorRowHeight=52;
 inline constexpr int operatorIconSize=44;
 
+class InkPopup final : public QFrame {
+public:
+    explicit InkPopup(QWidget* parent):QFrame(parent,Qt::Popup|Qt::FramelessWindowHint|Qt::NoDropShadowWindowHint){setAttribute(Qt::WA_TranslucentBackground);}
+protected:
+    void paintEvent(QPaintEvent*) override{
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
+        const QRectF face(1.5,1.5,width()-7,height()-8);
+        painter.setPen(Qt::NoPen);painter.setBrush(QColor("#31204C"));painter.drawRoundedRect(face.translated(4,5),12,12);
+        painter.setPen(QPen(QColor("#31204C"),3));painter.setBrush(Qt::white);painter.drawRoundedRect(face,12,12);
+    }
+};
+
+// Keep the combobox model/API, but draw its popup ourselves on every platform.
+class LanguageComboBox final : public QComboBox {
+    InkPopup* popup_;
+    QListWidget* choices_;
+    void choose(){const int index=choices_->currentRow();hidePopup();if(index>=0){setCurrentIndex(index);emit activated(index);}}
+public:
+    explicit LanguageComboBox(QWidget* parent=nullptr):QComboBox(parent),popup_(new InkPopup(this)),choices_(new QListWidget(popup_)){
+        popup_->setObjectName("languagePopup");auto* layout=new QVBoxLayout(popup_);layout->setContentsMargins(8,8,12,13);layout->addWidget(choices_);
+        choices_->setIconSize(QSize(22,15));choices_->setMouseTracking(false);choices_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        choices_->setStyleSheet("QListWidget{background:transparent;border:0;outline:0;} QListWidget::item{height:36px;padding:0 8px;border-radius:8px;background:transparent;} QListWidget::item:selected{background:#EBDEFF;color:#31204C;} QListWidget::item:hover:!selected{background:transparent;}");
+        choices_->installEventFilter(this);connect(choices_,&QListWidget::clicked,this,[this]{choose();});
+    }
+    void showPopup() override{
+        choices_->clear();for(int i=0;i<count();++i)new QListWidgetItem(itemIcon(i),itemText(i),choices_);
+        choices_->setCurrentRow(currentIndex());const auto screen=QGuiApplication::screenAt(mapToGlobal(rect().center()));const QRect bounds=(screen?screen:QGuiApplication::primaryScreen())->availableGeometry();
+        popup_->resize(qMin(bounds.width(),qMax(width(),choices_->sizeHintForColumn(0)+36)),qMin(bounds.height()-16,count()*36+21));
+        QPoint position=mapToGlobal(QPoint(0,height()+4));if(position.y()+popup_->height()>bounds.bottom())position.setY(mapToGlobal(QPoint()).y()-popup_->height()-4);
+        position.setX(qBound(bounds.left(),position.x(),bounds.right()-popup_->width()+1));position.setY(qMax(bounds.top(),position.y()));popup_->move(position);popup_->show();choices_->setFocus(Qt::PopupFocusReason);choices_->scrollToItem(choices_->currentItem());
+    }
+    void hidePopup() override{popup_->hide();QComboBox::hidePopup();}
+protected:
+    bool eventFilter(QObject* watched,QEvent* event) override{
+        if(watched==choices_&&event->type()==QEvent::KeyPress){const int key=static_cast<QKeyEvent*>(event)->key();if(key==Qt::Key_Return||key==Qt::Key_Enter||key==Qt::Key_Space){choose();return true;}if(key==Qt::Key_Escape||key==Qt::Key_Tab){hidePopup();setFocus(Qt::PopupFocusReason);return true;}}
+        return QComboBox::eventFilter(watched,event);
+    }
+};
+
 inline QColor mixColor(const QColor& from,const QColor& to,qreal amount){
     return QColor::fromRgbF(from.redF()+(to.redF()-from.redF())*amount,from.greenF()+(to.greenF()-from.greenF())*amount,from.blueF()+(to.blueF()-from.blueF())*amount);
 }

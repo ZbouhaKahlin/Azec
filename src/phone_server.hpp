@@ -5,6 +5,7 @@
 #include <QSvgRenderer>
 #include <QPainter>
 #include "diagnostics.hpp"
+#include "lan_address.hpp"
 
 class PhoneServer final : public QObject {
     QTcpServer server_;
@@ -45,7 +46,7 @@ class PhoneServer final : public QObject {
     }
     static void reply(QTcpSocket* socket,int status,const QByteArray& body,const QByteArray& type="application/json; charset=utf-8"){
         const QByteArray reason=status==200?"OK":status==400?"Bad Request":status==401?"Unauthorized":status==403?"Forbidden":status==404?"Not Found":status==429?"Too Many Requests":"Error";
-        socket->write("HTTP/1.1 "+QByteArray::number(status)+" "+reason+"\r\nContent-Type: "+type+"\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();
+        socket->write("HTTP/1.1 "+QByteArray::number(status)+" "+reason+"\r\nContent-Type: "+type+"\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();
     }
     static QByteArray json(const QJsonObject& value){return QJsonDocument(value).toJson(QJsonDocument::Compact);}
     void handle(QTcpSocket* socket,const QByteArray& request,int headerEnd,int length){
@@ -120,14 +121,7 @@ public:
     QString code() const{return code_;}
     QString token() const{return token_;}
     QString currentAddress() const{
-        QString best="127.0.0.1";
-        for(const auto& interface:QNetworkInterface::allInterfaces()){
-            const auto flags=interface.flags();if(!(flags&QNetworkInterface::IsUp)||!(flags&QNetworkInterface::IsRunning)||(flags&QNetworkInterface::IsLoopBack))continue;
-            for(const auto& entry:interface.addressEntries()){const auto ip=entry.ip();if(ip.protocol()!=QAbstractSocket::IPv4Protocol||ip.isLinkLocal())continue;
-                if(best=="127.0.0.1"||interface.type()==QNetworkInterface::Wifi){best=ip.toString();if(interface.type()==QNetworkInterface::Wifi)return "http://"+best+":"+QString::number(port());}
-            }
-        }
-        return "http://"+best+":"+QString::number(port());
+        return "http://"+lan::currentAddress()+":"+QString::number(port());
     }
     // refreshNetwork owns adapter enumeration; repeated UI reads in one toggle
     // must not rescan every interface for the address, link, and QR separately.

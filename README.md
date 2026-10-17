@@ -27,6 +27,14 @@ The desktop window: a yellow header band with the pixel-font Azec wordmark, the 
 
 The paired phone page reuses the same GoofyUI materials: cream canvas, white cards with chunky ink outlines and hard offset shadows, sticker section chips, yellow number chips, and face toggles.
 
+![Hotkey dialog](docs/ui-hotkey-dialog.png)
+
+The hotkey dialog keeps the action and key instructions readable, with explicit cancellation.
+
+![Phone language picker](docs/ui-phone-language-picker.png)
+
+The phone language picker stays inside the page and follows the same GoofyUI materials.
+
 ## Run
 
 Double-click **Azec.exe**, or **Run.cmd**.
@@ -54,11 +62,19 @@ Settings → Profile backup exports all primary profiles, secondary profiles, fa
 
 ## Phone control
 
+The advertised pairing address prefers an active physical Wi-Fi or Ethernet adapter with a gateway. Internal virtual switches without a gateway are excluded, so Hyper-V/WSL adapters cannot displace the PC's reachable LAN address. Both Copy link and the QR use this selection.
+
+Desktop Settings uses a GoofyUI language popup and a framed hotkey dialog with wrapped instructions and Cancel. The phone uses matching language, operator, and hotkey pickers, with search for keys/operators, keyboard navigation, and Escape to dismiss. Duplicate hotkeys keep the previous binding and show the validation error without marking a working connection offline. Fresh settings and the unpaired phone page default to English; the paired page follows the saved desktop language. Existing preferences and language IDs remain compatible (Portuguese 0, English 1).
+
 The app starts a local HTTP server automatically. In desktop **Settings → Phone control**, find its Wi-Fi address and six-digit pairing code. On an iPhone connected to the same Wi-Fi, open that address in Safari and enter the code. **Copy link** includes a session token to skip code entry. The address normally uses port 18764; the app selects another available port if needed, and Settings shows the actual address. `localhost` on the phone refers to the phone itself, so use the PC address shown in Settings.
 
 The QR card starts blurred. Click it, or focus it and press Space, to reveal the same session link used by Copy link. Click again to conceal it. Leaving Settings, hiding the window, or changing the network address conceals it automatically. QR generation is entirely local, using bundled Project Nayuki code. The host allow-list refreshes for each request; Settings and QR address changes are detected every 2.5 seconds.
 
-The QR fills its square with only the required four-module scan margin; module edges align to physical display pixels. Click reveal/conceal animates the blur over 420 ms and can reverse mid-animation. Blur textures are prepared off the GUI thread, with a gradual detail reveal and no image filtering during painting. Automatic concealment is immediate. Phone-access toggles expand/collapse only the connection details over 300 ms without rebuilding Settings or resetting its scroll position; disabling access stops the server immediately. The transition uses a transparent cached surface, keeps the toggle row stationary, and preserves the displayed height when reversed.
+The QR uses rounded ink modules, purple finder centers, and the Azec Steady Spark logo in its center. The highest QR error-correction level protects the small logo window, and the four-module white scan margin stays clear. Module edges align to physical display pixels. Click reveal/conceal animates the colour-preserving blur over 420 ms and can reverse mid-animation. Blur textures are prepared off the GUI thread, with a gradual detail reveal and no image filtering during painting. Automatic concealment is immediate. Phone-access toggles expand/collapse only the connection details over 300 ms without rebuilding Settings or resetting its scroll position; disabling access stops the server immediately. The transition uses a transparent cached surface, keeps the toggle row stationary, and preserves the displayed height when reversed.
+
+The Steady Spark logo also appears beside the desktop wordmark, in the window and tray icons, in the Windows launcher/runtime file icons, and on the phone page and home-screen shortcut. Its editable vector sources are `assets/logo.svg` and `assets/app-icon.svg`.
+
+After `build.cmd test`, run `python tests/run_checks.py --ui-only --qr-scan` to check the desktop at 100% and 150% and decode the actual rendered QR images. This optional decoding check requires `opencv-python-headless`. It covers the current fixture session plus five demo URLs; session URLs are compared by hash and never printed.
 
 The phone page edits the same in-memory profiles and global settings as the desktop, including favorites and both weapon slots. Changes apply immediately; use **Save changes** to persist them. It refreshes desktop changes while you are not editing an input. It embeds its display font and has no external fonts, libraries, or internet dependency. Keep the PC app running. If Windows requests network permission, allow the app on the private network used by the phone.
 
@@ -109,6 +125,7 @@ The second command runs core checks, builds a separate UI verification executabl
 - `src/engine.cpp` / `engine.hpp`: input workers, active weapon selection, and synchronized configuration access.
 - `src/profile_store.hpp`: compatible secondary-profile persistence.
 - `src/phone_server.hpp` and `assets/phone.html`: paired local HTTP control server and mobile interface.
+- `src/lan_address.hpp`: Windows adapter discovery and LAN pairing-address selection.
 - `src/core.cpp` / `core.hpp`: original binary record layout and movement arithmetic.
 - `src/launcher.cpp`: starts the packaged app with the correct working directory.
 - `tests/core_checks.cpp`, `tests/ui_checks.cpp`, and `tests/run_checks.py`: verification code and isolated runners.
@@ -119,11 +136,13 @@ Qt is dynamically linked. Its license texts are in `licenses/Qt`; upstream sourc
 
 ## Verification
 
-The current verification passed 21 core checks, 123 UI checks at both 100% and 150% display scaling, 43 HTTP checks, 11 recovery checks, and restart/single-instance checks. Separate motion captures verify continuous phone reversals, fixed toggle-row height, and transparent transition backgrounds at both scales; timing-only runs omit capture overhead. Core coverage includes malformed/truncated/random input, isolation of newer-operator data from the fixed binary layout, and preservation of the previous file after a failed atomic replacement. UI coverage includes the existing layout/interaction contracts plus QR conceal/reveal and animation reversal, smooth weapon tabs, in-place phone toggles with anchored or bottom-clamped scrolling, custom-accent Save states and save failures, close cancellation, backup validation, hotkey collisions, and stationary-cursor repaint suppression.
+Optional phone browser checks: install the Python `playwright` package and Google Chrome, then run `python tests/phone_browser_test.py`. This starts and stops an isolated dry-run instance and checks pairing, QR links, all nine languages at four widths, custom pickers, hotkey conflicts/persistence, and expired sessions. Screenshots and the JSON report stay under `.build/verification`.
 
-Phone checks cover pairing, authorization, invalid values/types/slots/hosts/origins, body limits, profile isolation, global round-trips, icons/manifest, persistence, lockout isolation, and rate-limit recovery. A browser at phone width exercised pairing, secondary edits, saving, language switching, and 72 unique operator options without horizontal overflow. Revealed QR screenshots decoded successfully in software at both scales, while concealed screenshots did not decode. A physical phone scan, actual network-address change, and real mouse output/in-game behavior were not tested.
+The current verification passed 21 core checks, 130 UI checks at both 100% and 150% display scaling, 45 HTTP checks, 11 recovery checks, 17 phone browser checks, and restart/single-instance checks. Separate motion captures verify continuous phone reversals, fixed toggle-row height, and transparent transition backgrounds at both scales; timing-only runs omit capture overhead. Core coverage includes malformed/truncated/random input, isolation of newer-operator data from the fixed binary layout, and preservation of the previous file after a failed atomic replacement. UI coverage includes the existing layout/interaction contracts plus QR conceal/reveal and animation reversal, smooth weapon tabs, in-place phone toggles with anchored or bottom-clamped scrolling, custom-accent Save states and save failures, close cancellation, backup validation, hotkey collisions, and stationary-cursor repaint suppression.
 
-The Windows workflow in `.github/workflows/windows.yml` builds and runs these checks and uploads selected reports/screenshots, excluding pairing-info files and revealed QR screenshots. The hosted workflow has not been run from this local session.
+Phone checks cover pairing, authorization, invalid values/types/slots/hosts/origins, body limits, profile isolation, global round-trips, icons/manifest, persistence, lockout isolation, and rate-limit recovery. Chrome exercised all nine languages at widths of 320, 390, 430, and 768 CSS pixels without horizontal overflow. Browser checks also covered code pairing and token links, English defaults, custom pickers, hotkey persistence/conflicts, Escape/focus behavior, and expired sessions. HTTP checks verified profile isolation and persistence after restarting. Revealed QR screenshots decoded successfully in software at both scales, while concealed screenshots did not decode. A physical phone scan, actual network-address change, and real mouse output/in-game behavior were not tested.
+
+The Windows workflow in `.github/workflows/windows.yml` builds and runs the core, HTTP, restart/recovery, and desktop checks, then uploads selected reports/screenshots, excluding pairing-info files and revealed QR screenshots. The optional Chrome browser suite runs separately. The hosted workflow has not been run from this local session.
 
 UI verification disables all SendInput calls:
 
