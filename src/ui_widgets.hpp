@@ -3,12 +3,21 @@
 #include <QSvgRenderer>
 #include <functional>
 #include <algorithm>
+#include <cmath>
 
 inline constexpr int operatorRowHeight=52;
 inline constexpr int operatorIconSize=44;
 
 inline QColor mixColor(const QColor& from,const QColor& to,qreal amount){
     return QColor::fromRgbF(from.redF()+(to.redF()-from.redF())*amount,from.greenF()+(to.greenF()-from.greenF())*amount,from.blueF()+(to.blueF()-from.blueF())*amount);
+}
+
+// Changing QVariantAnimation's duration/endpoints can emit valueChanged even
+// while stopped. Suppress those setup values so they cannot resize the page or
+// overwrite the current position before a reversal starts.
+inline void retargetAnimation(QVariantAnimation& animation,qreal from,qreal to,int duration){
+    {QSignalBlocker blocked(&animation);animation.stop();animation.setDuration(duration);animation.setStartValue(from);animation.setEndValue(to);animation.setCurrentTime(0);}
+    animation.start();
 }
 
 // The hit target stays stationary; only the vector ink changes on hover and save.
@@ -33,8 +42,10 @@ protected:
         const qreal ratio=devicePixelRatioF();
         if(mask_.isNull()||maskRatio_!=ratio){maskRatio_=ratio;mask_=QPixmap(QSize(20,20)*ratio);mask_.setDevicePixelRatio(ratio);mask_.fill(Qt::transparent);QPainter maskPainter(&mask_);renderer_.render(&maskPainter,QRectF(0,0,20,20));}
         const auto state=property("saveState").toString();
-        QColor color=state=="dirty"||property("activePage").toBool()?accent_():state=="error"?QColor("#ff8a91"):QColor("#909099");
-        color=mixColor(color,objectName()=="closeControl"?QColor("#e87980"):QColor("#bdbdc7"),hoverAmount_);
+        const bool unsaved=state=="dirty"||property("unsaved").toBool();
+        QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?QColor("#ff8a91"):QColor("#909099");
+        const QColor hoverColor=unsaved?mixColor(accent_(),Qt::white,.12):objectName()=="closeControl"?QColor("#e87980"):QColor("#bdbdc7");
+        color=mixColor(color,hoverColor,hoverAmount_);
         if(isDown())color=mixColor(color,QColor("#60606b"),.3);
         QPixmap ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);tint.end();
         QPainter painter(this);if(!isEnabled())painter.setOpacity(.35);painter.drawPixmap(QPointF((width()-20)/2.0,(height()-20)/2.0),ink);
@@ -53,7 +64,7 @@ public:
         connect(&animation_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){position_=value.toReal();update();});
         connect(this,&QAbstractButton::toggled,this,[this](bool on){animation_.stop();if(!isVisible()){position_=on?1:0;update();return;}animation_.setStartValue(position_);animation_.setEndValue(on?1.0:0.0);animation_.start();});
     }
-    void syncChecked(bool checked){QSignalBlocker blocked(this);animation_.stop();position_=checked?1:0;setChecked(checked);update();}
+    void syncChecked(bool checked){if(isChecked()==checked)return;QSignalBlocker blocked(this);animation_.stop();position_=checked?1:0;setChecked(checked);update();}
 protected:
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
@@ -66,11 +77,90 @@ protected:
     }
 };
 
+// Keep the content at its natural size while its viewport opens/closes. Reversals
+// start at the displayed progress, and an empty viewport reserves no layout gap.
+class ExpandingContent final : public QWidget {
+    QWidget* content_;
+    QVariantAnimation animation_;
+    QPixmap snapshot_;
+    qreal progress_=0;
+    int fullHeight_=0,duration_;
+    bool expanded_=false,initialized_=false;
+    int naturalHeight() const {
+        return std::max(0,content_->hasHeightForWidth()?content_->heightForWidth(width()):content_->sizeHint().height());
+    }
+    void apply(){
+        setFixedHeight(qRound(fullHeight_*progress_));update();
+    }
+    void sizeContent(){fullHeight_=naturalHeight();content_->setGeometry(0,0,width(),fullHeight_);if(content_->layout())content_->layout()->activate();}
+    void settle(){animation_.stop();progress_=expanded_?1:0;sizeContent();snapshot_=QPixmap();content_->setEnabled(expanded_);content_->setVisible(expanded_);apply();}
+public:
+    explicit ExpandingContent(QWidget* content,int duration=220,QWidget* parent=nullptr):QWidget(parent),content_(content),duration_(duration){
+        content_->setParent(this);
+        setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);setFixedHeight(0);
+        animation_.setEasingCurve(QEasingCurve::InOutSine);
+        connect(&animation_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){progress_=value.toReal();apply();});
+        connect(&animation_,&QVariantAnimation::finished,this,[this]{settle();});
+    }
+    bool expanded() const{return expanded_;}
+    bool transitioning() const{return animation_.state()==QAbstractAnimation::Running;}
+    qreal progress() const{return progress_;}
+    void setExpanded(bool expanded,bool animate=true){
+        if(initialized_&&expanded_==expanded)return;
+        const bool first=!initialized_;initialized_=true;expanded_=expanded;animation_.stop();
+        if(first||!animate||!isVisible()){settle();return;}
+        // Freeze one correctly laid-out frame. Fading/resizing live child widgets
+        // through an opacity effect can stretch controls and repaint clipped QR
+        // content repeatedly; only this cached surface is painted during motion.
+        content_->setEnabled(true);sizeContent();
+        snapshot_=QPixmap(QSize(width(),fullHeight_)*devicePixelRatioF());snapshot_.setDevicePixelRatio(devicePixelRatioF());snapshot_.fill(Qt::transparent);
+        {QPainter painter(&snapshot_);content_->render(&painter,QPoint(),QRegion(),QWidget::DrawChildren);}
+        content_->hide();
+        retargetAnimation(animation_,progress_,expanded?1.0:0.0,std::max(120,qRound(duration_*std::abs((expanded?1.0:0.0)-progress_))));
+    }
+    QSize sizeHint() const override{return {content_->sizeHint().width(),qRound(fullHeight_*progress_)};}
+protected:
+    void paintEvent(QPaintEvent*) override{if(!snapshot_.isNull()){QPainter painter(this);painter.setOpacity(std::sin(progress_*1.5707963267948966));painter.drawPixmap(0,0,snapshot_);}}
+    void resizeEvent(QResizeEvent* event) override{QWidget::resizeEvent(event);if(event->oldSize().width()!=width())settle();}
+    void hideEvent(QHideEvent* event) override{settle();QWidget::hideEvent(event);}
+};
+
+class WeaponButton final : public QPushButton {
+    QVariantAnimation selection_;
+    qreal amount_=0;
+    bool chosen_=false,initialized_=false;
+    std::function<QColor()> accent_;
+public:
+    explicit WeaponButton(std::function<QColor()> accent):accent_(std::move(accent)){
+        setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);
+        selection_.setEasingCurve(QEasingCurve::OutCubic);
+        connect(&selection_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){amount_=value.toReal();update();});
+    }
+    void setChosen(bool chosen){
+        if(initialized_&&chosen_==chosen)return;
+        const bool animate=initialized_&&isVisible();initialized_=true;chosen_=chosen;setProperty("chosen",chosen);selection_.stop();
+        if(!animate){amount_=chosen?1:0;update();return;}
+        selection_.setDuration(160);selection_.setStartValue(amount_);selection_.setEndValue(chosen?1.0:0.0);selection_.start();
+    }
+protected:
+    void paintEvent(QPaintEvent*) override{
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
+        QColor background("#29292f");background.setAlphaF(amount_);painter.setPen(Qt::NoPen);painter.setBrush(background);painter.drawRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),13,13);
+        QColor ink=mixColor(QColor("#90909c"),accent_(),amount_);if(underMouse())ink=mixColor(ink,QColor("#e9e9ef"),.3);if(isDown())ink=mixColor(ink,Qt::white,.15);
+        painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QColor("#686875"));painter.drawRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),13,13);}
+    }
+    void hideEvent(QHideEvent* event) override{selection_.stop();amount_=chosen_?1:0;QPushButton::hideEvent(event);}
+};
+
 inline QPixmap operatorPixmap(const QString& name,int size=32,qreal ratio=1) {
+    const QString key="kingboss/operator/"+name.toLower()+"/"+QString::number(size)+"/"+QString::number(ratio,'g',12);
+    QPixmap cached;if(QPixmapCache::find(key,&cached))return cached;
     QPixmap pixmap(QSize(size,size)*ratio);pixmap.setDevicePixelRatio(ratio);pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);painter.setRenderHint(QPainter::Antialiasing);
     QSvgRenderer renderer(":/operators/"+name.toLower()+".svg");
     if(renderer.isValid())renderer.render(&painter,QRectF(0,0,size,size));
+    painter.end();QPixmapCache::insert(key,pixmap);
     return pixmap;
 }
 inline QIcon operatorIcon(const QString& name) {QIcon icon;for(int scale:{1,2,3})icon.addPixmap(operatorPixmap(name,operatorIconSize,scale));return icon;}

@@ -60,5 +60,4 @@ public:
 };
 int recoil_interval(const Operator& op, bool rapid_master);
 int rapid_interval(const Operator& op);
-bool self_test(const std::filesystem::path& output);
 }

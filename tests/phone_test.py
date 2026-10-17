@@ -1,4 +1,4 @@
-import json, urllib.request, urllib.error, pathlib, sys
+import json, urllib.request, urllib.error, pathlib, sys, time, http.client
 folder=pathlib.Path(sys.argv[1] if len(sys.argv)>1 else ".build/phone-check")
 info=json.loads((folder/'phone-info.json').read_text())
 if not info.get('dryRun'):
@@ -33,6 +33,38 @@ saved=json.loads((folder/'kingboss_weapons.json').read_text())
 checks['secondary_persists']=saved['operators']['Ash']['enabled'] and abs(saved['operators']['Ash']['vertical']-23.7)<.001
 checks['operator_icon_available']=call('/icons/ash.svg',auth=False)[0]==200
 checks['rejects_icon_traversal']=call('/icons/../phone_server.hpp',auth=False)[0]==404
+checks['rejects_wrong_host']=call('/api/state',extra={'Host':'unrelated.example:'+str(info['port'])})[0]==403
+checks['unknown_authenticated_route']=call('/missing')[0]==404
+checks['manifest_available']=call('/manifest.webmanifest',auth=False)[0]==200
+checks['home_screen_icon_available']=call('/app-icon.svg',auth=False)[0]==200
+checks['rejects_wrong_value_type']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'vertical':'12'}})[0]==400
+checks['rejects_fractional_delay']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'delay':50.5}})[0]==400
+checks['rejects_duplicate_hotkeys']=call('/api/update',{'action':'setGlobal','values':{'key3':45}})[0]==400
+global_values={'key0':45,'key1':117,'key2':119,'key3':35,'key4':51,'key5':52,'language':0,'radius':177,'accent':'#123456'}
+status,body=call('/api/update',{'action':'setGlobal','values':global_values})
+state=json.loads(body)
+checks['global_settings_roundtrip']=status==200 and state['globals']['language']==0 and state['globals']['radius']==177 and state['globals']['accent']=='#123456' and state['keys'][4]['value']==51 and state['keys'][5]['value']==52
+checks['rejects_wrong_global_type']=call('/api/update',{'action':'setGlobal','values':{'sound':'yes'}})[0]==400
+checks['rejects_fractional_key']=call('/api/update',{'action':'setGlobal','values':{'key4':51.5}})[0]==400
+checks['invalid_global_update_is_atomic']=json.loads(call('/api/state')[1])['globals']['radius']==177 and call('/api/update',{'action':'setGlobal','values':{'radius':200,'sound':'yes'}})[0]==400 and json.loads(call('/api/state')[1])['globals']['radius']==177
+def raw_post(body,headers):
+ connection=http.client.HTTPConnection('127.0.0.1',info['port'],timeout=5)
+ try:
+  connection.request('POST','/api/update',body,headers)
+  response=connection.getresponse();status=response.status;response.read();return status
+ finally:connection.close()
+headers={'Authorization':'Bearer '+info['token'],'Content-Type':'application/x-www-form-urlencoded'}
+checks['rejects_form_without_origin']=raw_post(b'action=save',headers)==400
+checks['rejects_oversized_body']=raw_post(b' '*16385,{'Authorization':'Bearer '+info['token']})==400
+checks['authenticated_json_without_origin']=call('/api/update',{'action':'save'})[0]==200
+bad=[call('/api/pair',{'code':'000000'},False)[0] for _ in range(6)]
+checks['sixth_failed_pairing_is_rate_limited']=bad==[401]*5+[429]
+checks['pairing_lockout_keeps_authenticated_access']=call('/api/state')[0]==200
+print('Waiting for the 60-second pairing window to expire...',flush=True)
+time.sleep(61)
+checks['pairing_recovers_after_window']=call('/api/pair',{'code':info['code']},False)[0]==200
+checks['authenticated_access_after_window']=call('/api/state')[0]==200
 report={'checks':checks,'passed':all(checks.values())}
 (folder/'http-verification.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report,indent=2))
+raise SystemExit(0 if report['passed'] else 1)

@@ -32,10 +32,23 @@ pushd .build
 cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp /Fe:"..\KingBoss2004.exe" /link /SUBSYSTEM:WINDOWS user32.lib
 if errorlevel 1 exit /b 1
 if /I "%~1"=="test" (
-    cl /nologo /std:c++17 /O2 /EHsc /MT /D_CRT_SECURE_NO_WARNINGS ..\src\core_test.cpp ..\src\core.cpp /Fe:core-tests.exe
+    cl /nologo /std:c++17 /O2 /EHsc /MT /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS ..\tests\core_test.cpp ..\tests\core_checks.cpp ..\src\core.cpp /Fe:core-tests.exe
     if errorlevel 1 exit /b 1
     .\core-tests.exe test-config.bin
     if errorlevel 1 exit /b 1
 )
 popd
+if /I "%~1"=="test" (
+    if not exist .build\verification-build mkdir .build\verification-build
+    pushd .build\verification-build
+    "%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0KingBoss2004.pro" CONFIG+=verification -o Makefile
+    if errorlevel 1 exit /b 1
+    nmake /nologo
+    if errorlevel 1 exit /b 1
+    popd
+    copy /y ".build\verification-build\release\KingBoss2004-checks.exe" "runtime\KingBoss2004-checks.exe" > nul
+    if errorlevel 1 exit /b 1
+    python tests\run_checks.py
+    if errorlevel 1 exit /b 1
+)
 echo Build complete: KingBoss2004.exe

@@ -5,6 +5,11 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <atomic>
 
 namespace r6 {
 // FUN_140063d90 constructs 73 names but stops after index 70. Zero and Zofia
@@ -40,13 +45,24 @@ std::vector<std::uint8_t> Config::bytes() const {
 }
 bool Config::save(const std::filesystem::path& path) const {
     const auto b = bytes();
-    std::ofstream f(path, std::ios::binary | std::ios::trunc);
-    f.write(reinterpret_cast<const char*>(b.data()), b.size());
-    return bool(f);
+    static std::atomic_uint sequence{0};
+    auto temporary=path;
+    temporary+=L".tmp-"+std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(GetTickCount64())+L"-"+std::to_wstring(sequence++);
+    const HANDLE file=CreateFileW(temporary.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
+    if(file==INVALID_HANDLE_VALUE)return false;
+    DWORD written=0;
+    bool ok=WriteFile(file,b.data(),DWORD(b.size()),&written,nullptr)&&written==b.size()&&FlushFileBuffers(file);
+    if(!CloseHandle(file))ok=false;
+    if(ok)ok=MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=FALSE;
+    if(!ok){const DWORD error=GetLastError();DeleteFileW(temporary.c_str());SetLastError(error);}
+    return ok;
 }
 bool Config::load(const std::filesystem::path& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return false;
+    f.seekg(0,std::ios::end);const auto size=f.tellg();
+    if(size<3708||size>1024*1024)return false;
+    f.seekg(0);
     const std::vector<std::uint8_t> b((std::istreambuf_iterator<char>(f)), {});
     // The original reads partial records unchecked. Reject malformed core data
     // to prevent invalid names, NaNs, or an out-of-range worker index.
@@ -54,7 +70,7 @@ bool Config::load(const std::filesystem::path& path) {
     Config next;
     std::size_t offset = 0;
     auto read = [&](auto& value) {
-        if (offset + sizeof(value) > b.size()) return false;
+        if (offset + sizeof(value) > b.size()) {offset=b.size();return false;}
         std::memcpy(&value, b.data() + offset, sizeof(value));
         offset += sizeof(value);
         return true;
@@ -62,9 +78,7 @@ bool Config::load(const std::filesystem::path& path) {
     read(next.operators); read(next.menu_key); read(next.recoil_key);
     read(next.panic_key); read(next.selected);
     read(next.language); read(next.sound);
-    const auto default_rapid_key = next.rapid_key;
     read(next.rapid_key);
-    if (!next.rapid_key) next.rapid_key = default_rapid_key;
     read(next.rapid_master); read(next.neon); read(next.radius);
     if (next.selected < 0 || next.selected >= operator_count) return false;
     for (auto& op : next.operators) {
@@ -91,38 +105,4 @@ Movement RecoilAccumulator::step(const Operator& op, int jitter) {
 }
 int recoil_interval(const Operator& op, bool master) { return master && op.rapid ? 30 : 12; }
 int rapid_interval(const Operator& op) { return std::max(30, op.delay); }
-bool self_test(const std::filesystem::path& output) {
-    Config config;
-    const auto check = [](bool ok, const char* name) {
-        std::cout << (ok ? "PASS " : "FAIL ") << name << '\n';
-        return ok;
-    };
-    bool ok = check(sizeof(Operator) == 52 && config.bytes().size() == 3734, "recovered binary layout");
-    ok &= check(std::string(config.operators.front().name) == "Ace" &&
-                std::string(config.operators.back().name) == "Ying", "original operator bounds");
-    RecoilAccumulator accumulator;
-    Operator op; op.vertical = 1.25f; op.horizontal = -0.5f;
-    int x = 0, y = 0;
-    for (int i=0;i<4;++i) { const auto m=accumulator.step(op,0); x+=m.x; y+=m.y; }
-    ok &= check(x == -2 && y == 5, "fractional signed movement accumulation");
-    accumulator.reset();
-    auto m = accumulator.step(op, -1);
-    ok &= check(m.x == -1 && m.y == 0, "shared signed humanization jitter");
-    op.rapid=1; op.delay=10;
-    ok &= check(recoil_interval(op,true)==30 && recoil_interval(op,false)==12 &&
-                rapid_interval(op)==30, "worker timing and delay floor");
-    config.operators[4].horizontal=-4.5f;
-    config.selected=4; config.language=1; config.neon[0]=0.25f;
-    Config loaded;
-    ok &= check(config.save(output) && loaded.load(output) &&
-                config.bytes()==loaded.bytes(), "configuration byte round trip");
-    config.enable_secondary(4,true);config.weapon_slot=1;config.active_operator().vertical=23.5f;
-    ok &= check(config.active_operator().vertical==23.5f&&config.operators[4].vertical==10&&config.bytes().size()==3734,"secondary profile isolation and legacy layout");
-    config.enable_secondary(4,false);
-    ok &= check(config.active_slot()==0&&config.active_operator().vertical==10,"disabled secondary falls back to primary");
-    config.enable_secondary(4,true);config.weapon_slot=1;
-    ok &= check(config.active_operator().vertical==23.5f,"secondary edits survive disabling and reenabling");
-    std::cout << "CONFIG " << output.string() << '\n';
-    return ok;
-}
 }

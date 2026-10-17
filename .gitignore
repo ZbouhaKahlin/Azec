@@ -8,6 +8,9 @@
 /runtime/
 /phone-info.json
 /ui-verification.json
+/kingboss.log*
+/r6_config.corrupt-*.bin
+/*.lock
 __pycache__/
 *.py[cod]
 .env

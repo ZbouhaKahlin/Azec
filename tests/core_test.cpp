@@ -1,4 +1,4 @@
-#include "core.hpp"
+#include "core_checks.hpp"
 #include <string>
 int main(int argc,char** argv) {
     if(argc==3&&std::string(argv[1])=="--defaults")return r6::Config{}.save(argv[2])?0:1;

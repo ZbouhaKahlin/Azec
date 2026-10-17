@@ -4,8 +4,14 @@ CONFIG -= debug debug_and_release
 TEMPLATE = app
 TARGET = KingBoss2004
 DESTDIR = $$OUT_PWD/release
-SOURCES += src/app.cpp src/engine.cpp src/core.cpp
-HEADERS += src/engine.hpp src/core.hpp src/ui_widgets.hpp src/profile_store.hpp src/phone_server.hpp
+SOURCES += src/app.cpp src/phone_bridge.cpp src/profile_transfer.cpp src/engine.cpp src/core.cpp third_party/qrcodegen/qrcodegen.cpp
+HEADERS += src/engine.hpp src/core.hpp src/ui_widgets.hpp src/profile_store.hpp src/phone_server.hpp src/main_window.hpp src/app_style.hpp src/startup.hpp src/diagnostics.hpp src/pairing_qr.hpp src/hotkeys.hpp
+HEADERS += src/strings.hpp src/profile_transfer.hpp third_party/qrcodegen/qrcodegen.hpp
+contains(CONFIG, verification) {
+    TARGET = KingBoss2004-checks
+    DEFINES += KINGBOSS_UI_TESTS
+    SOURCES += tests/ui_checks.cpp
+}
 RESOURCES += assets/operators.qrc
 DEFINES += NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS
 LIBS += -luser32 -lgdi32 -ldwmapi

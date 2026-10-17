@@ -2,6 +2,9 @@
 #include <QtCore>
 #include <QtNetwork>
 #include <functional>
+#include <QSvgRenderer>
+#include <QPainter>
+#include "diagnostics.hpp"
 
 class PhoneServer final : public QObject {
     QTcpServer server_;
@@ -10,13 +13,43 @@ class PhoneServer final : public QObject {
     std::function<QJsonObject(const QJsonObject&)> update_;
     QHash<QString,QPair<int,qint64>> failures_;
     QStringList hosts_;
+    QTimer network_timer_;
+    QElapsedTimer elapsed_;
+    QString advertised_;
+    std::function<void()> network_changed_;
     int connections_=0;
+    static bool secretEqual(const QByteArray& actual,const QByteArray& expected){
+        if(actual.size()!=expected.size())return false;
+        volatile unsigned int difference=0;
+        for(qsizetype i=0;i<expected.size();++i)difference=difference|unsigned(static_cast<unsigned char>(actual[i])^static_cast<unsigned char>(expected[i]));
+        return difference==0;
+    }
+    void refreshNetwork(){
+        QStringList current={"localhost","127.0.0.1"};
+        for(const auto& address:QNetworkInterface::allAddresses())if(address.protocol()==QAbstractSocket::IPv4Protocol&&!current.contains(address.toString()))current<<address.toString();
+        current.sort();const auto nextAddress=currentAddress();
+        if(current!=hosts_||nextAddress!=advertised_){hosts_=current;advertised_=nextAddress;if(network_changed_)network_changed_();}
+    }
+    void pruneFailures(){
+        const auto now=elapsed_.elapsed();
+        for(auto it=failures_.begin();it!=failures_.end();)if(now-it.value().second>=60000)it=failures_.erase(it);else ++it;
+    }
+    void recordFailure(const QString& peer){
+        pruneFailures();
+        if(!failures_.contains(peer)&&failures_.size()>=256){
+            auto oldest=failures_.begin();for(auto it=failures_.begin();it!=failures_.end();++it)if(it.value().second<oldest.value().second)oldest=it;
+            failures_.erase(oldest);
+        }
+        if(!failures_.contains(peer))failures_.insert(peer,{0,elapsed_.elapsed()});
+        ++failures_[peer].first;
+    }
     static void reply(QTcpSocket* socket,int status,const QByteArray& body,const QByteArray& type="application/json; charset=utf-8"){
         const QByteArray reason=status==200?"OK":status==400?"Bad Request":status==401?"Unauthorized":status==403?"Forbidden":status==404?"Not Found":status==429?"Too Many Requests":"Error";
         socket->write("HTTP/1.1 "+QByteArray::number(status)+" "+reason+"\r\nContent-Type: "+type+"\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();
     }
     static QByteArray json(const QJsonObject& value){return QJsonDocument(value).toJson(QJsonDocument::Compact);}
     void handle(QTcpSocket* socket,const QByteArray& request,int headerEnd,int length){
+        refreshNetwork();
         const auto lines=request.left(headerEnd).split('\n');const auto first=lines.value(0).trimmed().split(' ');if(first.size()!=3){reply(socket,400,"{}");return;}
         const auto method=first[0];const auto target=QUrl::fromEncoded(first[1]);const auto path=target.path();QHash<QByteArray,QByteArray> headers;
         for(int i=1;i<lines.size();++i){const auto line=lines[i].trimmed();const int colon=line.indexOf(':');if(colon>0)headers[line.left(colon).toLower()]=line.mid(colon+1).trimmed();}
@@ -24,18 +57,29 @@ class PhoneServer final : public QObject {
         if(!hosts_.contains(hostname)||host!=expectedHost){reply(socket,403,"{\"error\":\"Invalid host\"}");return;}
         const auto origin=headers.value("origin");if(!origin.isEmpty()&&origin!="http://"+host.toUtf8()){reply(socket,403,"{\"error\":\"Invalid origin\"}");return;}
         if(method=="GET"&&path=="/"){QFile file(":/ui/phone.html");if(!file.open(QIODevice::ReadOnly)){reply(socket,404,"{}");return;}reply(socket,200,file.readAll(),"text/html; charset=utf-8");return;}
+        if(method=="GET"&&(path=="/manifest.webmanifest"||path=="/app-icon.svg")){
+            QFile file(path=="/manifest.webmanifest"?":/ui/manifest.webmanifest":":/ui/app-icon.svg");
+            if(!file.open(QIODevice::ReadOnly)){reply(socket,404,"{}");return;}
+            reply(socket,200,file.readAll(),path=="/manifest.webmanifest"?"application/manifest+json":"image/svg+xml");return;
+        }
+        if(method=="GET"&&(path=="/app-icon-192.png"||path=="/app-icon-512.png"||path=="/apple-touch-icon.png")){
+            const int size=path=="/app-icon-512.png"?512:path=="/app-icon-192.png"?192:180;
+            QImage image(size,size,QImage::Format_ARGB32_Premultiplied);image.fill(Qt::transparent);
+            QPainter painter(&image);QSvgRenderer renderer(QStringLiteral(":/ui/app-icon.svg"));renderer.render(&painter);painter.end();
+            QByteArray bytes;QBuffer buffer(&bytes);buffer.open(QIODevice::WriteOnly);image.save(&buffer,"PNG");reply(socket,200,bytes,"image/png");return;
+        }
         if(method=="GET"&&path.startsWith("/icons/")){
             const auto name=path.mid(7);if(!QRegularExpression("^[a-z0-9]+\\.svg$").match(name).hasMatch()){reply(socket,404,"{}");return;}
             QFile file(":/operators/"+name);if(!file.open(QIODevice::ReadOnly)){reply(socket,404,"{}");return;}reply(socket,200,file.readAll(),"image/svg+xml");return;
         }
-        const auto peer=socket->peerAddress().toString();auto& attempts=failures_[peer];const auto now=QDateTime::currentMSecsSinceEpoch();if(now-attempts.second>60000)attempts={0,now};
-        if(attempts.first>=5){reply(socket,429,"{\"error\":\"Wait a minute before pairing again\"}");return;}
         QJsonParseError parse;const auto body=QJsonDocument::fromJson(request.mid(headerEnd+4,length),&parse);
         if(method=="POST"&&path=="/api/pair"){
-            if(parse.error!=QJsonParseError::NoError||!body.isObject()||body.object()["code"].toString()!=code_){++attempts.first;reply(socket,401,"{\"error\":\"Incorrect pairing code\"}");return;}
-            attempts.first=0;reply(socket,200,json({{"token",token_}}));return;
+            pruneFailures();const auto peer=socket->peerAddress().toString();
+            if(failures_.value(peer).first>=5){reply(socket,429,"{\"error\":\"Wait a minute before pairing again\"}");return;}
+            if(parse.error!=QJsonParseError::NoError||!body.isObject()||!secretEqual(body.object()["code"].toString().toUtf8(),code_.toUtf8())){recordFailure(peer);reply(socket,401,"{\"error\":\"Incorrect pairing code\"}");return;}
+            failures_.remove(peer);reply(socket,200,json({{"token",token_}}));return;
         }
-        if(headers.value("authorization")!="Bearer "+token_.toUtf8()){++attempts.first;reply(socket,401,"{\"error\":\"Pair with the PC first\"}");return;}
+        if(!secretEqual(headers.value("authorization"),"Bearer "+token_.toUtf8())){reply(socket,401,"{\"error\":\"Pair with the PC first\"}");return;}
         if(method=="GET"&&path=="/api/state"){reply(socket,200,json(state_()));return;}
         if(method=="POST"&&path=="/api/update"){
             if(parse.error!=QJsonParseError::NoError||!body.isObject()){reply(socket,400,"{\"error\":\"Invalid JSON\"}");return;}
@@ -60,18 +104,22 @@ class PhoneServer final : public QObject {
         }
     }
 public:
-    PhoneServer(std::function<QJsonObject()> state,std::function<QJsonObject(const QJsonObject&)> update,QObject* parent=nullptr):QObject(parent),state_(std::move(state)),update_(std::move(update)){connect(&server_,&QTcpServer::newConnection,this,[this]{accept();});}
+    PhoneServer(std::function<QJsonObject()> state,std::function<QJsonObject(const QJsonObject&)> update,QObject* parent=nullptr):QObject(parent),state_(std::move(state)),update_(std::move(update)){
+        elapsed_.start();connect(&server_,&QTcpServer::newConnection,this,[this]{accept();});
+        network_timer_.setInterval(2500);connect(&network_timer_,&QTimer::timeout,this,[this]{refreshNetwork();pruneFailures();});
+    }
+    void onNetworkChanged(std::function<void()> callback){network_changed_=std::move(callback);}
     bool start(){
         if(server_.isListening())return true;
-        if(!server_.listen(QHostAddress::AnyIPv4,18764)&&!server_.listen(QHostAddress::AnyIPv4,0))return false;
-        hosts_={"localhost","127.0.0.1"};for(const auto& address:QNetworkInterface::allAddresses())if(address.protocol()==QAbstractSocket::IPv4Protocol&&!hosts_.contains(address.toString()))hosts_<<address.toString();return true;
+        if(!server_.listen(QHostAddress::AnyIPv4,18764)&&!server_.listen(QHostAddress::AnyIPv4,0)){diagnostic("phone start",server_.errorString());return false;}
+        refreshNetwork();network_timer_.start();return true;
     }
-    void stop(){server_.close();for(auto* socket:server_.findChildren<QTcpSocket*>())socket->abort();}
+    void stop(){network_timer_.stop();server_.close();for(auto* socket:server_.findChildren<QTcpSocket*>())socket->abort();if(network_changed_)network_changed_();}
     bool listening() const{return server_.isListening();}
     quint16 port() const{return server_.serverPort();}
     QString code() const{return code_;}
     QString token() const{return token_;}
-    QString address() const{
+    QString currentAddress() const{
         QString best="127.0.0.1";
         for(const auto& interface:QNetworkInterface::allInterfaces()){
             const auto flags=interface.flags();if(!(flags&QNetworkInterface::IsUp)||!(flags&QNetworkInterface::IsRunning)||(flags&QNetworkInterface::IsLoopBack))continue;
@@ -81,5 +129,8 @@ public:
         }
         return "http://"+best+":"+QString::number(port());
     }
+    // refreshNetwork owns adapter enumeration; repeated UI reads in one toggle
+    // must not rescan every interface for the address, link, and QR separately.
+    QString address() const{return server_.isListening()&&!advertised_.isEmpty()?advertised_:currentAddress();}
     QString pairingLink() const{return address()+"/#token="+token_;}
 };

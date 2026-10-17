@@ -13,7 +13,6 @@ class Engine {
     std::mutex stop_mutex_;
     std::condition_variable stop_condition_;
     std::thread recoil_, rapid_;
-    void* logitech_ = nullptr;
     bool dry_run_;
     void sleep(int ms);
     void input(unsigned long flags, int x=0, int y=0);
