@@ -8,7 +8,7 @@
 namespace r6 {
 Engine::Engine(bool dry_run):dry_run_(dry_run) {
     // Screenshot palette is the new default; persisted binary layout is unchanged.
-    config_.neon[0]=5.0f/255;config_.neon[1]=134.0f/255;config_.neon[2]=105.0f/255;
+    config_.neon[0]=1;config_.neon[1]=91.0f/255;config_.neon[2]=99.0f/255;
     if(!dry_run_)for(const char* path:{"logitechg_discord.dll","C:\\Program Files\\LGHUB\\logitechg_discord.dll","C:\\Program Files (x86)\\LGHUB\\logitechg_discord.dll"}) {
         logitech_=LoadLibraryA(path);
         if(logitech_){(void)GetProcAddress(static_cast<HMODULE>(logitech_),"LogiLedSetTargetDevice");break;}
@@ -22,9 +22,11 @@ bool Engine::select_weapon(int slot){std::lock_guard lock(config_mutex_);if(slot
 bool Engine::load(const std::filesystem::path& file){
     std::lock_guard lock(config_mutex_);
     if(!config_.load(file))return false;
-    // Migrate the previous default neon green to the requested screenshot teal.
-    if(config_.neon[0]==0&&config_.neon[1]==1&&std::abs(config_.neon[2]-.4f)<.00001f){
-        config_.neon[0]=5.0f/255;config_.neon[1]=134.0f/255;config_.neon[2]=105.0f/255;
+    // Update only the two former defaults; keep deliberately chosen custom colors.
+    const bool legacyGreen=config_.neon[0]==0&&config_.neon[1]==1&&std::abs(config_.neon[2]-.4f)<.00001f;
+    const bool legacyTeal=std::abs(config_.neon[0]-5.f/255)<.00001f&&std::abs(config_.neon[1]-134.f/255)<.00001f&&std::abs(config_.neon[2]-105.f/255)<.00001f;
+    if(legacyGreen||legacyTeal){
+        config_.neon[0]=1;config_.neon[1]=91.0f/255;config_.neon[2]=99.0f/255;
     }
     readWeaponProfiles(config_,file);rapid_master=bool(config_.rapid_master);return true;
 }

@@ -49,10 +49,13 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 
 ## UI contracts
 
-- Retain the compact window, 200 px sidebar, custom window controls, rounded corners, charcoal palette, teal active states, and stationary raised right panel.
-- Use Segoe UI for controls and operator names; the subtle `[ KING BOSS ]` title uses Consolas.
+- Retain the compact window, 200 px sidebar, custom window controls, rounded corners, charcoal palette, coral-red default accent (`#FF5B63`), and stationary raised right panel.
+- Use bundled Inter for controls and operator names. The top-left King Boss wordmark is seven lines of red ASCII artwork rendered with Consolas inside the existing header.
+- Header icons share 34 px hit targets and centered 20 px vector artwork. Hover changes only their ink subtly, without background tiles. Keep Save flat, without a glow, pulse, or checkmark swap; its tooltip confirms success.
+- Use 22 px outer window corners, 24 px panel corners, and soft 10-14 px button/input corners. Sliders have pill tracks and circular handles. Preserve the existing layout and hit targets.
+- Operator rows are 52 px tall with 44 px icons and 16 px Inter names. Keep long names readable within the existing sidebar width.
 - Favorites appear only when nonempty and matching search. Favorited operators are hidden from All operators, so each operator appears once. Removing a favorite returns it to All operators.
-- The favorite popup has an inset action; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
+- Right-click favorites use a compact context-menu action, without a nested push button; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
 - Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds.
 - Reactive radius remains a supported setting. Do not remove it as a typography cleanup.

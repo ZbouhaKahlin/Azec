@@ -22,10 +22,10 @@ static QString keyName(int key){
 }
 static void roundWindow(QWidget* window){
     const HWND handle=HWND(window->winId());const DWORD preference=2;
-    if(SUCCEEDED(DwmSetWindowAttribute(handle,33,&preference,sizeof(preference))))return;
-    // Windows 10 lacks the DWM corner-preference API. Clip the actual HWND.
-    RECT rectangle{};GetWindowRect(handle,&rectangle);const int radius=qRound(24*window->devicePixelRatioF());
-    HRGN shape=CreateRoundRectRgn(0,0,rectangle.right-rectangle.left+1,rectangle.bottom-rectangle.top+1,radius,radius);
+    DwmSetWindowAttribute(handle,33,&preference,sizeof(preference));
+    // A region gives both Windows versions the same softer, 22 px outer corners.
+    RECT rectangle{};GetWindowRect(handle,&rectangle);const int diameter=qRound(44*window->devicePixelRatioF());
+    HRGN shape=CreateRoundRectRgn(0,0,rectangle.right-rectangle.left+1,rectangle.bottom-rectangle.top+1,diameter,diameter);
     if(shape&&!SetWindowRgn(handle,shape,TRUE))DeleteObject(shape);
 }
 
@@ -34,13 +34,13 @@ class MainWindow final : public QWidget {
     std::filesystem::path config_path_;
     QListWidget* operators_=nullptr;QListWidget* favorites_list_=nullptr;QLineEdit* search_=nullptr;
     QLabel *favorites_title_=nullptr,*preferences_title_=nullptr;QWidget* favorites_group_=nullptr;
-    QPushButton* back_=nullptr;QSet<QString> favorites_;
+    IconButton* back_=nullptr;QSet<QString> favorites_;
     PageStack* pages_=nullptr;QWidget* operator_page_=nullptr;
     RaisedPanel* panel_=nullptr;QScrollArea* sidebar_scroll_=nullptr;
     QVariantAnimation operator_transition_;
     FadeLabel *name_opacity_=nullptr,*icon_opacity_=nullptr;
     QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr,*subtitle_=nullptr;
-    QPushButton *status_=nullptr,*save_=nullptr,*close_=nullptr,*gear_=nullptr;
+    QPushButton* status_=nullptr;IconButton *save_=nullptr,*close_=nullptr,*gear_=nullptr;
     QWidget* preferences_=nullptr;QScrollArea* preferences_scroll_=nullptr;
     QScrollArea* scroll_=nullptr;QWidget* settings_=nullptr;QVBoxLayout* cards_=nullptr;
     Section *appearance_=nullptr,*system_=nullptr;
@@ -115,9 +115,8 @@ class MainWindow final : public QWidget {
     }
     void updateSavePresentation(const QString& state){
         save_->setProperty("saveState",state);
-        save_->setIcon(QIcon(state=="saved"?":/ui/saved.svg":":/ui/save.svg"));
         save_->setToolTip(state=="dirty"?words("Save configuration · Unsaved changes","Salvar configuracoes · Alteracoes nao salvas"):state=="saved"?words("Configuration saved","Configuracao salva"):state=="error"?words("Could not save configuration","Nao foi possivel salvar"):words("Save configuration","Salvar configuracoes"));
-        save_->style()->unpolish(save_);save_->style()->polish(save_);save_->update();
+        save_->update();
     }
     void dirty(){if(!refreshing_){save_feedback_.stop();updateSavePresentation("dirty");}}
     void editOperator(const std::function<void(r6::Operator&)>& change){engine_.edit([&](r6::Config& c){change(c.active_operator());});dirty();}
@@ -138,7 +137,7 @@ class MainWindow final : public QWidget {
     }
     void filterOperators(){
         const auto term=search_->text();int shown=0;
-        for(auto* list:{operators_,favorites_list_}){int count=0;for(int row=0;row<list->count();++row){auto* item=list->item(row);const bool match=item->text().contains(term,Qt::CaseInsensitive)&&(list==favorites_list_||!favorites_.contains(item->text()));item->setHidden(!match);if(match)++count;}list->setFixedHeight(count*56);if(list==favorites_list_)shown=count;}
+        for(auto* list:{operators_,favorites_list_}){int count=0;for(int row=0;row<list->count();++row){auto* item=list->item(row);const bool match=item->text().contains(term,Qt::CaseInsensitive)&&(list==favorites_list_||!favorites_.contains(item->text()));item->setHidden(!match);if(match)++count;}list->setFixedHeight(count*operatorRowHeight);if(list==favorites_list_)shown=count;}
         favorites_group_->setVisible(shown>0);favorites_list_->setVisible(shown>0);
     }
     void refreshFavorites(){
@@ -193,71 +192,65 @@ class MainWindow final : public QWidget {
     }
     void applyStyle(){
         setStyleSheet(QString::fromUtf8(R"CSS(
-            QWidget { color:#d0cfd0; font-family:'Segoe UI'; font-size:13px; font-weight:400; }
-            QWidget#mainWindow { background:#1a191a; }
-            QFrame#titleBar { background:#1a191a; border:0; }
-            QLabel#brand { font-family:'Consolas'; font-size:19px; font-weight:400; color:#dfdddf; }
-            QLabel#pageTitle,QLabel#preferencesTitle { font-size:20px; font-weight:500; color:#eeedee; }
-            QLabel#sidebarTitle { font-size:15px; font-weight:500; color:#d0cfd0; }
-            QLabel#hint,QLabel#subtitle { color:#8e8b91; font-size:12px; }
-            QLabel#favoritesTitle { color:#b3a16a; font-size:12px; }
-            QFrame#favoritesDivider { background:#494332; border:0; max-height:1px; }
-            QFrame#operatorsDivider { background:#353236; border:0; max-height:1px; }
-            QLabel#rowTitle { color:#cecccf; font-size:13px; }
-            QLabel#cardTitle { color:#a9a7ab; font-size:13px; font-weight:500; }
-            QLabel#sectionArrow { color:#88858c; font-size:20px; }
-            QLineEdit#search { background:#252426; color:#dedcdf; border:1px solid transparent; border-radius:7px; padding:7px 9px; }
+            QWidget { color:#dedee5; font-family:'Inter'; font-size:14px; font-weight:400; }
+            QWidget#mainWindow { background:#141416; }
+            QFrame#titleBar { background:#141416; border:0; }
+            QLabel#brand { font-family:'Consolas'; color:#ff5b63; }
+            QLabel#pageTitle,QLabel#preferencesTitle { font-size:21px; font-weight:500; color:#f0f0f4; }
+            QLabel#sidebarTitle { font-size:15px; font-weight:500; }
+            QLabel#hint,QLabel#subtitle { color:#8c8c98; font-size:12px; }
+            QLabel#favoritesTitle { color:#a3a3ae; font-size:12px; }
+            QFrame#favoritesDivider,QFrame#operatorsDivider { background:#2c2c32; border:0; max-height:1px; }
+            QLabel#rowTitle { color:#d5d5dd; font-size:14px; }
+            QLabel#cardTitle { color:#91919e; font-size:12px; font-weight:500; }
+            QLabel#sectionArrow { color:#8c8c98; font-size:18px; }
+            QLineEdit#search { background:#202023; color:#dedee5; border:1px solid transparent; border-radius:12px; padding:7px 9px; font-size:12px; }
             QLineEdit#search:focus { border-color:%1; }
-            QMenu { background:#252426; color:#d0cfd0; border:0; padding:5px; }
-            QMenu::item { padding:8px 18px 8px 10px; border-radius:4px; }
-            QMenu::item:selected { background:#353236; }
-            QFrame#favoritePopup { background:#282729; border:1px solid #373538; border-radius:8px; }
-            QPushButton#toggleFavorite { text-align:left; background:transparent; border:0; border-radius:5px; padding:5px 9px; color:#dddadd; font-size:13px; }
-            QPushButton#toggleFavorite:hover { background:#373437; }
-            QPushButton#toggleFavorite:pressed { background:#403b40; }
-            QPushButton#weaponChoice { background:transparent; color:#a7a3a9; border:0; border-radius:5px; padding:7px 14px; font-size:13px; }
-            QPushButton#weaponChoice:hover { background:#2c2a2d; }
-            QPushButton#weaponChoice[chosen="true"] { background:#183c32; color:#b8e2d3; }
-            QLabel#phoneAddress { font-family:'Consolas'; font-size:12px; color:#a7c6bb; }
-            QPushButton#windowControl[activePage="true"] { background:#29272b; }
+            QMenu { background:#222226; color:#bdbdc7; border:1px solid #33333b; border-radius:10px; padding:4px; font-size:13px; }
+            QMenu::item { padding:5px 10px 5px 7px; border-radius:7px; background:transparent; }
+            QMenu::item:selected { background:#2a2a30; color:#f4f4f7; }
+            QMenu::icon { padding-left:4px; }
+            QPushButton#weaponChoice { background:transparent; color:#90909c; border:1px solid transparent; border-radius:13px; padding:6px 13px; font-size:13px; }
+            QPushButton#weaponChoice:hover { color:#e9e9ef; }
+            QPushButton#weaponChoice[chosen="true"] { background:#29292f; color:%1; }
+            QLabel#phoneAddress { font-family:'Consolas'; font-size:12px; color:#b9b9c6; }
             QListWidget { background:transparent; border:0; outline:0; }
             QFrame#settingCard { background:transparent; border:0; }
-            QWidget#settingRow { background:#252426; border-radius:6px; border-left:3px solid transparent; }
-            QWidget#settingRow[enabledSetting="true"] { border-left-color:%1; }
-            QPushButton#sectionHeading { text-align:left; padding:12px 0; border:0; background:transparent; color:#dedcdf; font-weight:500; }
+            QWidget#settingRow { background:#222225; border-radius:12px; border-left:3px solid transparent; }
+            QPushButton#sectionHeading { text-align:left; padding:12px 0; border:0; background:transparent; color:#d5d5dd; font-weight:500; }
             QPushButton#sectionHeading:hover { color:white; }
-            QPushButton#windowControl,QPushButton#saveControl { background:transparent; border:0; border-radius:6px; color:#a6a2aa; font-size:19px; }
-            QPushButton#windowControl:hover,QPushButton#saveControl:hover { background:#29272b; color:#f1eef3; }
-            QPushButton#saveControl[saveState="dirty"],QPushButton#saveControl[saveState="saved"] { background:#17362e; }
-            QPushButton#saveControl[saveState="error"] { background:#4c2a30; }
-            QPushButton#closeControl { background:transparent; border:0; border-radius:6px; color:#a6a2aa; font-size:24px; }
-            QPushButton#closeControl:hover { background:#4c2a30; color:#ffb5bd; }
-            QPushButton#status { font-family:'Segoe UI'; font-weight:400; background:#222122; border:0; border-radius:6px; padding:7px 12px; color:#aaa6ad; font-size:13px; }
+            QPushButton#windowControl,QPushButton#saveControl,QPushButton#closeControl { background:transparent; border:0; padding:0; }
+            QPushButton#status { background:transparent; border:1px solid transparent; border-radius:13px; padding:7px 12px; color:#9696a2; font-size:12px; }
+            QPushButton#status:hover { color:#e7e7ee; }
             QPushButton#status[active="true"] { color:%1; }
-            QPushButton#preferencesSave { font-family:'Segoe UI'; font-size:14px; background:%1; color:#f0f5f3; border:0; border-radius:7px; padding:10px 18px; font-weight:500; }
-            QPushButton#preferencesSave:hover { background:#079d7c; }
-            QPushButton#keyButton,QPushButton#secondary { background:#2e2c2f; border:0; border-radius:6px; padding:7px 12px; color:#d7d3da; }
-            QPushButton#keyButton:hover,QPushButton#secondary:hover { background:#373438; }
-            QPushButton#keyButton:pressed,QPushButton#secondary:pressed { background:#3e3a3f; }
-            QDoubleSpinBox,QSpinBox { background:#302e31; border:1px solid transparent; border-radius:5px; padding:5px; color:#e0dce3; }
+            QPushButton#preferencesSave,QPushButton#save { background:%1; color:#151518; border:1px solid transparent; border-radius:14px; padding:9px 16px; font-weight:500; }
+            QPushButton#preferencesSave:hover,QPushButton#save:hover { color:#fff; }
+            QPushButton#keyButton,QPushButton#secondary { background:#2a2a30; border:1px solid transparent; border-radius:12px; padding:6px 11px; color:#c4c4ce; font-size:13px; }
+            QPushButton#keyButton:hover,QPushButton#secondary:hover { background:#303037; color:#f0f0f5; }
+            QPushButton#keyButton:pressed,QPushButton#secondary:pressed { background:#25252b; }
+            QPushButton#keyButton[keyboardFocus="true"],QPushButton#secondary[keyboardFocus="true"],QPushButton#weaponChoice[keyboardFocus="true"],QPushButton#status[keyboardFocus="true"],QPushButton#save[keyboardFocus="true"],QPushButton#preferencesSave[keyboardFocus="true"] { border-color:#686875; }
+            QDoubleSpinBox,QSpinBox { background:#2a2a2f; border:1px solid transparent; border-radius:10px; padding:5px; color:#e1e1e9; font-size:13px; }
             QDoubleSpinBox:focus,QSpinBox:focus { border-color:%1; }
-            QDoubleSpinBox:disabled,QSpinBox:disabled { color:#6f6a74; background:#2b292c; }
-            QSlider::groove:horizontal { height:4px; background:#444045; border-radius:2px; }
-            QSlider::sub-page:horizontal { background:%1; border-radius:2px; }
-            QSlider::handle:horizontal { width:12px; margin:-4px 0; background:#d2d0d4; border:0; border-radius:6px; }
-            QComboBox { background:#353236; color:#d7d3da; border:0; border-radius:5px; padding:7px 10px; min-width:120px; }
+            QDoubleSpinBox:disabled,QSpinBox:disabled { color:#6e6e7a; background:#252529; }
+            QSlider::groove:horizontal { height:6px; background:#35353d; border-radius:3px; }
+            QSlider::sub-page:horizontal { background:%1; border-radius:3px; }
+            QSlider::handle:horizontal { width:14px; margin:-4px 0; background:#ececf1; border:0; border-radius:7px; }
+            QSlider::handle:horizontal:hover { background:white; }
+            QComboBox { background:#2a2a30; color:#d3d3dc; border:1px solid transparent; border-radius:12px; padding:6px 10px; min-width:120px; font-size:13px; }
+            QComboBox:focus { border-color:%1; }
             QComboBox::drop-down { border:0; width:22px; }
-            QComboBox QAbstractItemView { background:#2b282d; selection-background-color:%1; border:0; padding:4px; }
+            QComboBox::down-arrow { image:url(:/ui/chevron.svg); width:12px; height:12px; }
+            QComboBox QAbstractItemView { background:#25252b; selection-background-color:#35353e; border:0; padding:4px; }
             QScrollArea { background:transparent; border:0; }
             QScrollArea>QWidget>QWidget { background:transparent; }
             QScrollBar:vertical { background:transparent; width:6px; margin:3px 0; }
-            QScrollBar::handle:vertical { background:#454247; min-height:36px; border-radius:3px; }
+            QScrollBar::handle:vertical { background:#3d3d47; min-height:36px; border-radius:3px; }
             QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical { height:0; }
             QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical { background:transparent; }
-            QDialog { background:#1a191a; }
-            QToolTip { background:#302c32; color:#e0dce3; border:0; padding:7px; }
+            QDialog { background:#1c1c1f; }
+            QToolTip { background:#29292f; color:#e1e1e9; border:0; padding:6px 8px; font-size:12px; }
             QPushButton:focus { outline:0; }
-        )CSS").arg(accent().name()));operators_->viewport()->update();
+        )CSS").arg(accent().name()));operators_->viewport()->update();favorites_list_->viewport()->update();
     }
     void buildSettings(){
         refreshing_=true;const auto c=engine_.snapshot();if(settings_){scroll_->takeWidget();delete settings_;}
@@ -301,7 +294,7 @@ class MainWindow final : public QWidget {
         auto* colorRow=settingRow(appearance,words("Accent color","Cor de destaque"),words("Used for switches and selected states.","Usada nos controles e na selecao."));auto* color=new QPushButton(accent().name().toUpper());color->setObjectName("secondary");color->setAccessibleName("Accent color");colorRow->addWidget(color);
         connect(color,&QPushButton::clicked,this,[this,color]{const auto next=chooseColor();if(next.isValid()){engine_.edit([=](r6::Config& c){c.neon[0]=next.redF();c.neon[1]=next.greenF();c.neon[2]=next.blueF();});color->setText(next.name().toUpper());applyStyle();dirty();}});
         auto* radiusRow=settingRow(appearance,words("Reactive radius","Raio reativo"),words("Mouse response in the background.","Resposta ao mouse no fundo."));auto* radius=new QSlider(Qt::Horizontal);radius->setRange(50,400);radius->setValue(qRound(c.radius));radius->setAccessibleName("Reactive radius");radiusRow->addWidget(radius,1);connect(radius,&QSlider::valueChanged,this,[this](int n){engine_.edit([=](r6::Config& c){c.radius=float(n);});dirty();});
-        auto* reset=new QPushButton(words("Reset appearance","Redefinir aparencia"));reset->setObjectName("secondary");appearance->body->addWidget(reset,0,Qt::AlignLeft);connect(reset,&QPushButton::clicked,this,[this]{engine_.edit([](r6::Config& c){c.neon[0]=5.f/255;c.neon[1]=134.f/255;c.neon[2]=105.f/255;c.radius=130;});applyStyle();dirty();QTimer::singleShot(0,this,[this]{buildPreferences();});});
+        auto* reset=new QPushButton(words("Reset appearance","Redefinir aparencia"));reset->setObjectName("secondary");appearance->body->addWidget(reset,0,Qt::AlignLeft);connect(reset,&QPushButton::clicked,this,[this]{engine_.edit([](r6::Config& c){c.neon[0]=1;c.neon[1]=91.f/255;c.neon[2]=99.f/255;c.radius=130;});applyStyle();dirty();QTimer::singleShot(0,this,[this]{buildPreferences();});});
         auto* guide=new QPushButton(words("Quick guide","Guia rapido"));guide->setObjectName("secondary");preferencesLayout->addWidget(guide,0,Qt::AlignLeft);connect(guide,&QPushButton::clicked,this,[this]{help();});
         preferencesLayout->addStretch();preferences_scroll_->setWidget(content);refreshing_=false;
     }
@@ -353,14 +346,14 @@ class MainWindow final : public QWidget {
     }
     void bindKey(int index){
         binding_=index+1;QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setFixedSize(360,205);dialog.setWindowTitle("Key binding");auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(22,18,22,20);
-        auto* header=new QHBoxLayout;header->addWidget(label(words("Set a hotkey","Definir atalho"),"cardTitle"),1);auto* cancel=new QPushButton(QString::fromUtf8("×"));cancel->setObjectName("closeControl");cancel->setFixedSize(30,30);header->addWidget(cancel);layout->addLayout(header);connect(cancel,&QPushButton::clicked,&dialog,&QDialog::reject);
+        auto* header=new QHBoxLayout;header->addWidget(label(words("Set a hotkey","Definir atalho"),"cardTitle"),1);auto* cancel=new IconButton(":/ui/close.svg",[this]{return accent();});cancel->setObjectName("closeControl");cancel->setAccessibleName("Cancel hotkey binding");header->addWidget(cancel);layout->addLayout(header);connect(cancel,&QPushButton::clicked,&dialog,&QDialog::reject);
         auto* hint=label(words("Release your keys. Waiting...","Solte as teclas. Aguarde..."));hint->setWordWrap(true);layout->addWidget(hint);layout->addWidget(label(words("Esc cancels · Backspace clears","Esc cancela · Backspace remove"),"hint"));layout->addStretch();
         QElapsedTimer started;started.start();QTimer timer;timer.setInterval(16);connect(&timer,&QTimer::timeout,&dialog,[&]{if(started.elapsed()<1200)return;hint->setText(words("Press a key now","Pressione uma tecla agora"));for(int key=3;key<256;++key)if(keyDown(key)){if(key!=VK_ESCAPE){const auto existing=engine_.snapshot();if(key!=VK_BACK&&((index==4&&key==existing.secondary_key)||(index==5&&key==existing.primary_key))){hint->setText(words("Choose a different weapon key","Escolha outra tecla de arma"));return;}engine_.edit([=](r6::Config& c){int* keys[]={&c.menu_key,&c.recoil_key,&c.rapid_key,&c.panic_key,&c.primary_key,&c.secondary_key};*keys[index]=key==VK_BACK?0:key;});dirty();save();}release_key_=key;blocked_until_=clock_.elapsed()+250;dialog.accept();break;}});
         timer.start();roundWindow(&dialog);dialog.exec();binding_=0;const auto c=engine_.snapshot();const int keys[]={c.menu_key,c.recoil_key,c.rapid_key,c.panic_key,c.primary_key,c.secondary_key};if(key_buttons_[index])key_buttons_[index]->setText(keyName(keys[index]));syncSelection();updateStatus();
     }
     void help(){
         QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setFixedSize(410,230);dialog.setWindowTitle("KingBoss2004 help");auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(24,18,24,22);
-        auto* header=new QHBoxLayout;auto* title=label("","cardTitle");header->addWidget(title,1);auto* close=new QPushButton(QString::fromUtf8("×"));close->setObjectName("closeControl");close->setFixedSize(30,30);header->addWidget(close);layout->addLayout(header);connect(close,&QPushButton::clicked,&dialog,&QDialog::accept);
+        auto* header=new QHBoxLayout;auto* title=label("","cardTitle");header->addWidget(title,1);auto* close=new IconButton(":/ui/close.svg",[this]{return accent();});close->setObjectName("closeControl");close->setAccessibleName("Close quick guide");header->addWidget(close);layout->addLayout(header);connect(close,&QPushButton::clicked,&dialog,&QDialog::accept);
         auto* description=label("");description->setWordWrap(true);layout->addWidget(description,1);auto* row=new QHBoxLayout;auto* back=new QPushButton(words("Back","Voltar"));back->setObjectName("secondary");auto* next=new QPushButton(words("Next","Proximo"));next->setObjectName("save");auto* count=label("","hint");row->addWidget(back);row->addWidget(count,1,Qt::AlignCenter);row->addWidget(next);layout->addLayout(row);
         const QStringList titles={words("Welcome","Bem-vindo"),words("Choose an operator","Selecione um operador"),words("Adjust recoil","Ajuste o recoil"),"Rapid fire",words("Appearance","Aparencia"),words("Hotkeys and saving","Atalhos e configuracoes")};
         const QStringList descriptions={words("Your operator profiles and controls, in one place.","Seus perfis e controles em um so lugar."),words("Select a name in the sidebar, or search for an operator.","Selecione um nome na barra lateral ou pesquise um operador."),words("Set vertical and horizontal force. Use arrow keys for fine adjustments.","Ajuste a forca vertical e horizontal. Use as setas para ajustes finos."),words("Enable the global control, then enable rapid fire for the selected operator.","Habilite o controle global e depois o rapid fire do operador."),words("Open the settings gear to change the accent color and reactive radius.","Abra a engrenagem para alterar a cor e o raio reativo."),words("Set your hotkeys in System settings. Save configuration to keep your changes.","Defina os atalhos em Configuracoes. Salve para manter suas alteracoes.")};
@@ -369,7 +362,7 @@ class MainWindow final : public QWidget {
     }
 protected:
     void paintEvent(QPaintEvent*) override {
-        ++paint_count_;QPainter p(this);p.fillRect(rect(),QColor("#1a191a"));const auto c=engine_.snapshot();const QPoint mouse=mapFromGlobal(QCursor::pos());QColor color=accent();p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);
+        ++paint_count_;QPainter p(this);p.fillRect(rect(),QColor("#141416"));const auto c=engine_.snapshot();const QPoint mouse=mapFromGlobal(QCursor::pos());QColor color=accent();p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);
         static const QPixmap image("titio.png");if(!image.isNull()){p.setOpacity(.035);p.drawPixmap(rect(),image);p.setOpacity(1);}
         for(int x=18;x<width();x+=45)for(int y=90;y<height()-12;y+=45){const auto delta=QPoint(x,y)-mouse;const qreal distance=std::hypot(delta.x(),delta.y());QColor dot=color;dot.setAlpha(8);p.setBrush(dot);p.drawEllipse(QPointF(x,y),1.1,1.1);if(distance<c.radius){const qreal strength=1-distance/c.radius;dot.setAlpha(qRound(strength*15));p.setBrush(dot);p.drawEllipse(QPointF(x,y),1.5+strength*1.4,1.5+strength*1.4);}}
     }
@@ -380,6 +373,12 @@ protected:
     void closeEvent(QCloseEvent* event) override {engine_.stop();QWidget::closeEvent(event);}
     void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);if(native_ready_)roundWindow(this);}
     bool eventFilter(QObject* object,QEvent* event) override {
+        if(event->type()==QEvent::FocusIn||event->type()==QEvent::FocusOut||event->type()==QEvent::MouseButtonPress){
+            if(auto* button=qobject_cast<QPushButton*>(object);button&&isAncestorOf(button)){
+                const auto reason=event->type()==QEvent::MouseButtonPress?Qt::MouseFocusReason:static_cast<QFocusEvent*>(event)->reason();const bool keyboard=event->type()==QEvent::FocusIn&&(reason==Qt::TabFocusReason||reason==Qt::BacktabFocusReason||reason==Qt::ShortcutFocusReason);
+                button->setProperty("keyboardFocus",keyboard);button->style()->unpolish(button);button->style()->polish(button);button->update();
+            }
+        }
         if(event->type()==QEvent::KeyPress){auto* key=static_cast<QKeyEvent*>(event);auto* widget=qobject_cast<QWidget*>(object);
             if(widget&&widget->window()==this&&pages_->currentWidget()==operator_page_&&(key->key()==Qt::Key_Up||key->key()==Qt::Key_Down||key->key()==Qt::Key_Left||key->key()==Qt::Key_Right)&&!qobject_cast<QLineEdit*>(widget)&&!qobject_cast<QAbstractSpinBox*>(widget))return true;}
         return QWidget::eventFilter(object,event);
@@ -394,10 +393,10 @@ public:
         setObjectName("mainWindow");setWindowTitle("KingBoss2004");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setWindowIcon(operatorIcon("Ash"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(650,area.height()-48));move(area.center()-rect().center());
         auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(46);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,10,0);top->setSpacing(5);
         top->addWidget(new BrandLabel);top->addStretch();status_=new QPushButton;status_->setObjectName("status");status_->setToolTip("Toggle recoil activity");top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
-        save_=new QPushButton;save_->setObjectName("saveControl");save_->setAccessibleName("Save configuration");save_->setIcon(QIcon(":/ui/save.svg"));save_->setIconSize(QSize(21,21));save_->setFixedSize(34,34);save_->setCursor(Qt::PointingHandCursor);top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save();});
+        save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName("Save configuration");top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save();});
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
-        gear_=new QPushButton;gear_->setIcon(QIcon(":/ui/settings.svg"));gear_->setIconSize(QSize(21,21));gear_->setObjectName("windowControl");gear_->setFixedSize(34,34);gear_->setCursor(Qt::PointingHandCursor);gear_->setAccessibleName("Settings");gear_->setToolTip(words("Settings","Configuracoes"));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});auto* minimize=new QPushButton(QString::fromUtf8("−"));minimize->setObjectName("windowControl");minimize->setFixedSize(32,32);minimize->setAccessibleName("Minimize");top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
-        close_=new QPushButton(QString::fromUtf8("×"));close_->setObjectName("closeControl");close_->setFixedSize(34,34);close_->setAccessibleName("Close");top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
+        gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName("Settings");gear_->setToolTip(words("Settings","Configuracoes"));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName("Minimize");minimize->setToolTip("Minimize");top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
+        close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName("Close");close_->setToolTip("Close");top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
         auto* body=new QWidget;auto* columns=new QHBoxLayout(body);columns->setContentsMargins(0,0,0,0);columns->setSpacing(0);
         auto* sidebar=new QWidget;sidebar->setObjectName("operatorSidebar");sidebar->setFixedWidth(200);auto* sidebarLayout=new QVBoxLayout(sidebar);sidebarLayout->setContentsMargins(10,18,2,12);sidebarLayout->setSpacing(8);
         search_=new QLineEdit;search_->setObjectName("search");search_->setClearButtonEnabled(true);search_->setAccessibleName("Search operators");sidebarLayout->addWidget(search_);
@@ -417,7 +416,7 @@ public:
         name_opacity_=static_cast<FadeLabel*>(operator_name_);icon_opacity_=static_cast<FadeLabel*>(operator_icon_);
         scroll_=new QScrollArea;scroll_->setWidgetResizable(true);scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(scroll_);rightLayout->addWidget(scroll_,1);pages_->addWidget(operator_page_);
         preferences_=new QWidget;preferences_->setObjectName("preferencesPage");auto* preferenceLayout=new QVBoxLayout(preferences_);preferenceLayout->setContentsMargins(20,20,16,14);preferenceLayout->setSpacing(10);auto* preferenceHeader=new QHBoxLayout;preferenceHeader->setSpacing(10);
-        back_=new QPushButton;back_->setObjectName("windowControl");back_->setIcon(QIcon(":/ui/back.svg"));back_->setIconSize(QSize(20,20));back_->setFixedSize(30,30);back_->setAccessibleName("Back to operators");connect(back_,&QPushButton::clicked,this,[this]{showOperators();});preferenceHeader->addWidget(back_);preferences_title_=label("Settings","pageTitle");preferenceHeader->addWidget(preferences_title_,1);preferenceLayout->addLayout(preferenceHeader);
+        back_=new IconButton(":/ui/back.svg",[this]{return accent();});back_->setObjectName("windowControl");back_->setAccessibleName("Back to operators");connect(back_,&QPushButton::clicked,this,[this]{showOperators();});preferenceHeader->addWidget(back_);preferences_title_=label("Settings","pageTitle");preferenceHeader->addWidget(preferences_title_,1);preferenceLayout->addLayout(preferenceHeader);
         preferences_scroll_=new QScrollArea;preferences_scroll_->setWidgetResizable(true);preferences_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(preferences_scroll_);preferenceLayout->addWidget(preferences_scroll_,1);pages_->addWidget(preferences_);
         panel_=new RaisedPanel;panel_->setObjectName("raisedPanel");auto* panelLayout=new QVBoxLayout(panel_);panelLayout->setContentsMargins(8,3,12,13);panelLayout->setSpacing(0);panelLayout->addWidget(pages_);columns->addWidget(panel_,1);layout->addWidget(body,1);
         favorites_=readFavorites();refreshFavorites();
@@ -435,18 +434,27 @@ public:
     void closeUsingControl(){close_->click();}
     QJsonObject selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
-        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<698||size()==QSize(864,650);checks["sidebar_is_narrower"]=findChild<QWidget*>("operatorSidebar")->width()==200;checks["kingboss_branding"]=windowTitle()=="KingBoss2004"&&findChild<QLabel*>("brand")->text()=="[ KING BOSS ]";checks["all_71_operators"]=operators_->count()==71;checks["all_71_svg_icons_valid"]=icon_failures_.empty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
+        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<698||size()==QSize(864,650);checks["sidebar_is_narrower"]=findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["kingboss_branding"]=windowTitle()=="KingBoss2004"&&brand->accessibleName()=="King Boss"&&brand->text().split('\n').size()==7&&brand->text().contains('#');checks["all_71_operators"]=operators_->count()==71;checks["all_71_svg_icons_valid"]=icon_failures_.empty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
         auto* sidebarBar=static_cast<FadingScrollBar*>(sidebar_scroll_->verticalScrollBar());checks["scrollbars_start_invisible"]=sidebarBar->opacity()==0&&static_cast<FadingScrollBar*>(scroll_->verticalScrollBar())->opacity()==0&&static_cast<FadingScrollBar*>(preferences_scroll_->verticalScrollBar())->opacity()==0;
         checks["one_shared_sidebar_scroll"]=sidebar_scroll_->widget()->isAncestorOf(operators_)&&sidebar_scroll_->widget()->isAncestorOf(favorites_list_)&&operators_->verticalScrollBarPolicy()==Qt::ScrollBarAlwaysOff&&favorites_list_->verticalScrollBarPolicy()==Qt::ScrollBarAlwaysOff;
         checks["raised_panel_contains_both_pages"]=panel_->isAncestorOf(operator_page_)&&panel_->isAncestorOf(preferences_)&&!panel_->graphicsEffect()&&pages_->width()>findChild<QWidget*>("operatorSidebar")->width()*3;
         search_->setText("Blackbeard");int visible=0;for(int i=0;i<operators_->count();++i)if(!operators_->item(i)->isHidden())++visible;checks["search_filters_sidebar"]=visible==1;search_->clear();
         operators_->setCurrentRow(4);vertical_->setValue(12.3);horizontal_->setValue(-2.4);humanize_->setChecked(false);operator_rapid_->setChecked(true);delay_->setValue(75);auto c=engine_.snapshot();checks["controls_update_selected_operator"]=c.selected==4&&std::abs(c.operators[4].vertical-12.3f)<.001f&&std::abs(c.operators[4].horizontal+2.4f)<.001f&&!c.operators[4].humanize&&c.operators[4].rapid&&c.operators[4].delay==75;
         operators_->setCurrentRow(0);checks["other_profile_preserved"]=vertical_->value()==10&&horizontal_->value()==0;operators_->setCurrentRow(4);const auto fixture=std::filesystem::path(output.toStdWString())/L"ui-test-config.bin";r6::Config readback;checks["3734_byte_compatible_settings"]=engine_.save(fixture)&&readback.load(fixture)&&readback.bytes()==engine_.snapshot().bytes();
-        save_->click();r6::Config saved;checks["save_button_writes_settings"]=saved.load(config_path_)&&saved.bytes()==engine_.snapshot().bytes();checks["save_icon_feedback"]=save_->property("saveState").toString()=="saved";
+        const auto saveIcon=save_->icon().cacheKey();save_->click();r6::Config saved;checks["save_button_writes_settings"]=saved.load(config_path_)&&saved.bytes()==engine_.snapshot().bytes();checks["save_icon_feedback"]=save_->property("saveState").toString()=="saved";
+        wait(180);const auto saveAfterClick=save_->grab().toImage();capture(output+"/save-start.png");wait(1100);capture(output+"/save-feedback.png");
+        checks["save_has_no_glow_or_icon_swap"]=save_->grab().toImage()==saveAfterClick&&save_->icon().cacheKey()==saveIcon;
         const bool masterBefore=engine_.recoil_master;recoil_master_->click();checks["master_recoil_control"]=engine_.recoil_master.load()!=masterBefore;recoil_master_->click();const bool rapidBefore=engine_.rapid_master;rapid_master_->click();checks["global_rapid_control"]=engine_.rapid_master.load()!=rapidBefore&&bool(engine_.snapshot().rapid_master)==engine_.rapid_master.load();rapid_master_->click();
         const auto before=engine_.recoil_active.load();checks["initial_recoil_off"]=!before;status_->click();checks["activation_control"]=engine_.recoil_active.load()!=before;status_->click();checks["second_click_restores_off"]=!engine_.recoil_active.load();
-        checks["consistent_system_typography"]=QFontInfo(operator_name_->font()).family()=="Segoe UI"&&QFontInfo(save_->font()).family()=="Segoe UI"&&QFontInfo(status_->font()).family()=="Segoe UI"&&QFontInfo(findChild<QLabel*>("brand")->font()).family()=="Consolas";
-        checks["compact_operator_rows"]=operators_->sizeHintForRow(0)==56&&operators_->item(0)->icon().availableSizes().contains(QSize(40,40));
+        // Hidden harness windows need an active Qt focus context for Tab events.
+        QApplication::setActiveWindow(this);status_->clearFocus();status_->setFocus(Qt::TabFocusReason);QApplication::processEvents();const bool keyboardIndicator=status_->property("keyboardFocus").toBool();
+        const QPointF statusPoint=status_->rect().center();QMouseEvent press(QEvent::MouseButtonPress,statusPoint,QPointF(status_->mapToGlobal(statusPoint.toPoint())),Qt::LeftButton,Qt::LeftButton,Qt::NoModifier);QApplication::sendEvent(status_,&press);QMouseEvent release(QEvent::MouseButtonRelease,statusPoint,QPointF(status_->mapToGlobal(statusPoint.toPoint())),Qt::LeftButton,Qt::NoButton,Qt::NoModifier);QApplication::sendEvent(status_,&release);status_->click();checks["keyboard_focus_is_visible_and_mouse_click_clears_it"]=keyboardIndicator&&!status_->property("keyboardFocus").toBool()&&!engine_.recoil_active.load();
+        checks["consistent_bundled_typography"]=QFontInfo(operator_name_->font()).family()=="Inter"&&QFontInfo(save_->font()).family()=="Inter"&&QFontInfo(status_->font()).family()=="Inter";
+        checks["compact_operator_rows"]=operators_->sizeHintForRow(0)==operatorRowHeight&&operators_->item(0)->icon().availableSizes().contains(QSize(operatorIconSize,operatorIconSize));
+        QFont sidebarFont("Inter");sidebarFont.setPixelSize(16);sidebarFont.setWeight(QFont::Medium);bool namesFit=true;for(int row=0;row<operators_->count();++row)namesFit&=QFontMetrics(sidebarFont).horizontalAdvance(operators_->item(row)->text())<=operators_->viewport()->width()-73;checks["larger_operator_names_fit_sidebar"]=namesFit;
+        bool aligned=true;for(auto* button:save_->parentWidget()->findChildren<QPushButton*>(QString(),Qt::FindDirectChildrenOnly))if(button!=status_)aligned&=button->size()==QSize(34,34)&&button->geometry().center().y()==save_->geometry().center().y()&&button->text().isEmpty()&&button->iconSize()==QSize(20,20);checks["header_icons_share_geometry"]=aligned;
+        const auto gearBefore=gear_->grab().toImage();QEnterEvent enter(QPointF(17,17),QPointF(gear_->pos()+QPoint(17,17)),QPointF(gear_->mapToGlobal(QPoint(17,17))));QApplication::sendEvent(gear_,&enter);wait(170);const auto gearHovered=gear_->grab().toImage();capture(output+"/header-hover.png");
+        bool transparentEdges=true;for(int y=0;y<gearBefore.height();++y)for(int x=0;x<gearBefore.width();++x)if(x<3||y<3||x>=gearBefore.width()-3||y>=gearBefore.height()-3)transparentEdges&=gearBefore.pixelColor(x,y)==gearHovered.pixelColor(x,y);checks["header_hover_has_no_background_tile"]=transparentEdges&&gearBefore!=gearHovered;QEvent leave(QEvent::Leave);QApplication::sendEvent(gear_,&leave);wait(170);
         checks["status_has_no_hotkey"]=status_->text()=="Recoil off";
         checks["save_icon_next_to_settings"]=save_->text().isEmpty()&&!save_->icon().isNull()&&save_->parentWidget()==gear_->parentWidget()&&save_->geometry().right()<gear_->geometry().left();
         checks["footer_removed"]=!findChild<QFrame*>("footer");checks["small_r6_label_removed"]=!findChild<QLabel*>("r6Badge");
@@ -465,7 +473,7 @@ public:
         preferences_scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();capture(output+"/system.png");back_->click();checks["settings_back_preserves_profile"]=pages_->currentWidget()==operator_page_&&engine_.snapshot().selected==4&&vertical_->value()==12.3;
         const auto originalFavorites=favorites_;favorites_.clear();persistFavorites();refreshFavorites();wait(220);checks["empty_favorites_hide_entire_group"]=favorites_group_->isHidden()&&!favorites_title_->isVisible()&&favorites_list_->isHidden();capture(output+"/empty-favorites.png");
         setFavorite(4,false);operators_->scrollToItem(operators_->item(4));QApplication::processEvents();
-        bool favoriteAction=false,compactMenu=false,insetHover=false;QTimer::singleShot(50,this,[&]{auto* popup=QApplication::activePopupWidget();auto* button=popup?popup->findChild<QPushButton*>("toggleFavorite"):nullptr;if(button){favoriteAction=!button->icon().isNull();compactMenu=popup->width()==178&&popup->height()==52;const auto before=popup->grab().toImage();button->setAttribute(Qt::WA_UnderMouse,true);button->update();const auto after=popup->grab().toImage();insetHover=button->geometry().left()>=6&&button->geometry().top()>=6&&before.pixelColor(3,3)==after.pixelColor(3,3);popup->grab().save(output+"/favorite-menu.png");button->click();}});
+        bool favoriteAction=false,compactMenu=false,insetHover=false;QTimer::singleShot(50,this,[&]{auto* popup=qobject_cast<QMenu*>(QApplication::activePopupWidget());auto* action=popup?popup->findChild<QAction*>("toggleFavorite"):nullptr;if(action){favoriteAction=!action->icon().isNull()&&popup->findChildren<QPushButton*>().isEmpty();compactMenu=popup->width()<=190&&popup->height()<=42;const auto before=popup->grab().toImage();popup->setActiveAction(action);const auto after=popup->grab().toImage();const auto actionRect=popup->actionGeometry(action);insetHover=actionRect.left()>=4&&actionRect.top()>=4&&before.pixelColor(2,2)==after.pixelColor(2,2);popup->grab().save(output+"/favorite-menu.png");action->trigger();}});
         emit operators_->customContextMenuRequested(operators_->visualItemRect(operators_->item(4)).center());
         checks["right_click_adds_favorite"]=favoriteAction&&favorites_.contains("Ash")&&favorites_list_->count()>0&&favorites_group_->isVisible();checks["favorite_menu_is_compact"]=compactMenu;checks["favorite_hover_stays_inset"]=insetHover;checks["favorite_appears_only_once"]=operators_->item(4)->isHidden()&&!favorites_list_->isHidden();checks["favorites_persist_to_disk"]=readFavorites()==favorites_;
         {MainWindow reopened(engine_,config_path_);checks["favorites_reload_on_fresh_window"]=reopened.favorites_.contains("Ash")&&reopened.favorites_list_->count()==favorites_list_->count();}
@@ -477,11 +485,11 @@ public:
         operators_->setCurrentRow(1);wait(30);operators_->setCurrentRow(4);wait(170);checks["rapid_switching_finishes_on_last_profile"]=operator_transition_.state()==QAbstractAnimation::Stopped&&name_opacity_->opacity()==1&&icon_opacity_->opacity()==1&&engine_.snapshot().selected==4&&operator_name_->text()=="Ash"&&vertical_->value()==12.3;
         operators_->setCurrentRow(5);gear_->click();checks["settings_interrupts_fade_cleanly"]=name_opacity_->opacity()==1&&panel_->geometry()==panelRect;operators_->setCurrentRow(1);checks["all_list_selection_exits_settings"]=pages_->currentWidget()==operator_page_&&engine_.snapshot().selected==1;gear_->click();favorites_list_->setCurrentRow(favoriteRow);checks["favorite_selection_exits_settings"]=pages_->currentWidget()==operator_page_&&engine_.snapshot().selected==4;
         search_->clear();sidebar_scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();capture(output+"/favorites.png");
-        search_->setText("Ash");int favoriteMatches=0;for(int row=0;row<favorites_list_->count();++row)if(!favorites_list_->item(row)->isHidden())++favoriteMatches;checks["search_filters_without_duplicates"]=!favorites_list_->isHidden()&&operators_->item(4)->isHidden()&&operators_->height()==56&&favorites_list_->height()==favoriteMatches*56;search_->clear();
+        search_->setText("Ash");int favoriteMatches=0;for(int row=0;row<favorites_list_->count();++row)if(!favorites_list_->item(row)->isHidden())++favoriteMatches;checks["search_filters_without_duplicates"]=!favorites_list_->isHidden()&&operators_->item(4)->isHidden()&&operators_->height()==operatorRowHeight&&favorites_list_->height()==favoriteMatches*operatorRowHeight;search_->clear();
         search_->setText("Blackbeard");checks["search_filters_favorites"]=favorites_list_->isHidden()&&favorites_group_->isHidden();search_->clear();
-        QTimer::singleShot(50,this,[&]{auto* popup=QApplication::activePopupWidget();auto* button=popup?popup->findChild<QPushButton*>("toggleFavorite"):nullptr;if(button)button->click();});emit favorites_list_->customContextMenuRequested(favorites_list_->visualItemRect(favorites_list_->item(favoriteRow)).center());
+        QTimer::singleShot(50,this,[&]{auto* popup=QApplication::activePopupWidget();auto* action=popup?popup->findChild<QAction*>("toggleFavorite"):nullptr;if(action)action->trigger();});emit favorites_list_->customContextMenuRequested(favorites_list_->visualItemRect(favorites_list_->item(favoriteRow)).center());
         bool removed=true;for(int i=0;i<favorites_list_->count();++i)removed&=favorites_list_->item(i)->data(Qt::UserRole).toInt()!=4;checks["favorite_removal_updates_sidebar"]=removed&&!favorites_.contains("Ash")&&readFavorites()==favorites_&&favorites_group_->isHidden()&&!operators_->item(4)->isHidden();favorites_=originalFavorites;persistFavorites();refreshFavorites();
-        for(int i=0;i<6;++i)setFavorite(i,true);QApplication::processEvents();checks["favorites_have_no_separate_scroll_or_cap"]=favorites_list_->height()==favorites_list_->count()*56&&favorites_list_->height()>3*56&&favorites_list_->verticalScrollBar()->maximum()==0;
+        for(int i=0;i<6;++i)setFavorite(i,true);QApplication::processEvents();checks["favorites_have_no_separate_scroll_or_cap"]=favorites_list_->height()==favorites_list_->count()*operatorRowHeight&&favorites_list_->height()>3*operatorRowHeight&&favorites_list_->verticalScrollBar()->maximum()==0;
         // Real viewport wheel input must reach the common sidebar, even over a list.
         sidebarBar->setValue(0);const auto wheelPoint=operators_->viewport()->rect().center();QWheelEvent wheel(QPointF(wheelPoint),QPointF(operators_->viewport()->mapToGlobal(wheelPoint)),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);QApplication::sendEvent(operators_->viewport(),&wheel);wait(130);checks["wheel_over_list_scrolls_shared_sidebar"]=sidebarBar->value()>0&&sidebarBar->opacity()>.99;
         favorites_=originalFavorites;persistFavorites();refreshFavorites();QApplication::processEvents();
@@ -517,13 +525,20 @@ public:
         const auto unchanged=engine_.snapshot().bytes();QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/color.png");modal->reject();}});chooseColor();checks["cancel_color_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
         QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/binding.png");modal->reject();}});bindKey(0);checks["cancel_key_binding_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
         QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/help.png");modal->reject();}});help();checks["help_dialog_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
+        // Load previous default themes and a custom theme through the production loader.
+        const auto themeFixture=std::filesystem::path(output.toStdWString())/L"theme-test.bin";r6::Config theme;
+        bool migrationPassed=true;for(const auto& legacy:std::array<std::array<float,3>,2>{{{0,1,.4f},{5.f/255,134.f/255,105.f/255}}}){for(int i=0;i<3;++i)theme.neon[i]=legacy[i];r6::Engine migrated(true);migrationPassed&=theme.save(themeFixture)&&migrated.load(themeFixture);const auto loaded=migrated.snapshot();migrationPassed&=QColor::fromRgbF(loaded.neon[0],loaded.neon[1],loaded.neon[2]).name()=="#ff5b63"&&loaded.operators[4].vertical==theme.operators[4].vertical;}
+        checks["previous_default_accents_migrate_without_profile_changes"]=migrationPassed;
+        theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);checks["custom_accent_is_preserved"]=customLoaded&&customTheme.snapshot().bytes()==theme.bytes();
         QJsonObject report;report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="SendInput";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }
 };
 
 int main(int argc,char** argv){
-    QApplication app(argc,argv);QApplication::setApplicationName("KingBoss2004");QApplication::setOrganizationName("KingBoss2004");QApplication::setStyle("Fusion");QFont font("Segoe UI");font.setPixelSize(13);font.setWeight(QFont::Normal);font.setHintingPreference(QFont::PreferNoHinting);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
-    QPalette palette;palette.setColor(QPalette::Window,QColor("#1a191a"));palette.setColor(QPalette::WindowText,QColor("#d0cfd0"));palette.setColor(QPalette::Base,QColor("#252426"));palette.setColor(QPalette::AlternateBase,QColor("#302d32"));palette.setColor(QPalette::Text,QColor("#d0cfd0"));palette.setColor(QPalette::Button,QColor("#343135"));palette.setColor(QPalette::ButtonText,QColor("#d0cfd0"));palette.setColor(QPalette::Highlight,QColor("#058669"));palette.setColor(QPalette::HighlightedText,Qt::white);palette.setColor(QPalette::Disabled,QPalette::Text,QColor("#77727c"));app.setPalette(palette);
+    QApplication app(argc,argv);QApplication::setApplicationName("KingBoss2004");QApplication::setOrganizationName("KingBoss2004");QApplication::setStyle("Fusion");
+    for(const auto* weight:{"Regular","Medium","SemiBold","Bold"})QFontDatabase::addApplicationFont(QString(":/fonts/Inter-%1.otf").arg(weight));
+    QFont font("Inter");font.setPixelSize(14);font.setWeight(QFont::Normal);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
+    QPalette palette;palette.setColor(QPalette::Window,QColor("#141416"));palette.setColor(QPalette::WindowText,QColor("#dedee5"));palette.setColor(QPalette::Base,QColor("#222225"));palette.setColor(QPalette::AlternateBase,QColor("#2a2a30"));palette.setColor(QPalette::Text,QColor("#dedee5"));palette.setColor(QPalette::Button,QColor("#2a2a30"));palette.setColor(QPalette::ButtonText,QColor("#dedee5"));palette.setColor(QPalette::Highlight,QColor("#ff5b63"));palette.setColor(QPalette::HighlightedText,Qt::white);palette.setColor(QPalette::Disabled,QPalette::Text,QColor("#6e6e7a"));app.setPalette(palette);
     const auto arguments=app.arguments();const bool selftest=arguments.contains("--ui-self-test"),dryrun=selftest||arguments.contains("--dry-run");QString output,phoneInfo;int duration=0;for(const auto& argument:arguments){if(argument.startsWith("--phone-info="))phoneInfo=argument.mid(13);if(argument.startsWith("--output="))output=argument.mid(9);if(argument.startsWith("--exit-after-ms="))duration=argument.mid(16).toInt();}if(output.isEmpty())output=QDir::currentPath();QDir().mkpath(output);
     r6::Engine engine(dryrun);const auto configPath=std::filesystem::current_path()/L"r6_config.bin";if(!engine.load(configPath))engine.edit([](r6::Config& c){c.language=1;});engine.start();MainWindow window(engine,configPath);window.show();if(!phoneInfo.isEmpty())window.writePhoneInfo(phoneInfo);int testResult=0;
     if(selftest)QTimer::singleShot(700,&window,[&]{const auto report=window.selfTest(output);QFile file(output+"/ui-verification.json");file.open(QIODevice::WriteOnly);file.write(QJsonDocument(report).toJson());testResult=report["passed"].toBool()?0:2;QTimer::singleShot(150,&window,[&]{window.closeUsingControl();});});else if(duration>0)QTimer::singleShot(duration,&window,&QWidget::close);

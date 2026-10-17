@@ -76,6 +76,6 @@
     <file alias="Inter-SemiBold.otf">fonts/Inter-SemiBold.otf</file>
     <file alias="Inter-Bold.otf">fonts/Inter-Bold.otf</file>
 </qresource>
-<qresource prefix="/ui"><file alias="star.svg">star.svg</file><file alias="back.svg">back.svg</file><file alias="settings.svg">settings.svg</file><file alias="save.svg">save.svg</file><file alias="saved.svg">saved.svg</file></qresource>
+<qresource prefix="/ui"><file alias="star.svg">star.svg</file><file alias="back.svg">back.svg</file><file alias="settings.svg">settings.svg</file><file alias="save.svg">save.svg</file><file alias="close.svg">close.svg</file><file alias="minimize.svg">minimize.svg</file><file alias="chevron.svg">chevron.svg</file></qresource>
 <qresource prefix="/ui"><file alias="phone.html">phone.html</file></qresource>
 </RCC>
