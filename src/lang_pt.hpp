@@ -112,4 +112,8 @@ inline const char* const lang_pt[]={
     "Direita",
     "Cima",
     "Baixo",
+    "Interface",
+    "O novo visual é aplicado após reiniciar. Seus perfis são mantidos.",
+    "Aplicar e reiniciar",
+    "Não foi possível salvar a interface. O aplicativo não foi reiniciado.",
 };

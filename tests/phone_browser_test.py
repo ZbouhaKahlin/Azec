@@ -7,11 +7,12 @@ from playwright.sync_api import sync_playwright
 from run_checks import ROOT, start, stop
 
 
-def run():
-    folder = Path(tempfile.mkdtemp(prefix='phone-browser-', dir=ROOT / '.build' / 'verification'))
+def run(interface="goofy"):
+    folder = Path(tempfile.mkdtemp(prefix='phone-browser-'+interface+'-', dir=ROOT / '.build' / 'verification'))
     process = None
     checks = {}
     try:
+        (folder / "azec_ui.json").write_text(json.dumps({"version":1,"interface":interface,"favorites":[]}))
         process, info = start(folder)
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(channel='chrome', headless=True)
@@ -25,7 +26,8 @@ def run():
             page.get_by_role('button', name='Connect', exact=True).click()
             page.wait_for_selector('#controls:not([hidden])')
             checks['pairing_opens_controls_in_english'] = page.locator('html').get_attribute('lang') == 'en'
-            checks['embedded_font_loads'] = page.evaluate("document.fonts.ready.then(()=>document.fonts.check('16px Fredoka'))")
+            checks['embedded_font_loads'] = page.evaluate("document.fonts.ready.then(()=>document.fonts.check('16px " + ('Geist' if interface=='rally' else 'Fredoka') + "'))")
+            checks['accent_text_matches_interface'] = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim()") == ('#171c19' if interface=='rally' else '#ffffff')
             checks['nine_language_options'] = page.locator('#language option').count() == 9
             page.locator('summary').click()
             page.locator('#languagePicker').click()
@@ -99,4 +101,5 @@ def run():
 
 
 if __name__ == '__main__':
-    raise SystemExit(0 if run() else 1)
+    results=[run(interface) for interface in ('goofy','rally')]
+    raise SystemExit(0 if all(results) else 1)

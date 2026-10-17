@@ -39,6 +39,11 @@ inline void roundWindow(QWidget* window){
 class MainWindow final : public QWidget {
     r6::Engine& engine_;
     std::filesystem::path config_path_;
+    QWidget* roster_page_=nullptr;QPushButton* operator_picker_=nullptr;
+    QComboBox* interface_choice_=nullptr;QPushButton* interface_apply_=nullptr;QLabel* interface_feedback_=nullptr;
+    presentation::Interface pending_interface_=presentation::active;bool restart_requested_=false;
+    std::function<void()> restart_action_;
+    void buildGoofyLayout(QVBoxLayout* layout);void buildRallyLayout(QVBoxLayout* layout);
     QListWidget* operators_=nullptr;QListWidget* favorites_list_=nullptr;QLineEdit* search_=nullptr;
     QLabel *favorites_title_=nullptr,*preferences_title_=nullptr;QWidget* favorites_group_=nullptr;
     IconButton* back_=nullptr;QSet<QString> favorites_;
@@ -69,9 +74,10 @@ class MainWindow final : public QWidget {
     std::array<QPushButton*,6> key_buttons_{};
     QTimer poll_,paint_,save_feedback_;QElapsedTimer clock_;
     bool was_menu_=false,was_recoil_=false,was_rapid_=false,was_primary_=false,was_secondary_=false,refreshing_=false,native_ready_=false;
-    int binding_=0,release_key_=0,paint_count_=0;qint64 blocked_until_=0,last_tune_=0;
+    int binding_=0,release_key_=0,paint_count_=0,cursor_repaints_=0;qint64 blocked_until_=0,last_tune_=0;
     QStringList icon_failures_;
-    QColor accent() const {const auto c=engine_.snapshot();return QColor::fromRgbF(c.neon[0],c.neon[1],c.neon[2]);}
+    void trackCursor(const QPoint& current){if(current!=last_cursor_){last_cursor_=current;++cursor_repaints_;update();}}
+    QColor accent() const {const auto c=engine_.snapshot();const auto value=QColor::fromRgbF(c.neon[0],c.neon[1],c.neon[2]);return presentation::isRally()&&value.name()=="#7248d7"?rally::signal:value;}
     QString text(UiText id) const{return uiText(id,engine_.snapshot().language);}
     QString bindingName(int key) const{
         switch(key){case 0:return text(UiText::NoneKey);case VK_LEFT:return text(UiText::LeftKey);case VK_RIGHT:return text(UiText::RightKey);case VK_UP:return text(UiText::UpKey);case VK_DOWN:return text(UiText::DownKey);default:return keyName(key);}
@@ -124,15 +130,30 @@ class MainWindow final : public QWidget {
     }
     bool persistFavorites() const {
         QStringList names(favorites_.begin(),favorites_.end());names.sort(Qt::CaseInsensitive);
-        QSaveFile file(QString::fromStdWString(favoritesPath().wstring()));
-        if(!file.open(QIODevice::WriteOnly)){diagnostic("save favorites",file.errorString());return false;}
-        const auto bytes=QJsonDocument(QJsonObject{{"version",1},{"favorites",QJsonArray::fromStringList(names)}}).toJson();
-        const bool ok=file.write(bytes)==bytes.size()&&file.commit();if(!ok)diagnostic("save favorites",file.errorString());return ok;
+        return presentation::update(config_path_,[&](QJsonObject& root){root["favorites"]=QJsonArray::fromStringList(names);});
     }
-    void filterOperators(){
+    void applyInterface(){
+        if(pending_interface_==presentation::active)return;
+        if((unsaved_&&!save())||!presentation::write(config_path_,pending_interface_)){
+            interface_feedback_->setText(text(UiText::InterfaceSaveFailed));interface_feedback_->show();return;
+        }
+        restart_requested_=true;restart_action_();
+    }
+    void filterOperators(){if(presentation::isRally()){
+        if(!search_||!sidebar_scroll_||!operators_||!favorites_list_)return;
+        const auto term=search_->text();int shown=0;const int width=std::max(116,sidebar_scroll_->viewport()->width()-2);const int columns=std::max(1,width/116);const int cell=width/columns;
+        for(auto* list:{operators_,favorites_list_}){int count=0;for(int row=0;row<list->count();++row){auto* item=list->item(row);const bool match=item->text().contains(term,Qt::CaseInsensitive)&&(list==favorites_list_||!favorites_.contains(item->text()));item->setHidden(!match);if(match)++count;}list->setGridSize(QSize(cell,operatorRowHeight));list->setFixedHeight(((count+columns-1)/columns)*operatorRowHeight+2);list->doItemsLayout();if(list==favorites_list_)shown=count;}
+        favorites_group_->setVisible(shown>0);favorites_list_->setVisible(shown>0);
+    return;}
+
         const auto term=search_->text();int shown=0;
         for(auto* list:{operators_,favorites_list_}){int count=0;for(int row=0;row<list->count();++row){auto* item=list->item(row);const bool match=item->text().contains(term,Qt::CaseInsensitive)&&(list==favorites_list_||!favorites_.contains(item->text()));item->setHidden(!match);if(match)++count;}list->setFixedHeight(count*operatorRowHeight);if(list==favorites_list_)shown=count;}
         favorites_group_->setVisible(shown>0);favorites_list_->setVisible(shown>0);
+
+    }
+    void showRoster(){
+        if(pairing_qr_)pairing_qr_->conceal();stopTransition();pages_->switchTo(roster_page_);gear_->setProperty("activePage",false);gear_->update();filterOperators();
+        QTimer::singleShot(200,this,[this]{if(pages_->currentWidget()==roster_page_){filterOperators();search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();}});
     }
     void refreshFavorites(){
         QSignalBlocker blocked(favorites_list_);favorites_list_->clear();const auto c=engine_.snapshot();
@@ -164,9 +185,9 @@ class MainWindow final : public QWidget {
         if(changed)dirty();
         if(animate){name_opacity_->setOpacity(.35);icon_opacity_->setOpacity(.35);operator_transition_.start();}
     }
-    QLabel* label(const QString& text,const char* role="rowTitle"){auto* result=new QLabel(text);result->setObjectName(role);return result;}
+    QLabel* label(const QString& text,const char* role="rowTitle"){auto* result=new QLabel(text);result->setObjectName(role);if(presentation::isRally()&&QByteArray(role)=="rowTitle"){result->setWordWrap(true);result->setMinimumWidth(0);}return result;}
     QHBoxLayout* settingRow(Section* section,const QString& title,const QString& description={},int height=44){
-        auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(description.isEmpty()?height:56);auto* row=new QHBoxLayout(widget);row->setContentsMargins(14,8,12,8);row->setSpacing(12);
+        auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(description.isEmpty()?(presentation::isRally()?std::min(height,36):height):56);auto* row=new QHBoxLayout(widget);if(presentation::isRally())row->setContentsMargins(0,5,0,5);else row->setContentsMargins(14,8,12,8);row->setSpacing(12);
         auto* text=new QWidget;auto* column=new QVBoxLayout(text);column->setContentsMargins(0,0,0,0);column->setSpacing(2);column->addWidget(label(title));
         if(!description.isEmpty()){auto* hint=label(description,"rowHint");hint->setWordWrap(true);column->addWidget(hint);widget->setToolTip(description);}
         row->addWidget(text,1);section->body->addWidget(widget);return row;
@@ -176,33 +197,40 @@ class MainWindow final : public QWidget {
         auto* surface=row->parentWidget();surface->setProperty("enabledSetting",checked);connect(result,&QAbstractButton::toggled,surface,[surface](bool on){surface->setProperty("enabledSetting",on);surface->style()->unpolish(surface);surface->style()->polish(surface);});
         connect(result,&QAbstractButton::toggled,this,[this,callback](bool on){if(!refreshing_)callback(on);});return result;
     }
+    QSlider* makeSlider(){return presentation::isRally()?static_cast<QSlider*>(new rally::Slider):new QSlider(Qt::Horizontal);}
     void amount(Section* section,const QString& title,bool vertical){
-        auto* row=settingRow(section,title,{},44);row->itemAt(0)->widget()->setFixedWidth(144);
-        auto* slider=new QSlider(Qt::Horizontal);slider->setRange(vertical?0:-500,vertical?1000:500);slider->setAccessibleName(title);
-        auto* value=new QDoubleSpinBox;value->setDecimals(1);value->setSingleStep(.1);value->setRange(vertical?0:-50,vertical?100:50);value->setButtonSymbols(QAbstractSpinBox::NoButtons);value->setFixedWidth(65);value->setAlignment(Qt::AlignCenter);value->setAccessibleName(title+text(UiText::Value));
-        row->addWidget(slider,1);row->addWidget(value);if(vertical){vertical_=value;vertical_slider_=slider;}else{horizontal_=value;horizontal_slider_=slider;}
+        auto* slider=makeSlider();slider->setRange(vertical?0:-500,vertical?1000:500);slider->setAccessibleName(title);
+        auto* value=new QDoubleSpinBox;value->setDecimals(1);value->setSingleStep(.1);value->setRange(vertical?0:-50,vertical?100:50);value->setButtonSymbols(QAbstractSpinBox::NoButtons);value->setAccessibleName(title+text(UiText::Value));
+        if(presentation::isRally()){auto* field=new QWidget;field->setObjectName("forceField");auto* column=new QVBoxLayout(field);column->setContentsMargins(14,10,14,8);column->setSpacing(2);column->addWidget(label(title,"rowHint"));value->setObjectName("forceValue");value->setAlignment(Qt::AlignLeft);value->setMinimumHeight(54);column->addWidget(value);column->addWidget(slider);section->body->addWidget(field);}
+        else{auto* row=settingRow(section,title,{},44);row->itemAt(0)->widget()->setFixedWidth(144);value->setFixedWidth(65);value->setAlignment(Qt::AlignCenter);row->addWidget(slider,1);row->addWidget(value);}
+        if(vertical){vertical_=value;vertical_slider_=slider;}else{horizontal_=value;horizontal_slider_=slider;}
         connect(slider,&QSlider::valueChanged,value,[value](int n){value->setValue(n/10.0);});
         connect(value,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[=](double n){QSignalBlocker blocked(slider);slider->setValue(qRound(n*10));if(!refreshing_)editOperator([=](r6::Operator& op){if(vertical)op.vertical=float(n);else op.horizontal=float(n);});});
     }
-    void applyStyle(){setStyleSheet(applicationStyle(accent()));operators_->viewport()->update();favorites_list_->viewport()->update();update();}
+    void applyStyle(){if(presentation::isRally())setPalette(rally::palette(accent()));setStyleSheet(applicationStyle(accent()));operators_->viewport()->update();favorites_list_->viewport()->update();update();}
     void buildSettings(){
-        refreshing_=true;const auto c=engine_.snapshot();if(settings_){scroll_->takeWidget();delete settings_;}
-        settings_=new QWidget;settings_->setObjectName("settingsContent");cards_=new QVBoxLayout(settings_);cards_->setContentsMargins(2,0,10,12);cards_->setSpacing(10);
+        refreshing_=true;const auto c=engine_.snapshot();const auto hint=[this](UiText id){return presentation::isRally()?QString():text(id);};if(settings_){scroll_->takeWidget();delete settings_;}
+        settings_=new QWidget;settings_->setObjectName("settingsContent");cards_=new QVBoxLayout(settings_);if(presentation::isRally())cards_->setContentsMargins(0,0,8,0);else cards_->setContentsMargins(2,0,10,12);cards_->setSpacing(10);
         auto* weapons=new Section(text(UiText::WeaponProfiles),false,true,kbtheme::yellow);weapons->body->setSpacing(0);cards_->addWidget(weapons);
-        dual_=toggle(settingRow(weapons,text(UiText::SeparateSecondaryProfile),text(UiText::Use1And2ToSwitchWeaponProfilesChangeTheKeysInSettings)),"Separate secondary profile",c.secondary_enabled[c.selected],[this](bool on){engine_.edit([&](r6::Config& c){c.enable_secondary(c.selected,on);c.weapon_slot=on?1:0;});dirty();syncSelection();});
+        dual_=toggle(settingRow(weapons,text(UiText::SeparateSecondaryProfile),hint(UiText::Use1And2ToSwitchWeaponProfilesChangeTheKeysInSettings)),"Separate secondary profile",c.secondary_enabled[c.selected],[this](bool on){engine_.edit([&](r6::Config& c){c.enable_secondary(c.selected,on);c.weapon_slot=on?1:0;});dirty();syncSelection();});
         auto* weaponChoices=new QWidget;auto* choices=new QHBoxLayout(weaponChoices);choices->setContentsMargins(0,0,0,0);choices->setSpacing(6);
         primary_=new WeaponButton([this]{return accent();});secondary_=new WeaponButton([this]{return accent();});for(auto* button:{primary_,secondary_})choices->addWidget(button);choices->addStretch();auto* weaponBox=new QWidget;auto* weaponBoxLayout=new QVBoxLayout(weaponBox);weaponBoxLayout->setContentsMargins(0,8,0,0);weaponBoxLayout->setSpacing(0);weaponBoxLayout->addWidget(weaponChoices);weapon_selector_=new ExpandingContent(weaponBox);weapons->body->addWidget(weapon_selector_);
         connect(primary_,&QPushButton::clicked,this,[this]{chooseWeapon(0);});connect(secondary_,&QPushButton::clicked,this,[this]{chooseWeapon(1);});
         auto* recoil=new Section(text(UiText::RecoilControl),false,true,kbtheme::blue);cards_->addWidget(recoil);
-        recoil_master_=toggle(settingRow(recoil,text(UiText::MasterEnable),text(UiText::ApplyThisOperatorSRecoilSettings)),"Master recoil enable",engine_.recoil_master,[this](bool on){engine_.recoil_master=on;});
+        recoil_master_=toggle(settingRow(recoil,text(UiText::MasterEnable),hint(UiText::ApplyThisOperatorSRecoilSettings)),"Master recoil enable",engine_.recoil_master,[this](bool on){engine_.recoil_master=on;});
         amount(recoil,text(UiText::VerticalForce),true);amount(recoil,text(UiText::HorizontalAdjust),false);
-        humanize_=toggle(settingRow(recoil,text(UiText::HumanizeMovement),text(UiText::VaryMovementSlightlyOnBothAxes)),"Humanize movement",false,[this](bool on){editOperator([=](r6::Operator& op){op.humanize=on;});});
+        humanize_=toggle(settingRow(recoil,text(UiText::HumanizeMovement),hint(UiText::VaryMovementSlightlyOnBothAxes)),"Humanize movement",false,[this](bool on){editOperator([=](r6::Operator& op){op.humanize=on;});});
         auto* rapid=new Section(text(UiText::RapidFire),false,true,kbtheme::pink);cards_->addWidget(rapid);
-        rapid_master_=toggle(settingRow(rapid,text(UiText::GlobalRapidFire),text(UiText::MasterControlForEveryOperator)),"Global rapid fire",engine_.rapid_master,[this](bool on){engine_.set_rapid_master(on);dirty();});
+        rapid_master_=toggle(settingRow(rapid,text(UiText::GlobalRapidFire),hint(UiText::MasterControlForEveryOperator)),"Global rapid fire",engine_.rapid_master,[this](bool on){engine_.set_rapid_master(on);dirty();});
         operator_rapid_=toggle(settingRow(rapid,text(UiText::EnableForThisOperator)),"Operator rapid fire",false,[this](bool on){editOperator([=](r6::Operator& op){op.rapid=on;});delay_->setEnabled(on);});
-        auto* delayRow=settingRow(rapid,text(UiText::ShotDelay),text(UiText::DelayBetweenRepeatedShots));
+        auto* delayRow=settingRow(rapid,text(UiText::ShotDelay),hint(UiText::DelayBetweenRepeatedShots));
         delay_=new QSpinBox;delay_->setRange(30,150);delay_->setSuffix(text(UiText::Ms));delay_->setButtonSymbols(QAbstractSpinBox::NoButtons);delay_->setAlignment(Qt::AlignCenter);delay_->setFixedWidth(85);delay_->setAccessibleName(text(UiText::ShotDelay));delayRow->addWidget(delay_);
         connect(delay_,qOverload<int>(&QSpinBox::valueChanged),this,[this](int n){if(!refreshing_)editOperator([=](r6::Operator& op){op.delay=n;});});
+        if(presentation::isRally()){
+            auto* verticalField=recoil->body->takeAt(1);auto* horizontalField=recoil->body->takeAt(1);auto* axes=new QHBoxLayout;axes->setSpacing(12);axes->addWidget(verticalField->widget(),1);axes->addWidget(horizontalField->widget(),1);delete verticalField;delete horizontalField;recoil->body->insertLayout(1,axes);
+            auto* profileHint=label(text(UiText::Use1And2ToSwitchWeaponProfilesChangeTheKeysInSettings),"rowHint");profileHint->setWordWrap(true);weapons->body->insertWidget(1,profileHint);weapons->body->addStretch();
+            for(auto* section:{weapons,recoil,rapid})cards_->removeWidget(section);cards_->setSpacing(12);cards_->addWidget(recoil);auto* lower=new QHBoxLayout;lower->setSpacing(12);lower->addWidget(weapons,1);lower->addWidget(rapid,1);cards_->addLayout(lower);
+        }
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
     }
     void buildPreferences(){
@@ -210,6 +238,13 @@ class MainWindow final : public QWidget {
         refreshing_=true;const auto c=engine_.snapshot();
         delete preferences_scroll_->takeWidget();auto* content=new QWidget;
         auto* preferencesLayout=new QVBoxLayout(content);preferencesLayout->setContentsMargins(2,0,10,0);preferencesLayout->setSpacing(14);
+        auto* design=new Section(text(UiText::InterfaceStyle),false,true,kbtheme::yellow);preferencesLayout->addWidget(design);
+        auto* designRow=settingRow(design,text(UiText::Appearance),text(UiText::InterfaceRestartHint));
+        interface_choice_=new LanguageComboBox(nullptr,"interfacePopup");interface_choice_->setObjectName("interfaceChoice");interface_choice_->setAccessibleName(text(UiText::InterfaceStyle));interface_choice_->addItem("Goofy",int(presentation::Interface::Goofy));interface_choice_->addItem("Rally",int(presentation::Interface::Rally));interface_choice_->setCurrentIndex(interface_choice_->findData(int(pending_interface_)));designRow->addWidget(interface_choice_);
+        interface_apply_=new QPushButton(text(UiText::ApplyAndRestart));interface_apply_->setObjectName("secondary");interface_apply_->setEnabled(pending_interface_!=presentation::active);design->body->addWidget(interface_apply_,0,Qt::AlignRight);
+        interface_feedback_=label("","rowHint");interface_feedback_->setWordWrap(true);interface_feedback_->hide();design->body->addWidget(interface_feedback_);
+        connect(interface_choice_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){pending_interface_=presentation::Interface(interface_choice_->itemData(index).toInt());interface_apply_->setEnabled(pending_interface_!=presentation::active);interface_feedback_->hide();});
+        connect(interface_apply_,&QPushButton::clicked,this,[this]{applyInterface();});
         auto* system=new Section(text(UiText::SystemSettings),false,true,kbtheme::lime);system_=system;preferencesLayout->addWidget(system);
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::BeepWhenHotkeyStatesChange)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         auto* langRow=settingRow(system,text(UiText::Language));language_=new LanguageComboBox;language_->setAccessibleName(text(UiText::Language));language_->setIconSize(QSize(22,15));
@@ -238,7 +273,7 @@ class MainWindow final : public QWidget {
         auto* appearance=new Section(text(UiText::Appearance),false,true,kbtheme::blue);appearance_=appearance;preferencesLayout->addWidget(appearance);
         auto* colorRow=settingRow(appearance,text(UiText::AccentColor),text(UiText::UsedForSwitchesAndSelectedStates));auto* color=new QPushButton(accent().name().toUpper());color->setObjectName("secondary");color->setAccessibleName(text(UiText::AccentColor));colorRow->addWidget(color);
         connect(color,&QPushButton::clicked,this,[this,color]{const auto next=chooseColor();if(next.isValid()){engine_.edit([=](r6::Config& c){c.neon[0]=next.redF();c.neon[1]=next.greenF();c.neon[2]=next.blueF();});color->setText(next.name().toUpper());applyStyle();dirty();}});
-        auto* radiusRow=settingRow(appearance,text(UiText::ReactiveRadius),text(UiText::MouseResponseInTheBackground));auto* radius=new QSlider(Qt::Horizontal);radius->setRange(50,400);radius->setValue(qRound(c.radius));radius->setAccessibleName(text(UiText::ReactiveRadius));radiusRow->addWidget(radius,1);connect(radius,&QSlider::valueChanged,this,[this](int n){engine_.edit([=](r6::Config& c){c.radius=float(n);});dirty();});
+        auto* radiusRow=settingRow(appearance,text(UiText::ReactiveRadius),text(UiText::MouseResponseInTheBackground));auto* radius=makeSlider();radius->setRange(50,400);radius->setValue(qRound(c.radius));radius->setAccessibleName(text(UiText::ReactiveRadius));radiusRow->addWidget(radius,1);connect(radius,&QSlider::valueChanged,this,[this](int n){engine_.edit([=](r6::Config& c){c.radius=float(n);});dirty();});
         auto* reset=new QPushButton(text(UiText::ResetAppearance));reset->setObjectName("secondary");appearance->body->addWidget(reset,0,Qt::AlignLeft);connect(reset,&QPushButton::clicked,this,[this]{engine_.edit([](r6::Config& c){c.neon[0]=114.f/255;c.neon[1]=72.f/255;c.neon[2]=215.f/255;c.radius=130;});applyStyle();dirty();QTimer::singleShot(0,this,[this]{buildPreferences();});});
         auto* guide=new QPushButton(text(UiText::QuickGuide));guide->setObjectName("secondary");preferencesLayout->addWidget(guide,0,Qt::AlignLeft);connect(guide,&QPushButton::clicked,this,[this]{help();});
         auto* transfer=new Section(text(UiText::ProfileBackup),false,true,kbtheme::pink);preferencesLayout->addWidget(transfer);
@@ -257,6 +292,7 @@ class MainWindow final : public QWidget {
         stopTransition();pages_->switchTo(preferences_);gear_->setProperty("activePage",true);gear_->style()->unpolish(gear_);gear_->style()->polish(gear_);
     }
     void updateLanguage(){
+        if(operator_picker_){operator_picker_->setText(text(UiText::AllOperators)+QString::fromUtf8("  ↗"));operator_picker_->setAccessibleName(text(UiText::AllOperators));roster_page_->findChild<QLabel*>("rosterTitle")->setText(text(UiText::AllOperators));roster_page_->findChild<QPushButton*>("rosterBack")->setAccessibleName(text(UiText::BackToOperators));}
         operators_title_->setText(text(UiText::AllOperators));favorites_title_->setText(text(UiText::Favorites));search_->setPlaceholderText(text(UiText::SearchOperators));subtitle_->setText(text(UiText::OperatorSettings));
         updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));filterOperators();syncSelection();updateStatus();
     }
@@ -286,7 +322,7 @@ class MainWindow final : public QWidget {
         was_menu_=menu;was_recoil_=recoil;was_rapid_=rapid;
         auto* focused=QApplication::focusWidget();const bool editing=isActiveWindow()&&(qobject_cast<QLineEdit*>(focused)||qobject_cast<QAbstractSpinBox*>(focused)||qobject_cast<QComboBox*>(focused));
         handleWeaponKeys(keyDown(c.primary_key),keyDown(c.secondary_key),editing,keyDown(VK_CONTROL)||keyDown(VK_MENU)||keyDown(VK_LWIN)||keyDown(VK_RWIN));
-        if(isVisible()&&isActiveWindow()&&pages_->currentWidget()==operator_page_&&!editing&&clock_.elapsed()-last_tune_>80){const float y=(keyDown(VK_UP)? .1f:0)-(keyDown(VK_DOWN)? .1f:0),x=(keyDown(VK_RIGHT)? .1f:0)-(keyDown(VK_LEFT)? .1f:0);if(x||y){editOperator([=](r6::Operator& op){op.vertical=std::clamp(op.vertical+y,0.f,100.f);op.horizontal=std::clamp(op.horizontal+x,-50.f,50.f);});syncSelection();last_tune_=clock_.elapsed();}}
+        if(isVisible()&&isActiveWindow()&&pages_->currentWidget()==operator_page_&&!editing&&!qobject_cast<QSlider*>(focused)&&clock_.elapsed()-last_tune_>80){const float y=(keyDown(VK_UP)? .1f:0)-(keyDown(VK_DOWN)? .1f:0),x=(keyDown(VK_RIGHT)? .1f:0)-(keyDown(VK_LEFT)? .1f:0);if(x||y){editOperator([=](r6::Operator& op){op.vertical=std::clamp(op.vertical+y,0.f,100.f);op.horizontal=std::clamp(op.horizontal+x,-50.f,50.f);});syncSelection();last_tune_=clock_.elapsed();}}
     }
     bool save(){
         const bool saved=!save_blocked_&&engine_.save(config_path_);updateSavePresentation(saved?"saved":"error");
@@ -344,12 +380,14 @@ class MainWindow final : public QWidget {
     }
 protected:
     void paintEvent(QPaintEvent*) override {
+        if(presentation::isRally()){++paint_count_;QPainter p(this);p.fillRect(rect(),rally::canvas);const auto c=engine_.snapshot();const auto mouse=mapFromGlobal(QCursor::pos());for(int x=24;x<width()-24;x+=12){const qreal distance=std::hypot(double(x-mouse.x()),double(height()-5-mouse.y()));p.setPen(distance<c.radius?accent():rally::line);p.drawLine(x,height()-5,x,height()-(x%48==24?10:7));}return;}
+
         ++paint_count_;QPainter p(this);p.fillRect(rect(),kbtheme::paper);const auto c=engine_.snapshot();const QPoint mouse=mapFromGlobal(QCursor::pos());QColor color=accent();p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);
         static const QPixmap image("titio.png");if(!image.isNull()){p.setOpacity(.02);p.drawPixmap(rect(),image);p.setOpacity(1);}
         for(int x=18;x<width();x+=45)for(int y=90;y<height()-12;y+=45){const auto delta=QPoint(x,y)-mouse;const qreal distance=std::hypot(delta.x(),delta.y());QColor dot=color;dot.setAlpha(8);p.setBrush(dot);p.drawEllipse(QPointF(x,y),1.1,1.1);if(distance<c.radius){const qreal strength=1-distance/c.radius;dot.setAlpha(qRound(strength*15));p.setBrush(dot);p.drawEllipse(QPointF(x,y),1.5+strength*1.4,1.5+strength*1.4);}}
     }
     void showEvent(QShowEvent* event) override {
-        QWidget::showEvent(event);engine_.menu_visible=true;if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);roundWindow(this);const BOOL dark=FALSE;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));}
+        QWidget::showEvent(event);engine_.menu_visible=true;if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);roundWindow(this);const BOOL dark=presentation::isRally()?TRUE:FALSE;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));}
     }
     void hideEvent(QHideEvent* event) override {if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);}
     void closeEvent(QCloseEvent* event) override {
@@ -367,7 +405,7 @@ protected:
         }
         if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
-    void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);if(native_ready_)roundWindow(this);}
+    void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);if(native_ready_)roundWindow(this);if(presentation::isRally())QTimer::singleShot(0,this,[this]{filterOperators();});}
     bool eventFilter(QObject* object,QEvent* event) override {
         if(event->type()==QEvent::FocusIn||event->type()==QEvent::FocusOut||event->type()==QEvent::MouseButtonPress){
             if(auto* button=qobject_cast<QPushButton*>(object);button&&isAncestorOf(button)){
@@ -376,7 +414,7 @@ protected:
             }
         }
         if(event->type()==QEvent::KeyPress){auto* key=static_cast<QKeyEvent*>(event);auto* widget=qobject_cast<QWidget*>(object);
-            if(widget&&widget->window()==this&&pages_->currentWidget()==operator_page_&&(key->key()==Qt::Key_Up||key->key()==Qt::Key_Down||key->key()==Qt::Key_Left||key->key()==Qt::Key_Right)&&!qobject_cast<QLineEdit*>(widget)&&!qobject_cast<QAbstractSpinBox*>(widget))return true;}
+            if(widget&&widget->window()==this&&pages_->currentWidget()==operator_page_&&(key->key()==Qt::Key_Up||key->key()==Qt::Key_Down||key->key()==Qt::Key_Left||key->key()==Qt::Key_Right)&&!qobject_cast<QLineEdit*>(widget)&&!qobject_cast<QAbstractSpinBox*>(widget)&&!qobject_cast<QSlider*>(widget))return true;}
         return QWidget::eventFilter(object,event);
     }
     bool nativeEvent(const QByteArray& type,void* message,qintptr* result) override {
@@ -387,36 +425,18 @@ protected:
 public:
     explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path):engine_(engine),config_path_(std::move(config_path)){
         setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setWindowIcon(QIcon(":/ui/app-icon.svg"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(650,area.height()-48));move(area.center()-rect().center());
-        auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(46);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,10,0);top->setSpacing(5);
-        auto* logo=new QLabel;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));top->addWidget(logo);
-        top->addWidget(new BrandLabel);top->addStretch();status_=new QPushButton;status_->setObjectName("status");status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
+        auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(presentation::isRally()?58:46);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,10,0);top->setSpacing(5);
+        auto* logo=new QLabel;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));if(!presentation::isRally())top->addWidget(logo);else delete logo;
+        top->addWidget(new BrandLabel);
+        if(presentation::isRally()){top->addSpacing(26);operator_picker_=new QPushButton;operator_picker_->setObjectName("operatorPicker");operator_picker_->setMinimumWidth(150);top->addWidget(operator_picker_);connect(operator_picker_,&QPushButton::clicked,this,[this]{if(pages_->currentWidget()==roster_page_)showOperators();else showRoster();});}top->addStretch();status_=new QPushButton;status_->setObjectName("status");status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
         save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save();});
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
         gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
-        notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);notice_->setContentsMargins(18,8,18,8);notice_->setStyleSheet("color:#31204C;background:#FFA8C9;font-weight:600;");notice_->hide();layout->addWidget(notice_);
-        auto* body=new QWidget;auto* columns=new QHBoxLayout(body);columns->setContentsMargins(0,0,0,0);columns->setSpacing(0);
-        auto* sidebar=new QWidget;sidebar->setObjectName("operatorSidebar");sidebar->setFixedWidth(200);auto* sidebarLayout=new QVBoxLayout(sidebar);sidebarLayout->setContentsMargins(10,18,2,12);sidebarLayout->setSpacing(8);
-        search_=new QLineEdit;search_->setObjectName("search");search_->setClearButtonEnabled(true);search_->setAccessibleName(text(UiText::SearchOperators4c533));sidebarLayout->addWidget(search_);
-        sidebar_scroll_=new QScrollArea;sidebar_scroll_->setObjectName("sidebarScroll");sidebar_scroll_->setWidgetResizable(true);sidebar_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);sidebarLayout->addWidget(sidebar_scroll_,1);
-        auto* sidebarContent=new QWidget;auto* groups=new QVBoxLayout(sidebarContent);groups->setContentsMargins(0,0,0,0);groups->setSpacing(8);
-        const auto sectionHeader=[&](QVBoxLayout* column,QLabel* title,const char* dividerName){auto* row=new QHBoxLayout;row->setContentsMargins(10,8,8,0);row->setSpacing(8);row->addWidget(title);auto* line=new QFrame;line->setObjectName(dividerName);line->setFixedHeight(2);row->addWidget(line,1);column->addLayout(row);};
-        favorites_group_=new QWidget;favorites_group_->setObjectName("favoritesGroup");auto* favoriteRows=new QVBoxLayout(favorites_group_);favoriteRows->setContentsMargins(0,0,0,0);favoriteRows->setSpacing(8);groups->addWidget(favorites_group_);
-        favorites_title_=new StickerLabel("Favorites",kbtheme::yellow);sectionHeader(favoriteRows,favorites_title_,"favoritesDivider");
-        favorites_list_=new OperatorList(sidebar_scroll_);favorites_list_->setObjectName("favorites");favorites_list_->setAccessibleName(text(UiText::FavoriteOperators));favoriteRows->addWidget(favorites_list_);
-        operators_title_=new StickerLabel("All operators",kbtheme::blue);sectionHeader(groups,operators_title_,"operatorsDivider");
-        operators_=new OperatorList(sidebar_scroll_);operators_->setObjectName("operators");operators_->setAccessibleName(text(UiText::AllOperators));groups->addWidget(operators_);groups->addStretch();sidebar_scroll_->setWidget(sidebarContent);FadingScrollBar::install(sidebar_scroll_);new ScrollFade(sidebar_scroll_,kbtheme::paper);new ScrollFade(sidebar_scroll_,kbtheme::paper,true);
-        for(auto* list:{operators_,favorites_list_}){list->setMouseTracking(true);list->setUniformItemSizes(true);list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);list->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);list->setItemDelegate(new OperatorDelegate([this]{return accent();},list));list->setContextMenuPolicy(Qt::CustomContextMenu);connect(list,&QWidget::customContextMenuRequested,this,[this,list](const QPoint& point){showOperatorMenu(list,point);});}
+        notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);notice_->setContentsMargins(18,8,18,8);notice_->setStyleSheet(presentation::isRally()?"color:#171C19;background:#FF967F;font-weight:600;":"color:#31204C;background:#FFA8C9;font-weight:600;");notice_->hide();layout->addWidget(notice_);
+        if(presentation::isRally())buildRallyLayout(layout);else buildGoofyLayout(layout);
         const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+name.toLower()+".svg");if(!renderer.isValid())icon_failures_<<name;}
-        operators_->setCurrentRow(c.selected);columns->addWidget(sidebar);
-        pages_=new PageStack;pages_->setObjectName("contentPages");operator_page_=new QWidget;operator_page_->setObjectName("operatorPage");auto* rightLayout=new QVBoxLayout(operator_page_);rightLayout->setContentsMargins(20,20,16,14);rightLayout->setSpacing(10);
-        auto* selected=new QHBoxLayout;selected->setContentsMargins(2,0,0,0);selected->setSpacing(10);operator_icon_=new FadeLabel;operator_icon_->setFixedSize(46,46);selected->addWidget(operator_icon_);auto* titles=new QVBoxLayout;titles->setSpacing(2);operator_name_=new FadeLabel;operator_name_->setObjectName("pageTitle");subtitle_=label("","subtitle");titles->addWidget(operator_name_);titles->addWidget(subtitle_);selected->addLayout(titles,1);rightLayout->addLayout(selected);
-        name_opacity_=static_cast<FadeLabel*>(operator_name_);icon_opacity_=static_cast<FadeLabel*>(operator_icon_);
-        scroll_=new QScrollArea;scroll_->setWidgetResizable(true);scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(scroll_);new ScrollFade(scroll_,kbtheme::surface);new ScrollFade(scroll_,kbtheme::surface,true);rightLayout->addWidget(scroll_,1);pages_->addWidget(operator_page_);
-        preferences_=new QWidget;preferences_->setObjectName("preferencesPage");auto* preferenceLayout=new QVBoxLayout(preferences_);preferenceLayout->setContentsMargins(20,20,16,14);preferenceLayout->setSpacing(10);auto* preferenceHeader=new QHBoxLayout;preferenceHeader->setSpacing(10);
-        back_=new IconButton(":/ui/back.svg",[this]{return accent();});back_->setObjectName("windowControl");back_->setAccessibleName(text(UiText::BackToOperators));connect(back_,&QPushButton::clicked,this,[this]{showOperators();});preferenceHeader->addWidget(back_);preferences_title_=label("Settings","pageTitle");preferenceHeader->addWidget(preferences_title_,1);preferenceLayout->addLayout(preferenceHeader);
-        preferences_scroll_=new QScrollArea;preferences_scroll_->setWidgetResizable(true);preferences_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(preferences_scroll_);preferenceLayout->addWidget(preferences_scroll_,1);pages_->addWidget(preferences_);
-        panel_=new RaisedPanel;panel_->setObjectName("raisedPanel");auto* panelLayout=new QVBoxLayout(panel_);panelLayout->setContentsMargins(8,3,12,13);panelLayout->setSpacing(0);panelLayout->addWidget(pages_);columns->addWidget(panel_,1);layout->addWidget(body,1);
+        operators_->setCurrentRow(c.selected);
         favorites_=readFavorites();refreshFavorites();
         connect(operators_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});connect(favorites_list_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});
         for(auto* list:{operators_,favorites_list_})connect(list,&QListWidget::itemClicked,this,[this](QListWidgetItem* item){if(item)selectOperator(item->data(Qt::UserRole).toInt());});
@@ -425,17 +445,21 @@ public:
         connect(&operator_transition_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){name_opacity_->setOpacity(value.toReal());icon_opacity_->setOpacity(value.toReal());});
         phone_=new PhoneServer([this]{return mobileState();},[this](const QJsonObject& request){return mobileUpdate(request);},this);if(c.phone_enabled)phone_->start();
         phone_->onNetworkChanged([this]{updatePhoneDetails();});
-        buildPreferences();
-        buildSettings();updateLanguage();applyStyle();buildTray();qApp->installEventFilter(this);clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());if(current!=last_cursor_){last_cursor_=current;update();}}});paint_.start();
+        restart_action_=[this]{force_close_=true;close();};buildPreferences();
+        buildSettings();updateLanguage();applyStyle();buildTray();qApp->installEventFilter(this);clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});paint_.start();
     }
+    bool restartRequested() const{return restart_requested_;}
     void capture(const QString& file){grab().save(file);}
-    void writePhoneInfo(const QString& path) const {if(!engine_.dry_run())return;QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"port",int(phone_->port())},{"address",phone_->address()},{"token",phone_->token()},{"code",phone_->code()},{"pid",int(QCoreApplication::applicationPid())},{"dryRun",true}}).toJson());}
+    void writePhoneInfo(const QString& path) const {if(!engine_.dry_run())return;QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"port",int(phone_->port())},{"address",phone_->address()},{"token",phone_->token()},{"code",phone_->code()},{"pid",int(QCoreApplication::applicationPid())},{"dryRun",true},{"interface",presentation::name(presentation::active)}}).toJson());}
     void closeUsingControl(){close_->click();}
     void setStartupNotice(const QString& message,bool blockSaving){save_blocked_=blockSaving;if(!message.isEmpty()){notice_->setText(message);notice_->show();}else if(!uniqueHotkeys(engine_.snapshot())){notice_->setText(text(UiText::ConflictingHotkeys));notice_->show();}}
     void closeForTimeout(){if(engine_.dry_run())force_close_=true;close();}
 #ifdef AZEC_UI_TESTS
+    void verifyRestartTo(const QString& name){showPreferences();interface_choice_->setCurrentIndex(interface_choice_->findData(int(presentation::fromName(name))));interface_apply_->click();}
     void finishVerification(){force_close_=true;close();}
     QJsonObject selfTest(const QString& output);
 #endif
 
 };
+
+#include "desktop_layouts.hpp"

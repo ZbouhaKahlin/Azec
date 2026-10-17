@@ -136,7 +136,7 @@ protected:
                 // blur chain gently so neither startup nor section settling pops.
                 if(progress_<.15){painter.setOpacity(1-progress_/.15);painter.drawPixmap(target,obscured_,QRectF(obscured_.rect()));}
             }
-            painter.setOpacity(std::max(0.0,1-progress_*2));painter.setPen(kbtheme::ink);painter.drawText(QRect(12,62,160,60),Qt::AlignCenter|Qt::TextWordWrap,reveal_text_);
+            painter.setOpacity(std::max(0.0,1-progress_*2));painter.setPen(QColor("#31204C"));painter.drawText(QRect(12,62,160,60),Qt::AlignCenter|Qt::TextWordWrap,reveal_text_);
             painter.restore();
         }
         painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::ink,2));painter.drawRoundedRect(QRectF(1,1,182,182),12,12);

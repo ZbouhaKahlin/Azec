@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+project(RallyUI LANGUAGES CXX)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets)
+add_library(rally_ui INTERFACE)
+add_library(Rally::UI ALIAS rally_ui)
+target_include_directories(rally_ui INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(rally_ui INTERFACE Qt6::Widgets)
+target_compile_features(rally_ui INTERFACE cxx_std_17)

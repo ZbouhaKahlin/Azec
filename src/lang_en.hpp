@@ -112,4 +112,8 @@ inline const char* const lang_en[]={
     "Right",
     "Up",
     "Down",
+    "Interface",
+    "The new design is applied after restarting. Your profiles stay the same.",
+    "Apply and restart",
+    "Could not save the interface selection. The app was not restarted.",
 };

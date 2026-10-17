@@ -60,6 +60,14 @@ Optional browser checks use `python tests/phone_browser_test.py` with Python Pla
 - Use Engine synchronization when accessing configuration from worker threads. Keep UI updates on the Qt GUI thread.
 - Never replace, commit, or package the user's personal configuration files as defaults.
 
+## Interface selection
+
+- Goofy is the default. Settings offers only Goofy and Rally, applied after saving and restarting. Do not restore Atelier or Glass as choices.
+- Both presentations use the same MainWindow bindings, Engine, hotkey handlers, phone server, validation, persistence, and profile transfer. Only the selected UI is constructed. Layout builders live in src/desktop_layouts.hpp; do not fork backend behavior for a design.
+- Store the interface name in azec_ui.json alongside favorites; changing either must preserve the other. Invalid or missing names fall back to Goofy. Preserve the 3,734-byte binary layout.
+- Restart only after pending profile changes and the UI preference are saved successfully; release the instance lock before relaunch. Preserve dry-run on restart.
+- The Goofy visual rules below apply to Goofy. Rally retains its dark green canvas, warm text, signal-orange default presentation accent, flat squared controls, full-width tuning deck and searchable operator grid. The same phone HTML/JS uses an alternate embedded stylesheet for Rally.
+
 ## UI contracts
 
 - The interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): chunky 2-3 px ink outlines, flat colour, hard offset ink shadows without blur, no gradients or glow. Retain the compact window, 200 px sidebar, custom window controls, rounded corners, the cream `#FFFAEE` canvas with white surfaces, the yellow `#FFDD59` header band, the GoofyUI purple default accent (`#7248D7`), and the stationary raised right panel.
@@ -74,7 +82,7 @@ Optional browser checks use `python tests/phone_browser_test.py` with Python Pla
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
 - Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds.
 - Reactive radius remains a supported setting. Do not remove it as a typography cleanup.
-- Nine language entries ship in the picker with painted flags: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` and every `phoneTexts` map in `assets/phone.html` must keep the full 112 / 80 keys in enum order; the `static_assert`s enforce the desktop count.
+- Nine language entries ship in the picker with painted flags: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` and every `phoneTexts` map in `assets/phone.html` must keep the full 116 / 80 keys in enum order; the `static_assert`s enforce the desktop count.
 - Localized text must never widen the fixed 200 px sidebar: sticker chips elide (`StickerLabel`), setting hints word-wrap, and `tests/ui_checks.cpp` asserts the sidebar fits for every language.
 
 ## Phone interface

@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-inline constexpr int operatorRowHeight=52;
+inline int operatorRowHeight=52;
 inline constexpr int operatorIconSize=44;
 
 class InkPopup final : public QFrame {
@@ -14,6 +14,7 @@ public:
     explicit InkPopup(QWidget* parent):QFrame(parent,Qt::Popup|Qt::FramelessWindowHint|Qt::NoDropShadowWindowHint){setAttribute(Qt::WA_TranslucentBackground);}
 protected:
     void paintEvent(QPaintEvent*) override{
+        if(presentation::isRally()){QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setBrush(rally::panel);p.setPen(QPen(rally::line,1));p.drawRoundedRect(QRectF(rect()).adjusted(1,1,-5,-6),4,4);return;}
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
         const QRectF face(1.5,1.5,width()-7,height()-8);
         painter.setPen(Qt::NoPen);painter.setBrush(QColor("#31204C"));painter.drawRoundedRect(face.translated(4,5),12,12);
@@ -27,10 +28,11 @@ class LanguageComboBox final : public QComboBox {
     QListWidget* choices_;
     void choose(){const int index=choices_->currentRow();hidePopup();if(index>=0){setCurrentIndex(index);emit activated(index);}}
 public:
-    explicit LanguageComboBox(QWidget* parent=nullptr):QComboBox(parent),popup_(new InkPopup(this)),choices_(new QListWidget(popup_)){
-        popup_->setObjectName("languagePopup");auto* layout=new QVBoxLayout(popup_);layout->setContentsMargins(8,8,12,13);layout->addWidget(choices_);
+    explicit LanguageComboBox(QWidget* parent=nullptr,const QString& popupName=QStringLiteral("languagePopup")):QComboBox(parent),popup_(new InkPopup(this)),choices_(new QListWidget(popup_)){
+        popup_->setObjectName(popupName);auto* layout=new QVBoxLayout(popup_);layout->setContentsMargins(8,8,12,13);layout->addWidget(choices_);
         choices_->setIconSize(QSize(22,15));choices_->setMouseTracking(false);choices_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         choices_->setStyleSheet("QListWidget{background:transparent;border:0;outline:0;} QListWidget::item{height:36px;padding:0 8px;border-radius:8px;background:transparent;} QListWidget::item:selected{background:#EBDEFF;color:#31204C;} QListWidget::item:hover:!selected{background:transparent;}");
+        if(presentation::isRally())choices_->setStyleSheet("QListWidget{background:transparent;border:0;outline:0;color:#EEEADE;} QListWidget::item{height:36px;padding:0 8px;border-radius:3px;background:transparent;} QListWidget::item:selected{background:#414A40;color:#EEEADE;} QListWidget::item:hover:!selected{background:transparent;}");
         choices_->installEventFilter(this);connect(choices_,&QListWidget::clicked,this,[this]{choose();});
     }
     void showPopup() override{
@@ -86,24 +88,14 @@ protected:
 
 // GoofyUI face switch: a chunky ink-outlined pill whose white knob carries a
 // "-" when off and a ":)" when on. The track is lavender off, the accent on.
-class Toggle final : public QAbstractButton {
-    QVariantAnimation animation_;
-    qreal position_=0;
-    std::function<QColor()> accent_;
+class Toggle final : public rally::Switch {
 public:
-    explicit Toggle(std::function<QColor()> accent,QWidget* parent=nullptr):QAbstractButton(parent),accent_(std::move(accent)) {
-        setCheckable(true);setCursor(Qt::PointingHandCursor);setFixedSize(48,28);setFocusPolicy(Qt::StrongFocus);
-        // A light spring on the knob travel; colours stay clamped while painting.
-        QEasingCurve spring(QEasingCurve::OutBack);spring.setOvershoot(1.05);
-        animation_.setDuration(320);animation_.setEasingCurve(spring);
-        connect(&animation_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){position_=value.toReal();update();});
-        connect(this,&QAbstractButton::toggled,this,[this](bool on){animation_.stop();if(!isVisible()){position_=on?1:0;update();return;}animation_.setStartValue(position_);animation_.setEndValue(on?1.0:0.0);animation_.start();});
-    }
-    void syncChecked(bool checked){if(isChecked()==checked)return;QSignalBlocker blocked(this);animation_.stop();position_=checked?1:0;setChecked(checked);update();}
+    explicit Toggle(std::function<QColor()> accent,QWidget* parent=nullptr):rally::Switch(std::move(accent),parent){if(!presentation::isRally()){setFixedSize(48,28);QEasingCurve spring(QEasingCurve::OutBack);spring.setOvershoot(1.05);motion_.setDuration(320);motion_.setEasingCurve(spring);}}
 protected:
-    void paintEvent(QPaintEvent*) override {
+    void paintEvent(QPaintEvent* event) override{if(presentation::isRally()){rally::Switch::paintEvent(event);return;}
+
         QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
-        const qreal position=animation_.state()==QAbstractAnimation::Running?position_:(isChecked()?1.0:0.0);
+        const qreal position=motion_.state()==QAbstractAnimation::Running?position_:(isChecked()?1.0:0.0);
         const qreal clamped=std::clamp(position,0.0,1.0);
         if(!isEnabled())p.setOpacity(.4);
         const QColor accent=accent_();
@@ -117,6 +109,7 @@ protected:
         QFont face("Geist");face.setPixelSize(9);face.setWeight(QFont::Black);p.setFont(face);p.setPen(kbtheme::ink);
         p.drawText(QRectF(knobX-8,14-8,16,16),Qt::AlignCenter,clamped>.5?QStringLiteral(":)"):QStringLiteral("-"));
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setBrush(Qt::NoBrush);p.setPen(QPen(accent,2));p.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),11,11);}
+
     }
 };
 
@@ -168,25 +161,12 @@ protected:
     void hideEvent(QHideEvent* event) override{settle();QWidget::hideEvent(event);}
 };
 
-class WeaponButton final : public QPushButton {
-    QVariantAnimation selection_;
-    qreal amount_=0;
-    bool chosen_=false,initialized_=false;
-    std::function<QColor()> accent_;
+class WeaponButton final : public rally::Segment {
 public:
-    explicit WeaponButton(std::function<QColor()> accent):accent_(std::move(accent)){
-        setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);
-        selection_.setEasingCurve(QEasingCurve::OutCubic);
-        connect(&selection_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){amount_=value.toReal();update();});
-    }
-    void setChosen(bool chosen){
-        if(initialized_&&chosen_==chosen)return;
-        const bool animate=initialized_&&isVisible();initialized_=true;chosen_=chosen;setProperty("chosen",chosen);selection_.stop();
-        if(!animate){amount_=chosen?1:0;update();return;}
-        selection_.setDuration(160);selection_.setStartValue(amount_);selection_.setEndValue(chosen?1.0:0.0);selection_.start();
-    }
+    explicit WeaponButton(std::function<QColor()> accent):rally::Segment(std::move(accent)){if(!presentation::isRally())setMinimumHeight(0);}
 protected:
-    void paintEvent(QPaintEvent*) override{
+    void paintEvent(QPaintEvent* event) override{if(presentation::isRally()){rally::Segment::paintEvent(event);return;}
+
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
         const QRectF pill=QRectF(rect()).adjusted(1,1,-1,-1);
         const qreal amount=std::clamp(amount_,0.0,1.0);
@@ -196,8 +176,8 @@ protected:
         QColor ink=mixColor(kbtheme::ink,kbtheme::readableOn(accent_()),amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
         painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),2));painter.drawRoundedRect(pill,12,12);}
+
     }
-    void hideEvent(QHideEvent* event) override{selection_.stop();amount_=chosen_?1:0;QPushButton::hideEvent(event);}
 };
 
 inline QPixmap operatorPixmap(const QString& name,int size=32,qreal ratio=1) {
@@ -216,8 +196,15 @@ class OperatorDelegate final : public QStyledItemDelegate {
     std::function<QColor()> accent_;
 public:
     explicit OperatorDelegate(std::function<QColor()> accent,QObject* parent):QStyledItemDelegate(parent),accent_(std::move(accent)){}
-    QSize sizeHint(const QStyleOptionViewItem&,const QModelIndex&) const override{return {200,operatorRowHeight};}
+    QSize sizeHint(const QStyleOptionViewItem&,const QModelIndex&) const override{return {presentation::isRally()?116:200,operatorRowHeight};}
     void paint(QPainter* p,const QStyleOptionViewItem& option,const QModelIndex& index) const override {
+        if(presentation::isRally()){
+        p->save();p->setRenderHint(QPainter::Antialiasing);const QRect r=option.rect.adjusted(4,4,-4,-4);const bool selected=option.state&QStyle::State_Selected;
+        p->setBrush(selected?rally::well:rally::panel);p->setPen(QPen(selected?accent_():rally::line,selected?2:1));p->drawRoundedRect(QRectF(r).adjusted(1,1,-1,-1),4,4);
+        if(selected){p->setPen(Qt::NoPen);p->setBrush(accent_());p->drawRect(r.left()+1,r.top()+12,3,22);}
+        qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(r.center().x()-operatorIconSize/2,r.top()+12,operatorIconSize,operatorIconSize));
+        QFont f("Geist");f.setPixelSize(12);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(rally::text);p->drawText(r.adjusted(4,62,-4,-5),Qt::AlignHCenter|Qt::AlignTop,QFontMetrics(f).elidedText(index.data().toString(),Qt::ElideRight,r.width()-8));p->restore();
+    return;}
         p->save();p->setRenderHint(QPainter::Antialiasing);p->setRenderHint(QPainter::TextAntialiasing);const QRect r=option.rect;
         const bool selected=option.state&QStyle::State_Selected;
         const QRectF pill=QRectF(r.adjusted(4,2,-4,-2));
@@ -244,10 +231,14 @@ class BrandLabel final : public QLabel {
 public:
     BrandLabel(){
         setText("Azec");setObjectName("brand");setAccessibleName("Azec");setAlignment(Qt::AlignCenter);
-        QFont pixel("Press Start 2P");pixel.setPixelSize(21);setFixedSize(QFontMetrics(pixel).horizontalAdvance(text())+8,36);
+        if(presentation::isRally())setFixedSize(118,32);else{QFont pixel("Press Start 2P");pixel.setPixelSize(21);setFixedSize(QFontMetrics(pixel).horizontalAdvance(text())+8,36);}
     }
 protected:
-    void paintEvent(QPaintEvent*) override {
+    void paintEvent(QPaintEvent*) override {if(presentation::isRally()){
+        QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.translate(1,5);p.scale(.97,.8);p.setPen(Qt::NoPen);p.setBrush(rally::text);QPainterPath a;a.setFillRule(Qt::OddEvenFill);
+        a.moveTo(0,28);a.lineTo(9,0);a.lineTo(19,0);a.lineTo(29,28);a.lineTo(21,28);a.lineTo(18,20);a.lineTo(10,20);a.lineTo(7,28);a.closeSubpath();a.moveTo(12,14);a.lineTo(16,14);a.lineTo(14,7);a.closeSubpath();p.drawPath(a);
+        for(const auto& poly:QList<QPolygonF>{QPolygonF{{34,0},{59,0},{59,6},{44,22},{60,22},{60,28},{33,28},{33,22},{49,6},{34,6}},QPolygonF{{65,0},{88,0},{88,6},{72,6},{72,11},{86,11},{86,17},{72,17},{72,22},{88,22},{88,28},{65,28}},QPolygonF{{117,0},{117,6},{101,6},{101,22},{117,22},{117,28},{99,28},{94,23},{94,5},{99,0}}})p.drawPolygon(poly);
+    return;}
         QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);QFont pixel("Press Start 2P");pixel.setPixelSize(21);painter.setFont(pixel);
         painter.setPen(kbtheme::ink);painter.drawText(rect().translated(2,2),Qt::AlignCenter,text());
         painter.setPen(Qt::white);painter.drawText(rect(),Qt::AlignCenter,text());
@@ -282,9 +273,9 @@ protected:
 class RaisedPanel final : public QWidget {
 public:
     explicit RaisedPanel(QWidget* parent=nullptr):QWidget(parent){}
-    QRectF surfaceRect() const{return QRectF(rect()).adjusted(8,3,-12,-13);}
+    QRectF surfaceRect() const{return presentation::isRally()?QRectF(rect()):QRectF(rect()).adjusted(8,3,-12,-13);}
 protected:
-    void paintEvent(QPaintEvent*) override {
+    void paintEvent(QPaintEvent*) override {if(presentation::isRally())return;
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);
         const auto surface=surfaceRect();
         // GoofyUI hard shadow: one flat ink plate offset down-right, no blur.
@@ -419,12 +410,13 @@ class StickerLabel final : public QLabel {
     QColor color_;
 public:
     StickerLabel(const QString& text,const QColor& color,QWidget* parent=nullptr):QLabel(parent),color_(color){setText(text);setObjectName("sticker");setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Fixed);}
-    QSize sizeHint() const override {const QFontMetrics metrics(stickerFont());return {metrics.horizontalAdvance(text().toUpper())+22,26};}
+    QSize sizeHint() const override {if(presentation::isRally())return {QFontMetrics(rally::Caption::captionFont()).horizontalAdvance(text().toUpper())+20,22};const QFontMetrics metrics(stickerFont());return {metrics.horizontalAdvance(text().toUpper())+22,26};}
     // Long translations must never widen the 200 px sidebar: the chip elides instead.
-    QSize minimumSizeHint() const override {return {qMin(sizeHint().width(),96),26};}
-    static QFont stickerFont(){QFont font("Geist");font.setPixelSize(11);font.setWeight(QFont::ExtraBold);font.setCapitalization(QFont::AllUppercase);font.setLetterSpacing(QFont::AbsoluteSpacing,0.6);return font;}
+    QSize minimumSizeHint() const override {return {qMin(sizeHint().width(),96),presentation::isRally()?22:26};}
+    static QFont stickerFont(){if(presentation::isRally())return rally::Caption::captionFont();QFont font("Geist");font.setPixelSize(11);font.setWeight(QFont::ExtraBold);font.setCapitalization(QFont::AllUppercase);font.setLetterSpacing(QFont::AbsoluteSpacing,0.6);return font;}
 protected:
-    void paintEvent(QPaintEvent*) override {
+    void paintEvent(QPaintEvent*) override {if(presentation::isRally()){QPainter p(this);p.setPen(Qt::NoPen);p.setBrush(rally::signal);p.drawRect(0,height()/2-3,5,5);p.setFont(stickerFont());p.setPen(rally::muted);p.drawText(rect().adjusted(15,0,0,0),Qt::AlignVCenter,QFontMetrics(stickerFont()).elidedText(text().toUpper(),Qt::ElideRight,width()-15));return;}
+
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setRenderHint(QPainter::TextAntialiasing);
         const QRectF chip=QRectF(rect()).adjusted(2,2,-2,-2);
         painter.translate(chip.center());painter.rotate(-2.0);painter.translate(-chip.center());
@@ -442,12 +434,12 @@ class Section final : public QFrame {
 public:
     QVBoxLayout* body;QWidget* content;QPushButton* heading=nullptr;
     explicit Section(const QString& title,bool collapsible,bool expanded,const QColor& stickerColor=QColor(),QWidget* parent=nullptr):QFrame(parent) {
-        setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(12,11,12,12);layout->setSpacing(0);
+        setObjectName("settingCard");auto* layout=new QVBoxLayout(this);if(presentation::isRally())layout->setContentsMargins(18,13,18,16);else layout->setContentsMargins(12,11,12,12);layout->setSpacing(0);
         auto* header=new QWidget;auto* row=new QHBoxLayout(header);row->setContentsMargins(2,0,2,0);header->setMinimumHeight(24);
         if(collapsible){heading=new QPushButton(title);heading->setObjectName("sectionHeading");heading->setCursor(Qt::PointingHandCursor);row->addWidget(heading,1);
             auto* arrow=new QLabel(expanded?QString::fromUtf8("⌄"):QString::fromUtf8("›"));arrow->setObjectName("sectionArrow");row->addWidget(arrow);
-            layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);content->setVisible(expanded);layout->addWidget(content);if(!expanded)layout->setContentsMargins(12,4,12,4);
+            layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(presentation::isRally()?4:8);content->setVisible(expanded);layout->addWidget(content);if(!expanded)layout->setContentsMargins(12,4,12,4);
             connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));layout->setContentsMargins(12,open?11:4,12,open?12:4);});
-        }else{auto* sticker=new StickerLabel(title,stickerColor.isValid()?stickerColor:sectionStickerColor(title));row->addWidget(sticker);row->addStretch(1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);layout->addWidget(content);}
+        }else{auto* sticker=new StickerLabel(title,stickerColor.isValid()?stickerColor:sectionStickerColor(title));row->addWidget(sticker);row->addStretch(1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(presentation::isRally()?4:8);layout->addWidget(content);}
     }
 };

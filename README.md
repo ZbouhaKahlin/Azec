@@ -13,9 +13,23 @@ The repository contains source, embedded assets, tests, scripts, and licenses. G
 
 ## Overview
 
-C++ / Qt 6 desktop interface for the recovered R6 behavior. The window is 864 × 650 at 100% display scale, with screen-fit sizing at higher scales, rounded outer corners, a custom title bar, a 200 px operator sidebar, and Settings inside the main window.
+C++ / Qt 6 desktop interface for the recovered R6 behavior. The window is 864 × 650 at 100% display scale, with screen-fit sizing at higher scales, custom window controls, and Settings inside the main window. Goofy has a 200 px operator sidebar; Rally has a dedicated operator grid.
 
-The interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): a cream `#FFFAEE` canvas under a yellow `#FFDD59` header band, white surfaces with chunky ink (`#31204C`) outlines, flat colour, and hard offset ink shadows instead of blur. Live state uses the user-selectable accent, which ships as GoofyUI purple (`#7248D7`). Both pages live inside one stationary rounded white panel with a 3 px ink outline. Settings navigation crossfades over 180 ms. Controls use bundled Geist (13 px base, 14 px rows) with Fredoka display headings; operator rows are 52 px tall with 14 px Geist names and 44 px icons, and selection is a lavender pill with an ink outline. Group and section headings are GoofyUI stickers: slightly tilted colour chips with ink outlines. The Azec wordmark is rendered in the bundled Press Start 2P pixel font — chunky white pixel lettering with a hard ink shadow inside the yellow header. All header controls use centered 20 px vector icons inside matching 34 px hit targets and stay flat until pressed, focused, or selected. Clicking switches does not add an outer focus ring; keyboard navigation keeps a 2 px accent outline. Switches are GoofyUI face toggles — lavender when off, accent when on, with a white knob showing `-` or `:)`. Sliders use lavender pill tracks with white ink-rimmed handles, and numeric fields are yellow mono chips. Window corners have a 24 px radius, panel corners 24 px, and buttons and inputs use 10-18 px corners. Reactive radius remains available in Appearance. Operator changes apply a gentle 120 ms fade only to the new icon and name; the selected profile and controls update immediately, including during rapid switching.
+The default interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): a cream `#FFFAEE` canvas under a yellow `#FFDD59` header band, white surfaces with chunky ink (`#31204C`) outlines, flat colour, and hard offset ink shadows instead of blur. Live state uses the user-selectable accent, which ships as GoofyUI purple (`#7248D7`). Both pages live inside one stationary rounded white panel with a 3 px ink outline. Settings navigation crossfades over 180 ms. Controls use bundled Geist (13 px base, 14 px rows) with Fredoka display headings; operator rows are 52 px tall with 14 px Geist names and 44 px icons, and selection is a lavender pill with an ink outline. Group and section headings are GoofyUI stickers: slightly tilted colour chips with ink outlines. The Azec wordmark is rendered in the bundled Press Start 2P pixel font — chunky white pixel lettering with a hard ink shadow inside the yellow header. All header controls use centered 20 px vector icons inside matching 34 px hit targets and stay flat until pressed, focused, or selected. Clicking switches does not add an outer focus ring; keyboard navigation keeps a 2 px accent outline. Switches are GoofyUI face toggles — lavender when off, accent when on, with a white knob showing `-` or `:)`. Sliders use lavender pill tracks with white ink-rimmed handles, and numeric fields are yellow mono chips. Window corners have a 24 px radius, panel corners 24 px, and buttons and inputs use 10-18 px corners. Reactive radius remains available in Appearance. Operator changes apply a gentle 120 ms fade only to the new icon and name; the selected profile and controls update immediately, including during rapid switching.
+
+## Choose an interface
+
+Goofy is the default. Open **Settings → Interface**, choose **Rally**, then click **Apply and restart**. Choosing Goofy switches back the same way. Pending profile edits are saved first; a failed save leaves the app open and shows the error. Both interfaces share the latest engine, hotkey capture, LAN-address selection, phone validation, backup, and save behavior.
+
+Only the selected interface is constructed at startup. Goofy retains its sidebar and original controls. Rally uses a full-width tuning deck, paired axis readouts, and a searchable operator grid. The phone page follows the selected design and uses the same HTML/JavaScript behavior with an alternate embedded stylesheet. Phone pairing sessions rotate on restart as usual.
+
+The interface name is stored in `azec_ui.json` beside favorites. Missing or unsupported choices fall back to Goofy. Favorites and interface updates preserve each other. The 3,734-byte binary profile format is unchanged; importing profiles keeps the current interface choice.
+
+The two layouts are built in `src/desktop_layouts.hpp`. Bindings and application services remain shared in `MainWindow`; do not maintain separate backend copies for UI variants. The reusable Rally Qt controls and styling are in `third_party/rally_ui`.
+
+![Interface selection](docs/ui-interface-selection.png)
+
+![Rally interface](docs/ui-rally-desktop.png)
 
 ## Screenshots
 
@@ -113,10 +127,12 @@ On another development machine, run `setup-qt.ps1` with Python available. It dow
 .\build.cmd test
 ```
 
-The second command runs core checks, builds a separate UI verification executable, and automatically runs isolated HTTP, restart, and single-instance checks, including the real 60-second pairing-limit expiry. Build intermediates go in `.build`. The build deploys the Qt runtime and compiles the small root launcher. Full application source is in `src`; operator SVGs and the embedded-resource manifest are in `assets`.
+The second command runs core checks, builds a separate UI verification executable, and automatically runs isolated HTTP, interface-switch restart, and single-instance checks, including the real 60-second pairing-limit expiry. Build intermediates go in `.build`. The build deploys the Qt runtime and compiles the small root launcher. Full application source is in `src`; operator SVGs and the embedded-resource manifest are in `assets`.
 
 - `src/app.cpp` / `src/startup.hpp`: startup, single-instance activation, configuration recovery, and verification dispatch.
-- `src/main_window.hpp`: window, settings, hotkeys, tray, and dialogs.
+- `src/main_window.hpp`: shared window behavior, settings, hotkeys, tray, and dialogs.
+- `src/desktop_layouts.hpp`: Goofy and Rally widget placement.
+- `src/interface_preferences.hpp`: atomic interface/favorites UI preferences.
 - `src/app_style.hpp` / `src/strings.hpp`: desktop styling and localized presentation text.
 - `src/phone_bridge.cpp`: validated phone-to-desktop updates and state building.
 - `src/profile_transfer.hpp` / `src/profile_transfer.cpp`: portable backup validation and import/export.
@@ -136,9 +152,9 @@ Qt is dynamically linked. Its license texts are in `licenses/Qt`; upstream sourc
 
 ## Verification
 
-Optional phone browser checks: install the Python `playwright` package and Google Chrome, then run `python tests/phone_browser_test.py`. This starts and stops an isolated dry-run instance and checks pairing, QR links, all nine languages at four widths, custom pickers, hotkey conflicts/persistence, and expired sessions. Screenshots and the JSON report stay under `.build/verification`.
+Optional phone browser checks: install the Python `playwright` package and Google Chrome, then run `python tests/phone_browser_test.py` (it checks Goofy and Rally). This starts and stops an isolated dry-run instance and checks pairing, QR links, all nine languages at four widths, custom pickers, hotkey conflicts/persistence, and expired sessions. Screenshots and the JSON report stay under `.build/verification`.
 
-The current verification passed 21 core checks, 130 UI checks at both 100% and 150% display scaling, 45 HTTP checks, 11 recovery checks, 17 phone browser checks, and restart/single-instance checks. Separate motion captures verify continuous phone reversals, fixed toggle-row height, and transparent transition backgrounds at both scales; timing-only runs omit capture overhead. Core coverage includes malformed/truncated/random input, isolation of newer-operator data from the fixed binary layout, and preservation of the previous file after a failed atomic replacement. UI coverage includes the existing layout/interaction contracts plus QR conceal/reveal and animation reversal, smooth weapon tabs, in-place phone toggles with anchored or bottom-clamped scrolling, custom-accent Save states and save failures, close cancellation, backup validation, hotkey collisions, and stationary-cursor repaint suppression.
+The combined-interface verification covers 21 core checks, 146 desktop checks per interface at both 100% and 150% display scaling, 45 HTTP checks, 11 recovery checks, 18 browser checks per phone interface, 13 real interface-switch restart checks, and 5 persistence/single-instance checks. Separate motion captures verify continuous phone reversals, fixed toggle-row height, and transparent transition backgrounds at both scales; timing-only runs omit capture overhead. Core coverage includes malformed/truncated/random input, isolation of newer-operator data from the fixed binary layout, and preservation of the previous file after a failed atomic replacement. UI coverage includes the existing layout/interaction contracts plus QR conceal/reveal and animation reversal, smooth weapon tabs, in-place phone toggles with anchored or bottom-clamped scrolling, custom-accent Save states and save failures, close cancellation, backup validation, hotkey collisions, and stationary-cursor repaint suppression.
 
 Phone checks cover pairing, authorization, invalid values/types/slots/hosts/origins, body limits, profile isolation, global round-trips, icons/manifest, persistence, lockout isolation, and rate-limit recovery. Chrome exercised all nine languages at widths of 320, 390, 430, and 768 CSS pixels without horizontal overflow. Browser checks also covered code pairing and token links, English defaults, custom pickers, hotkey persistence/conflicts, Escape/focus behavior, and expired sessions. HTTP checks verified profile isolation and persistence after restarting. Revealed QR screenshots decoded successfully in software at both scales, while concealed screenshots did not decode. A physical phone scan, actual network-address change, and real mouse output/in-game behavior were not tested.
 
@@ -153,7 +169,7 @@ Push-Location .build\verification
 Pop-Location
 ```
 
-Run `build.cmd test` first to create `runtime/Azec-checks.exe`. The normal runtime delegates `--ui-self-test` to that separate executable; verification code is absent from the release application. To automate both isolated display-scale runs, use `python tests/run_checks.py --ui-only`.
+Run `build.cmd test` first to create `runtime/Azec-checks.exe`. The normal runtime delegates `--ui-self-test` to that separate executable; verification code is absent from the release application. To automate both interfaces at both display scales, use `python tests/run_checks.py --ui-only`.
 
 For animation inspection, run `--ui-self-test --motion-only` in a fresh fixture directory. It records local frame sequences and timing/geometry samples for phone toggles, reversals, and QR reveal/conceal. Add `--motion-timing-only` to measure GUI responsiveness without frame-capture overhead. Keep these captures local because they include temporary pairing details.
 

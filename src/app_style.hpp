@@ -8,6 +8,7 @@
 // reserved for live state (the accent, user-selectable) and the semantic
 // palette. Placeholders: %1 accent hex, %2 text on accent.
 inline QString applicationStyle(const QColor& accent){
+    if(presentation::isRally())return rally::style(accent);
     const QString accentHex=accent.name();
     const QString onAccent=kbtheme::readableOn(accent).name();
     return QString::fromUtf8(R"CSS(
@@ -86,6 +87,7 @@ inline QString applicationStyle(const QColor& accent){
         QDialog#palestinePopup { background:#FFFAEE; border:3px solid #31204C; border-radius:24px; }
         QLabel#palestineArabic { color:#31204C; font-size:24px; font-weight:900; }
         QToolTip { background:#FFFFFF; color:#31204C; border:2px solid #31204C; border-radius:10px; padding:6px 8px; font-size:12px; }
+        QPushButton#secondary:disabled { color:#8A7EA0; border-color:#BCAFD0; }
         QPushButton:focus { outline:0; }
     )CSS").arg(accentHex,onAccent);
 }

@@ -112,4 +112,8 @@ inline const char* const lang_es[]={
     "Derecha",
     "Arriba",
     "Abajo",
+    "Interfaz",
+    "El nuevo diseño se aplica al reiniciar. Tus perfiles se conservan.",
+    "Aplicar y reiniciar",
+    "No se pudo guardar la interfaz. La aplicación no se reinició.",
 };

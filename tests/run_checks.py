@@ -81,19 +81,22 @@ def run(ui=False,ui_only=False,qr_scan=False):
         run_http(parent)
         from recovery_test import run as run_recovery
         run_recovery(parent)
+        from interface_restart_test import run as run_interfaces
+        run_interfaces(parent)
     if ui:
-        for scale in ('1', '1.5'):
-            fixture = Path(tempfile.mkdtemp(prefix='ui-' + scale + '-', dir=parent))
-            env = os.environ.copy()
-            env['QT_SCALE_FACTOR'] = scale
-            subprocess.run([str(ROOT / 'runtime' / 'Azec-checks.exe'), '--ui-self-test'], cwd=fixture, env=env, check=True, timeout=150)
-            report = json.loads((fixture / 'ui-verification.json').read_text())
-            if not report['passed']:
-                raise RuntimeError('UI report failed at scale ' + scale)
-            if qr_scan:
-                from qr_scan import verify
-                if not verify(fixture):
-                    raise RuntimeError('QR decoding failed at scale ' + scale)
+        for interface in ('goofy', 'rally'):
+            for scale in ('1', '1.5'):
+                fixture = Path(tempfile.mkdtemp(prefix='ui-' + interface + '-' + scale + '-', dir=parent))
+                env = os.environ.copy()
+                env['QT_SCALE_FACTOR'] = scale
+                subprocess.run([str(ROOT / 'runtime' / 'Azec-checks.exe'), '--ui-self-test', '--interface='+interface], cwd=fixture, env=env, check=True, timeout=150)
+                report = json.loads((fixture / 'ui-verification.json').read_text())
+                if not report['passed']:
+                    raise RuntimeError('UI report failed at scale ' + scale)
+                if qr_scan:
+                    from qr_scan import verify
+                    if not verify(fixture):
+                        raise RuntimeError('QR decoding failed at scale ' + scale)
     print('Verification artifacts: ' + str(parent))
 
 if __name__ == '__main__':

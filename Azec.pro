@@ -19,3 +19,6 @@ HEADERS += src/lan_address.hpp
 LIBS += -luser32 -lgdi32 -ldwmapi -liphlpapi -lws2_32
 QMAKE_CXXFLAGS += /utf-8
 QMAKE_LFLAGS += /MANIFEST:EMBED
+
+HEADERS += src/interface_preferences.hpp src/desktop_layouts.hpp
+include(third_party/rally_ui/qt/rally-ui.pri)

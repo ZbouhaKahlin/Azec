@@ -112,4 +112,8 @@ inline const char* const lang_fr[]={
     "Droite",
     "Haut",
     "Bas",
+    "Interface",
+    "Le nouveau design sera appliqué après redémarrage. Vos profils sont conservés.",
+    "Appliquer et redémarrer",
+    "Impossible d’enregistrer l’interface. L’application n’a pas redémarré.",
 };

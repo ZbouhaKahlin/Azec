@@ -112,4 +112,8 @@ inline const char* const lang_de[]={
     "Rechts",
     "Hoch",
     "Runter",
+    "Oberfläche",
+    "Das neue Design wird nach einem Neustart angewendet. Deine Profile bleiben erhalten.",
+    "Anwenden und neu starten",
+    "Die Oberfläche konnte nicht gespeichert werden. Die App wurde nicht neu gestartet.",
 };
