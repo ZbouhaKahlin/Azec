@@ -26,8 +26,8 @@ def run(parent):
     process=None
     original=b'broken primary configuration'
     (folder/'r6_config.bin').write_bytes(original)
-    (folder/'kingboss_ui.json').write_text(json.dumps({'favorites':['Ash']}))  # legacy pre-rename name; must still load once
-    (folder/'kingboss_weapons.json').write_text(json.dumps({'version':1,'operators':{
+    (folder/'azec_ui.json').write_text(json.dumps({'favorites':['Ash']}))  # unversioned favorites file must load
+    (folder/'azec_weapons.json').write_text(json.dumps({'version':1,'operators':{
         'Ash':{'enabled':True,'initialized':True,'vertical':23.7,'horizontal':-3.4,'delay':500,
                'rapid':True,'humanize':False}}}))
     checks={}
@@ -41,9 +41,9 @@ def run(parent):
         checks['defaults_save_after_recovery']=call(info,{'action':'save'})[0]==200 and (folder/'r6_config.bin').stat().st_size==3734
         call(info,{'action':'setFavorite','operator':4,'enabled':True})
         checks['favorites_write_version']=json.loads((folder/'azec_ui.json').read_text())['version']==1
-        checks['legacy_secondary_delay_preserved']=json.loads((folder/'kingboss_weapons.json').read_text())['operators']['Ash']['delay']==500
-        migrated=folder/'azec_weapons.json'
-        checks['legacy_weapons_migrate_on_save']=(not migrated.exists())or json.loads(migrated.read_text())['operators']['Ash']['delay']==500
+        stored=json.loads((folder/'azec_weapons.json').read_text())['operators']['Ash']
+        checks['secondary_delay_preserved']=stored['delay']==500
+        checks['weapons_store_survives_save']=stored['enabled'] is True and abs(stored['vertical']-23.7)<0.001
         log=(folder/'azec.log').read_text()
         checks['recovery_logged_without_token']='recover binary' in log and info['token'] not in log
     finally:

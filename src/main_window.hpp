@@ -114,7 +114,6 @@ class MainWindow final : public QWidget {
     std::filesystem::path favoritesPath() const{return config_path_.parent_path()/L"azec_ui.json";}
     QSet<QString> readFavorites() const {
         QFile file(QString::fromStdWString(favoritesPath().wstring()));QSet<QString> result;
-        if(!file.exists()){const auto legacy=config_path_.parent_path()/L"kingboss_ui.json";if(std::filesystem::exists(legacy))file.setFileName(QString::fromStdWString(legacy.wstring()));}
         if(!file.open(QIODevice::ReadOnly))return result;
         if(file.size()>1024*1024){diagnostic("load favorites","File too large; ignored");return result;}
         QJsonParseError error;const auto document=QJsonDocument::fromJson(file.readAll(),&error);const auto root=document.object();

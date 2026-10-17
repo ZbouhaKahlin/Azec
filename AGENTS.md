@@ -47,8 +47,9 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 ## Data and behavior contracts
 
 - Preserve the original 3,734-byte primary configuration layout in `r6_config.bin`. Keep backward compatibility when adding features.
-- Operators beyond the original 71-element list are extensions. Noor is appended at id 71; his primary profile and the selected extension operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`), while the binary `selected` field still rejects indexes past the original list and `r6_config.bin` stays at 3,734 bytes. Backups from before the extension still import by name.
-- Store secondary profiles, weapon hotkeys, and the phone-access preference in `azec_weapons.json`. Favorites use `azec_ui.json`. Pre-rename `kingboss_*.json` files still load once and are superseded on the next save.
+- The operator roster covers all 72 operators in id order: Ace, Alibi, Amaru, Aruni, Ash, Azami, Bandit, Blackbeard, Blitz, Brava, Buck, Capitao, Castle, Caveira, Clash, Deimos, Doc, Dokkaebi, Echo, Ela, Fenrir, Finka, Flores, Frost, Fuze, Glaz, Goyo, Gridlock, Grim, Hibana, Iana, IQ, Jackal, Jager, Kaid, Kali, Kapkan, Lesion, Lion, Maestro, Maverick, Melusi, Mira, Montagne, Mozzie, Mute, Nokk, Osa, Oryx, Pulse, Ram, Rook, Sens, Sentry, Skopos, Smoke, Solis, Striker, Sledge, Tachanka, Thatcher, Thermite, Thorn, Thunderbird, Tubarao, Twitch, Valkyrie, Vigil, Wamai, Warden, Ying, Noor. Keep this order: extend at the end only so existing records never shift.
+- `r6_config.bin` serializes only the original 71 records. Primary profiles for operators past the original list (Noor, id 71) and the selected operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`); the binary `selected` field still rejects indexes past the original list. Backups with 71 or 72 records import by name.
+- Store secondary profiles, weapon hotkeys, and the phone-access preference in `azec_weapons.json`. Favorites use `azec_ui.json`.
 - Each operator has a primary profile and an optional independent secondary profile. First enable copies primary settings; disabling preserves secondary edits. Character selection starts on primary.
 - Default weapon keys are 1 and 2 and are configurable. Weapon shortcuts must not interrupt text/number editing or Ctrl/Alt/Windows-key shortcuts.
 - Preserve fractional accumulation, timing, and SendInput behavior unless the requested change concerns them. Reset fractional movement when the active operator/weapon changes.
@@ -87,3 +88,5 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 Keep source, embedded assets, tests, build/setup scripts, documentation, and third-party license files in Git. Generated executables, deployed Qt DLLs, `.build/`, personal configurations, credentials, and pairing info are excluded by `.gitignore`.
 
 Preserve third-party attribution and licenses. Package the root launcher together with `runtime/` and license files for runnable releases. Exclude stale executable backups and local settings. Report relevant checks and any actual testing limitations; do not claim a physical iPhone or in-game test without performing it.
+
+The local working folder keeps its historical `KingBoss2004` name because the in-use checkout cannot be renamed; the GitHub repository is `Azec-Zuckerberg/Azec`, and every application name, window, written file, package, and document uses `Azec`. Do not reintroduce the old name in code, files, or compatibility fallbacks.

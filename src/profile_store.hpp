@@ -6,10 +6,8 @@
 #include "diagnostics.hpp"
 
 inline QString weaponFile(const std::filesystem::path& base){return QString::fromStdWString((base.parent_path()/L"azec_weapons.json").wstring());}
-// Files written before the Azec rename still load once; the next save uses the new name.
-inline QString legacyWeaponFile(const std::filesystem::path& base){return QString::fromStdWString((base.parent_path()/L"kingboss_weapons.json").wstring());}
 inline void readWeaponProfiles(r6::Config& config,const std::filesystem::path& base){
-    QFile file(weaponFile(base));if(!file.exists()&&QFile::exists(legacyWeaponFile(base)))file.setFileName(legacyWeaponFile(base));if(!file.exists())return;
+    QFile file(weaponFile(base));if(!file.exists())return;
     if(!file.open(QIODevice::ReadOnly)){diagnostic("load weapon profiles",file.errorString());return;}
     if(file.size()>1024*1024){diagnostic("load weapon profiles","File exceeds 1 MiB; ignored");return;}
     QJsonParseError error;const auto document=QJsonDocument::fromJson(file.readAll(),&error);

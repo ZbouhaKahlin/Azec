@@ -22,7 +22,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
 inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>& favorites){
     const auto number=[](const QJsonValue& value,double lo,double hi){return value.isDouble()&&std::isfinite(value.toDouble())&&value.toDouble()>=lo&&value.toDouble()<=hi;};
     const auto integer=[&](const QJsonValue& value,int lo,int hi){return number(value,lo,hi)&&std::floor(value.toDouble())==value.toDouble();};
-    if((root["application"]!="Azec"&&root["application"]!="KingBoss2004")||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
+    if(root["application"]!="Azec"||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
     const auto records=root["operators"].toArray();const auto settings=root["settings"].toObject();r6::Config next;
     // Backups made before the extension carry 71 records; both sizes import by name.
     if(records.size()!=r6::operator_count&&records.size()!=r6::legacy_operator_count)return false;
