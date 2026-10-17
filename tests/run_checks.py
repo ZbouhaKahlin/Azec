@@ -59,11 +59,16 @@ def run_http(parent):
         ash = next(op for op in state['operators'] if op['name'] == 'Ash')
         if not ash['dual'] or not ash['favorite'] or old_token == info['token']:
             raise RuntimeError('Restart did not preserve profiles/favorites and rotate session token')
+        if state['operatorId'] != 71 or abs(state['profile']['vertical'] - 31.5) > .001:
+            raise RuntimeError('Restart lost the extension operator selection or profile')
         weapons = json.loads((folder / 'azec_weapons.json').read_text())
         if abs(weapons['operators']['Ash']['vertical'] - 23.7) > .001:
             raise RuntimeError('Restart lost the secondary profile')
+        if weapons.get('selected') != 71 or abs(weapons['primaryProfiles']['Noor']['vertical'] - 31.5) > .001:
+            raise RuntimeError('Restart lost the extension profile store')
         (folder / 'restart-verification.json').write_text(json.dumps({'passed': True,
-            'checks': {'secondary': True, 'favorites': True, 'session_rotated': True, 'single_instance': True}}, indent=2))
+            'checks': {'secondary': True, 'favorites': True, 'session_rotated': True, 'single_instance': True,
+                       'extension_operator': True}}, indent=2))
     finally:
         stop(process)
         # Session credentials must never be uploaded as verification artifacts.

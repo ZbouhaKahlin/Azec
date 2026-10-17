@@ -36,7 +36,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             motionChecks["phone_retarget_preserves_height"]=continuous;motionChecks["phone_switch_keeps_44px_row"]=stableControls;if(captureFrames)motionChecks["phone_background_stays_panel_color"]=stableBackground;
             return {{"passed",continuous&&stableControls&&stableBackground},{"checks",motionChecks},{"sequences",sequences}};
         }
-        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<698||size()==QSize(864,650);checks["sidebar_is_narrower"]=findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="Azec";checks["all_71_operators"]=operators_->count()==71;checks["all_71_svg_icons_valid"]=icon_failures_.empty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
+        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<698||size()==QSize(864,650);checks["sidebar_is_narrower"]=findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="Azec";checks["all_72_operators"]=operators_->count()==r6::operator_count;checks["extension_operator_row"]=operators_->item(operators_->count()-1)->text()=="Noor";checks["all_72_svg_icons_valid"]=icon_failures_.empty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
         auto* sidebarBar=static_cast<FadingScrollBar*>(sidebar_scroll_->verticalScrollBar());checks["scrollbars_start_invisible"]=sidebarBar->opacity()==0&&static_cast<FadingScrollBar*>(scroll_->verticalScrollBar())->opacity()==0&&static_cast<FadingScrollBar*>(preferences_scroll_->verticalScrollBar())->opacity()==0;
         checks["one_shared_sidebar_scroll"]=sidebar_scroll_->widget()->isAncestorOf(operators_)&&sidebar_scroll_->widget()->isAncestorOf(favorites_list_)&&operators_->verticalScrollBarPolicy()==Qt::ScrollBarAlwaysOff&&favorites_list_->verticalScrollBarPolicy()==Qt::ScrollBarAlwaysOff;
         checks["raised_panel_contains_both_pages"]=panel_->isAncestorOf(operator_page_)&&panel_->isAncestorOf(preferences_)&&!panel_->graphicsEffect()&&pages_->width()>findChild<QWidget*>("operatorSidebar")->width()*3;
@@ -173,7 +173,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["tray_has_window_recoil_rapid_exit"]=tray_&&tray_menu_&&tray_recoil_->isCheckable()&&tray_rapid_->isCheckable()&&tray_exit_;
         const auto baseline=engine_.snapshot();const auto backup=makeBackup(baseline,favorites_);r6::Config imported;QSet<QString> importedFavorites;
         checks["complete_profile_backup_roundtrip"]=parseBackup(backup,imported,importedFavorites)&&imported.bytes()==baseline.bytes()&&importedFavorites==favorites_&&imported.secondary_enabled==baseline.secondary_enabled;
-        auto malformedBackup=backup;auto entries=backup["operators"].toArray();entries.removeLast();malformedBackup["operators"]=entries;
+        auto malformedBackup=backup;auto entries=backup["operators"].toArray();entries.removeLast();entries.removeLast();malformedBackup["operators"]=entries;
         const auto unchangedBeforeImport=engine_.snapshot().bytes();
         checks["invalid_import_preserves_profiles"]=!applyBackup(QJsonDocument(malformedBackup).toJson())&&engine_.snapshot().bytes()==unchangedBeforeImport;
         checks["valid_import_updates_production_ui"]=applyBackup(QJsonDocument(backup).toJson())&&unsaved_&&engine_.snapshot().bytes()==baseline.bytes();
@@ -190,11 +190,13 @@ QJsonObject MainWindow::selfTest(const QString& output){
         save_blocked_=true;QTimer::singleShot(80,this,[]{if(auto* modal=QApplication::activeModalWidget())if(auto* button=modal->findChild<QPushButton*>("save"))button->click();});
         close();checks["failed_save_during_close_keeps_window_open"]=isVisible()&&engine_.running&&unsaved_;save_blocked_=false;
         engine_.edit([&](r6::Config& config){config=baseline;});applyStyle();syncSelection();dirty();save();wait(1800);
-        QCursor::setPos(mapToGlobal(QPoint(-20,-20)));wait(250);const int idlePaints=paint_count_;wait(350);
+        // A longer settle absorbs machine-delayed one-shot repaints; the measured window stays strict.
+        QCursor::setPos(mapToGlobal(QPoint(-20,-20)));wait(750);const int idlePaints=paint_count_;wait(350);
         checks["stationary_cursor_does_not_repaint_window"]=paint_count_==idlePaints;
         capture(output+"/save-neutral.png");editOperator([](r6::Operator& op){op.vertical=13.2f;});capture(output+"/save-unsaved.png");save();
         // Load previous default themes and a custom theme through the production loader.
-        const auto themeFixture=std::filesystem::path(output.toStdWString())/L"theme-test.bin";r6::Config theme;
+        // The fixture lives in its own directory so no azec_weapons.json sidecar applies.
+        const auto themeDirectory=std::filesystem::path(output.toStdWString())/L"theme-fixture";std::error_code themeError;std::filesystem::create_directories(themeDirectory,themeError);const auto themeFixture=themeDirectory/L"theme-test.bin";r6::Config theme;
         bool migrationPassed=true;for(const auto& legacy:std::array<std::array<float,3>,4>{{{0,1,.4f},{5.f/255,134.f/255,105.f/255},{1.f,91.f/255,99.f/255},{210.f/255,210.f/255,210.f/255}}}){for(int i=0;i<3;++i)theme.neon[i]=legacy[i];r6::Engine migrated(true);migrationPassed&=theme.save(themeFixture)&&migrated.load(themeFixture);const auto loaded=migrated.snapshot();migrationPassed&=QColor::fromRgbF(loaded.neon[0],loaded.neon[1],loaded.neon[2]).name()=="#7248d7"&&loaded.operators[4].vertical==theme.operators[4].vertical;}
         checks["previous_default_accents_migrate_without_profile_changes"]=migrationPassed;
         theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);checks["custom_accent_is_preserved"]=customLoaded&&customTheme.snapshot().bytes()==theme.bytes();

@@ -27,11 +27,18 @@ checks['edits_secondary']=abs(json.loads(call('/api/update',{'action':'setProfil
 checks['primary_unchanged']=json.loads(call('/api/update',{'action':'selectWeapon','slot':0})[1])['profile']['vertical']==10
 checks['secondary_preserved']=abs(json.loads(call('/api/update',{'action':'selectWeapon','slot':1})[1])['profile']['vertical']-23.7)<.001
 checks['favorite_saves']=next(o for o in json.loads(call('/api/update',{'action':'setFavorite','operator':4,'enabled':True})[1])['operators'] if o['id']==4)['favorite']
+state=json.loads(call('/api/state')[1])
+checks['extension_operator_listed']=any(o['id']==71 and o['name']=='Noor' for o in state['operators'])
+checks['selects_extension_operator']=json.loads(call('/api/update',{'action':'selectOperator','operator':71})[1])['operatorId']==71
+checks['extension_profile_edits']=abs(json.loads(call('/api/update',{'action':'setProfile','operator':71,'slot':0,'values':{'vertical':31.5,'horizontal':-4.25,'delay':90,'rapid':True,'humanize':False}})[1])['profile']['vertical']-31.5)<.001
+checks['rejects_extension_boundary']=call('/api/update',{'action':'selectOperator','operator':72})[0]==400
 checks['save_succeeds']=call('/api/update',{'action':'save'})[0]==200
 checks['legacy_layout_unchanged']=(folder/'r6_config.bin').stat().st_size==3734
 saved=json.loads((folder/'azec_weapons.json').read_text())
 checks['secondary_persists']=saved['operators']['Ash']['enabled'] and abs(saved['operators']['Ash']['vertical']-23.7)<.001
+checks['extension_primary_persists']=saved['selected']==71 and abs(saved['primaryProfiles']['Noor']['vertical']-31.5)<.001 and saved['primaryProfiles']['Noor']['delay']==90
 checks['operator_icon_available']=call('/icons/ash.svg',auth=False)[0]==200
+checks['extension_icon_available']=call('/icons/noor.svg',auth=False)[0]==200
 checks['rejects_icon_traversal']=call('/icons/../phone_server.hpp',auth=False)[0]==404
 checks['rejects_wrong_host']=call('/api/state',extra={'Host':'unrelated.example:'+str(info['port'])})[0]==403
 checks['unknown_authenticated_route']=call('/missing')[0]==404

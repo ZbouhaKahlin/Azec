@@ -13,7 +13,8 @@
 
 namespace r6 {
 // FUN_140063d90 constructs 73 names but stops after index 70. Zero and Zofia
-// are embedded strings, but never enter the original's 71-element list.
+// are embedded strings, but never enter the original's 71-element list. Noor
+// (Year 11) is appended as an extension and never enters the binary layout.
 static const char* names[] = {
     "Ace", "Alibi", "Amaru", "Aruni", "Ash", "Azami", "Bandit", "Blackbeard",
     "Blitz", "Brava", "Buck", "Capitao", "Castle", "Caveira", "Clash", "Deimos",
@@ -23,7 +24,7 @@ static const char* names[] = {
     "Melusi", "Mira", "Montagne", "Mozzie", "Mute", "Nokk", "Osa", "Oryx",
     "Pulse", "Ram", "Rook", "Sens", "Sentry", "Skopos", "Smoke", "Solis",
     "Striker", "Sledge", "Tachanka", "Thatcher", "Thermite", "Thorn",
-    "Thunderbird", "Tubarao", "Twitch", "Valkyrie", "Vigil", "Wamai", "Warden", "Ying"
+    "Thunderbird", "Tubarao", "Twitch", "Valkyrie", "Vigil", "Wamai", "Warden", "Ying", "Noor"
 };
 static_assert(std::size(names) == operator_count);
 Config::Config() {
@@ -38,8 +39,12 @@ template<class T> static void append(std::vector<std::uint8_t>& b, const T& valu
 std::vector<std::uint8_t> Config::bytes() const {
     std::vector<std::uint8_t> b;
     b.reserve(3734);
-    append(b, operators); append(b, menu_key); append(b, recoil_key);
-    append(b, panic_key); append(b, selected); append(b, language); append(b, sound);
+    for (int i = 0; i < legacy_operator_count; ++i) append(b, operators[i]);
+    append(b, menu_key); append(b, recoil_key);
+    append(b, panic_key);
+    // The original field only accepts the legacy list; extension selection lives in azec_weapons.json.
+    append(b, std::int32_t(selected >= legacy_operator_count ? 0 : selected));
+    append(b, language); append(b, sound);
     append(b, rapid_key); append(b, rapid_master); append(b, neon); append(b, radius);
     return b;
 }
@@ -75,12 +80,14 @@ bool Config::load(const std::filesystem::path& path) {
         offset += sizeof(value);
         return true;
     };
-    read(next.operators); read(next.menu_key); read(next.recoil_key);
+    for (int i = 0; i < legacy_operator_count; ++i) read(next.operators[i]);
+    read(next.menu_key); read(next.recoil_key);
     read(next.panic_key); read(next.selected);
     read(next.language); read(next.sound);
     read(next.rapid_key);
     read(next.rapid_master); read(next.neon); read(next.radius);
-    if (next.selected < 0 || next.selected >= operator_count) return false;
+    // Extension selections are reapplied from azec_weapons.json after the load.
+    if (next.selected < 0 || next.selected >= legacy_operator_count) return false;
     for (auto& op : next.operators) {
         if (!std::memchr(op.name, 0, 32) || !std::isfinite(op.vertical) ||
             !std::isfinite(op.horizontal)) return false;

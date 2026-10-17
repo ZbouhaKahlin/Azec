@@ -47,6 +47,7 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 ## Data and behavior contracts
 
 - Preserve the original 3,734-byte primary configuration layout in `r6_config.bin`. Keep backward compatibility when adding features.
+- Operators beyond the original 71-element list are extensions. Noor is appended at id 71; his primary profile and the selected extension operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`), while the binary `selected` field still rejects indexes past the original list and `r6_config.bin` stays at 3,734 bytes. Backups from before the extension still import by name.
 - Store secondary profiles, weapon hotkeys, and the phone-access preference in `azec_weapons.json`. Favorites use `azec_ui.json`. Pre-rename `kingboss_*.json` files still load once and are superseded on the next save.
 - Each operator has a primary profile and an optional independent secondary profile. First enable copies primary settings; disabling preserves secondary edits. Character selection starts on primary.
 - Default weapon keys are 1 and 2 and are configurable. Weapon shortcuts must not interrupt text/number editing or Ctrl/Alt/Windows-key shortcuts.

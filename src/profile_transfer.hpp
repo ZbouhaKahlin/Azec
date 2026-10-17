@@ -24,7 +24,8 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     const auto integer=[&](const QJsonValue& value,int lo,int hi){return number(value,lo,hi)&&std::floor(value.toDouble())==value.toDouble();};
     if((root["application"]!="Azec"&&root["application"]!="KingBoss2004")||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
     const auto records=root["operators"].toArray();const auto settings=root["settings"].toObject();r6::Config next;
-    if(records.size()!=r6::operator_count)return false;
+    // Backups made before the extension carry 71 records; both sizes import by name.
+    if(records.size()!=r6::operator_count&&records.size()!=r6::legacy_operator_count)return false;
     const auto profile=[&](const QJsonValue& record,r6::Operator& op){
         if(!record.isObject())return false;const auto values=record.toObject();
         if(!number(values["vertical"],0,100)||!number(values["horizontal"],-50,50)||!integer(values["delay"],0,60000)||!values["rapid"].isBool()||!values["humanize"].isBool())return false;

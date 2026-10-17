@@ -23,7 +23,10 @@ static_assert(offsetof(Operator, vertical) == 32);
 static_assert(offsetof(Operator, rapid) == 40);
 static_assert(offsetof(Operator, delay) == 44);
 static_assert(offsetof(Operator, humanize) == 48);
-constexpr int operator_count = 71;
+constexpr int operator_count = 72;
+// The original writes exactly 71 operator records; extension operators (Noor)
+// keep r6_config.bin at 3,734 bytes and live in azec_weapons.json instead.
+constexpr int legacy_operator_count = 71;
 struct Config {
     std::array<Operator, operator_count> operators;
     std::int32_t menu_key = 0x2d, recoil_key = 0x75, panic_key = 0x23;

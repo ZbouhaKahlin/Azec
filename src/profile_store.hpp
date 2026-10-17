@@ -25,11 +25,21 @@ inline void readWeaponProfiles(r6::Config& config,const std::filesystem::path& b
         auto& op=config.secondary[id];op=config.operators[id];op.vertical=float(vertical);op.horizontal=float(horizontal);op.delay=delay;op.rapid=item["rapid"].toBool();op.humanize=item["humanize"].toBool(true);
         config.secondary_enabled[id]=item["enabled"].toBool();config.secondary_initialized[id]=item["initialized"].toBool(true);
     }
+    const int selected=root["selected"].toInt(-1);if(selected>=0&&selected<r6::operator_count)config.selected=selected;
+    const auto primaries=root["primaryProfiles"].toObject();
+    for(int id=r6::legacy_operator_count;id<r6::operator_count;++id){
+        const auto name=QString::fromUtf8(config.operators[id].name);const auto item=primaries[name].toObject();if(item.isEmpty())continue;
+        const auto vertical=item["vertical"].toDouble(-1),horizontal=item["horizontal"].toDouble(-1000);const int delay=item["delay"].toInt(-1);
+        if(!std::isfinite(vertical)||!std::isfinite(horizontal)||vertical<0||vertical>100||horizontal<-50||horizontal>50||delay<0||delay>60000){diagnostic("load extension profile",name+": invalid values; ignored");continue;}
+        auto& op=config.operators[id];op.vertical=float(vertical);op.horizontal=float(horizontal);op.delay=delay;op.rapid=item["rapid"].toBool();op.humanize=item["humanize"].toBool(true);
+    }
 }
 inline bool writeWeaponProfiles(const r6::Config& config,const std::filesystem::path& base){
-    QJsonObject profiles;
+    QJsonObject profiles,primaries;
     for(int id=0;id<r6::operator_count;++id){const auto& op=config.secondary[id];profiles[QString::fromUtf8(config.operators[id].name)]=QJsonObject{{"enabled",config.secondary_enabled[id]},{"initialized",config.secondary_initialized[id]},{"vertical",op.vertical},{"horizontal",op.horizontal},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)},{"delay",op.delay}};}
-    const auto bytes=QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},{"operators",profiles}}).toJson();
+    // Extension operators keep their primary profile and the live selection here.
+    for(int id=r6::legacy_operator_count;id<r6::operator_count;++id){const auto& op=config.operators[id];primaries[QString::fromUtf8(config.operators[id].name)]=QJsonObject{{"vertical",op.vertical},{"horizontal",op.horizontal},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)},{"delay",op.delay}};}
+    const auto bytes=QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries}}).toJson();
     QSaveFile file(weaponFile(base));const bool ok=file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();
     if(!ok)diagnostic("save weapon profiles",file.errorString());return ok;
 }
