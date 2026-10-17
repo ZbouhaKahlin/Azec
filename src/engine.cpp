@@ -8,8 +8,8 @@
 
 namespace r6 {
 Engine::Engine(bool dry_run):dry_run_(dry_run) {
-    // Atelier neutral chrome is the new default; persisted binary layout is unchanged.
-    config_.neon[0]=210.0f/255;config_.neon[1]=210.0f/255;config_.neon[2]=210.0f/255;
+    // GoofyUI purple is the current default; persisted binary layout is unchanged.
+    config_.neon[0]=114.0f/255;config_.neon[1]=72.0f/255;config_.neon[2]=215.0f/255;
 }
 Engine::~Engine(){stop();}
 Config Engine::snapshot() const {std::lock_guard lock(config_mutex_);return config_;}
@@ -23,8 +23,9 @@ bool Engine::load(const std::filesystem::path& file){
     const bool legacyGreen=config_.neon[0]==0&&config_.neon[1]==1&&std::abs(config_.neon[2]-.4f)<.00001f;
     const bool legacyTeal=std::abs(config_.neon[0]-5.f/255)<.00001f&&std::abs(config_.neon[1]-134.f/255)<.00001f&&std::abs(config_.neon[2]-105.f/255)<.00001f;
     const bool legacyCoral=std::abs(config_.neon[0]-1.f)<.00001f&&std::abs(config_.neon[1]-91.f/255)<.00001f&&std::abs(config_.neon[2]-99.f/255)<.00001f;
-    if(legacyGreen||legacyTeal||legacyCoral){
-        config_.neon[0]=210.0f/255;config_.neon[1]=210.0f/255;config_.neon[2]=210.0f/255;
+    const bool legacyNeutral=std::abs(config_.neon[0]-210.f/255)<.00001f&&std::abs(config_.neon[1]-210.f/255)<.00001f&&std::abs(config_.neon[2]-210.f/255)<.00001f;
+    if(legacyGreen||legacyTeal||legacyCoral||legacyNeutral){
+        config_.neon[0]=114.0f/255;config_.neon[1]=72.0f/255;config_.neon[2]=215.0f/255;
     }
     readWeaponProfiles(config_,file);rapid_master=bool(config_.rapid_master);return true;
 }

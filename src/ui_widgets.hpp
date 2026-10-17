@@ -1,6 +1,7 @@
 #pragma once
 #include <QtWidgets>
 #include <QSvgRenderer>
+#include "theme.hpp"
 #include <functional>
 #include <algorithm>
 #include <cmath>
@@ -43,26 +44,28 @@ protected:
         if(mask_.isNull()||maskRatio_!=ratio){maskRatio_=ratio;mask_=QPixmap(QSize(20,20)*ratio);mask_.setDevicePixelRatio(ratio);mask_.fill(Qt::transparent);QPainter maskPainter(&mask_);renderer_.render(&maskPainter,QRectF(0,0,20,20));}
         const auto state=property("saveState").toString();
         const bool unsaved=state=="dirty"||property("unsaved").toBool();
-        QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?QColor("#ff6b6e"):QColor("#8a8a8a");
-        const QColor hoverColor=unsaved?mixColor(accent_(),Qt::white,.12):objectName()=="closeControl"?QColor("#ff6b6e"):QColor("#b4b4b4");
+        QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?kbtheme::danger:kbtheme::muted;
+        const QColor hoverColor=unsaved?mixColor(accent_(),Qt::white,.12):objectName()=="closeControl"?kbtheme::danger:kbtheme::ink;
         color=mixColor(color,hoverColor,hoverAmount_);
-        if(isDown())color=mixColor(color,QColor("#60606b"),.3);
+        if(isDown())color=mixColor(color,kbtheme::ink,.25);
         QPixmap ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);tint.end();
         QPainter painter(this);if(!isEnabled())painter.setOpacity(.35);painter.drawPixmap(QPointF((width()-20)/2.0,(height()-20)/2.0),ink);
-        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setPen(QPen(accent_(),1));painter.drawLine(12,height()-3,width()-12,height()-3);}
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),2));painter.drawRoundedRect(QRectF(rect()).adjusted(2,2,-2,-2),10,10);}
     }
 };
 
+// GoofyUI face switch: a chunky ink-outlined pill whose white knob carries a
+// "-" when off and a ":)" when on. The track is lavender off, the accent on.
 class Toggle final : public QAbstractButton {
     QVariantAnimation animation_;
     qreal position_=0;
     std::function<QColor()> accent_;
 public:
     explicit Toggle(std::function<QColor()> accent,QWidget* parent=nullptr):QAbstractButton(parent),accent_(std::move(accent)) {
-        setCheckable(true);setCursor(Qt::PointingHandCursor);setFixedSize(42,26);setFocusPolicy(Qt::StrongFocus);
+        setCheckable(true);setCursor(Qt::PointingHandCursor);setFixedSize(48,28);setFocusPolicy(Qt::StrongFocus);
         // A light spring on the knob travel; colours stay clamped while painting.
         QEasingCurve spring(QEasingCurve::OutBack);spring.setOvershoot(1.05);
-        animation_.setDuration(240);animation_.setEasingCurve(spring);
+        animation_.setDuration(320);animation_.setEasingCurve(spring);
         connect(&animation_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){position_=value.toReal();update();});
         connect(this,&QAbstractButton::toggled,this,[this](bool on){animation_.stop();if(!isVisible()){position_=on?1:0;update();return;}animation_.setStartValue(position_);animation_.setEndValue(on?1.0:0.0);animation_.start();});
     }
@@ -72,19 +75,18 @@ protected:
         QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
         const qreal position=animation_.state()==QAbstractAnimation::Running?position_:(isChecked()?1.0:0.0);
         const qreal clamped=std::clamp(position,0.0,1.0);
-        if(!isEnabled())p.setOpacity(.38);
+        if(!isEnabled())p.setOpacity(.4);
         const QColor accent=accent_();
-        const QRectF track(4,5,34,16);
-        // Flat recessed well when off; the accent fill fades in over it when on.
-        p.setPen(QPen(QColor(255,255,255,22),1));p.setBrush(QColor(0,0,0,66));p.drawRoundedRect(track.adjusted(.5,.5,-.5,-.5),8,8);
-        if(clamped>0.001){
-            QColor fill=accent;fill.setAlphaF(clamped);
-            p.setPen(QPen(QColor(255,255,255,qRound(153*clamped)),1));p.setBrush(fill);p.drawRoundedRect(track.adjusted(.5,.5,-.5,-.5),8,8);
-        }
-        // Knob: flat ink-muted off, on-solid on.
-        const qreal knobX=11.5+19.0*position;
-        p.setPen(Qt::NoPen);p.setBrush(mixColor(QColor("#b4b4b4"),QColor("#141414"),clamped));p.drawEllipse(QPointF(knobX,13),6.5,6.5);
-        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setPen(QPen(accent,1));p.drawLine(12,25,30,25);}
+        const QRectF track=QRectF(1,4,46,20).adjusted(1,1,-1,-1);
+        // Lavender well when off; the accent fill fades in over it when on.
+        const QColor fill=mixColor(kbtheme::lavender,accent,clamped);
+        p.setPen(QPen(kbtheme::ink,2));p.setBrush(fill);p.drawRoundedRect(track,9,9);
+        // Knob: white puck with an ink rim, wearing the state face.
+        const qreal knobX=12.0+24.0*position;
+        p.setBrush(kbtheme::surface);p.drawEllipse(QPointF(knobX,14),8,8);
+        QFont face("Geist");face.setPixelSize(9);face.setWeight(QFont::Black);p.setFont(face);p.setPen(kbtheme::ink);
+        p.drawText(QRectF(knobX-8,14-8,16,16),Qt::AlignCenter,clamped>.5?QStringLiteral(":)"):QStringLiteral("-"));
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setBrush(Qt::NoBrush);p.setPen(QPen(accent,2));p.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),11,11);}
     }
 };
 
@@ -138,14 +140,17 @@ protected:
 
 class WeaponButton final : public QPushButton {
     QVariantAnimation selection_;
-    qreal amount_=0;
+    QVariantAnimation hover_;
+    qreal amount_=0,hoverAmount_=0;
     bool chosen_=false,initialized_=false;
     std::function<QColor()> accent_;
 public:
     explicit WeaponButton(std::function<QColor()> accent):accent_(std::move(accent)){
         setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);
         selection_.setEasingCurve(QEasingCurve::OutCubic);
+        hover_.setDuration(140);hover_.setEasingCurve(QEasingCurve::OutCubic);
         connect(&selection_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){amount_=value.toReal();update();});
+        connect(&hover_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){hoverAmount_=value.toReal();update();});
     }
     void setChosen(bool chosen){
         if(initialized_&&chosen_==chosen)return;
@@ -154,20 +159,19 @@ public:
         selection_.setDuration(160);selection_.setStartValue(amount_);selection_.setEndValue(chosen?1.0:0.0);selection_.start();
     }
 protected:
+    void enterEvent(QEnterEvent* event) override {hover_.stop();hover_.setStartValue(hoverAmount_);hover_.setEndValue(1);hover_.start();QPushButton::enterEvent(event);}
+    void leaveEvent(QEvent* event) override {hover_.stop();hover_.setStartValue(hoverAmount_);hover_.setEndValue(0);hover_.start();QPushButton::leaveEvent(event);}
     void paintEvent(QPaintEvent*) override{
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
-        const QRectF pill=QRectF(rect()).adjusted(.5,.5,-.5,-.5);
-        // The chosen segment is the Atelier selection pill: flat accent tint,
-        // accent border, one bevel line on the top edge.
-        if(amount_>0.002){
-            const QColor accent=accent_();
-            painter.setPen(Qt::NoPen);painter.setBrush(QColor(accent.red(),accent.green(),accent.blue(),qRound(31*amount_)));painter.drawRoundedRect(pill,8,8);
-            painter.setPen(QPen(QColor(accent.red(),accent.green(),accent.blue(),qRound(178*amount_)),1));painter.setBrush(Qt::NoBrush);painter.drawRoundedRect(pill,8,8);
-            painter.setPen(QPen(QColor(255,255,255,qRound(31*amount_)),1));painter.drawLine(QPointF(pill.left()+9,pill.top()+1.5),QPointF(pill.right()-9,pill.top()+1.5));
-        }
-        QColor ink=mixColor(QColor("#8a8a8a"),QColor("#e6e6e6"),amount_);if(isDown())ink=mixColor(ink,QColor("#000000"),.15);
+        const QRectF pill=QRectF(rect()).adjusted(1,1,-1,-1);
+        const qreal amount=std::clamp(amount_,0.0,1.0),hoverAmount=std::clamp(hoverAmount_,0.0,1.0)*(1-amount);
+        // GoofyUI pill: white surface with a 2 px ink outline; solid accent when chosen.
+        QColor fill=mixColor(kbtheme::surface,kbtheme::hover,hoverAmount);
+        fill=mixColor(fill,accent_(),amount);
+        painter.setPen(QPen(kbtheme::ink,2));painter.setBrush(fill);painter.drawRoundedRect(pill,12,12);
+        QColor ink=mixColor(kbtheme::ink,kbtheme::readableOn(accent_()),amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
         painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
-        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QColor("#8a8a8a"));painter.drawRoundedRect(pill,8,8);}
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),2));painter.drawRoundedRect(pill,12,12);}
     }
     void hideEvent(QHideEvent* event) override{selection_.stop();amount_=chosen_?1:0;QPushButton::hideEvent(event);}
 };
@@ -192,10 +196,11 @@ public:
     void paint(QPainter* p,const QStyleOptionViewItem& option,const QModelIndex& index) const override {
         p->save();p->setRenderHint(QPainter::Antialiasing);p->setRenderHint(QPainter::TextAntialiasing);const QRect r=option.rect;
         const bool selected=option.state&QStyle::State_Selected,hovered=option.state&QStyle::State_MouseOver;
-        if(selected||hovered){p->setPen(Qt::NoPen);p->setBrush(QColor(255,255,255,selected?28:20));p->drawRoundedRect(r.adjusted(4,2,-4,-2),8,8);}
-        if(selected){p->setPen(QPen(QColor(255,255,255,41),1));p->setBrush(Qt::NoBrush);p->drawRoundedRect(QRectF(r.adjusted(4,2,-4,-2)).adjusted(.5,.5,-.5,-.5),8,8);}
+        const QRectF pill=QRectF(r.adjusted(4,2,-4,-2));
+        if(selected){p->setPen(QPen(kbtheme::ink,2));p->setBrush(kbtheme::lavender);p->drawRoundedRect(pill.adjusted(1,1,-1,-1),12,12);}
+        else if(hovered){p->setPen(Qt::NoPen);p->setBrush(kbtheme::hover);p->drawRoundedRect(pill,12,12);}
         qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(r.left()+12,r.top()+4,operatorIconSize,operatorIconSize));
-        QFont f=option.font;f.setFamily("Geist");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(14);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(QColor(selected?"#e6e6e6":"#b4b4b4"));
+        QFont f=option.font;f.setFamily("Geist");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(14);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(kbtheme::ink);
         const QRect textRect(r.left()+65,r.top(),r.width()-73,r.height());
         p->drawText(textRect,Qt::AlignVCenter|Qt::AlignLeft,QFontMetrics(f).elidedText(index.data().toString(),Qt::ElideRight,textRect.width()));p->restore();
     }
@@ -232,7 +237,7 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);QFont mono("Consolas");mono.setPixelSize(6);painter.setFont(mono);
         const auto rows=text().split('\n');const qreal advance=QFontMetricsF(mono).horizontalAdvance('#'),lineHeight=4.6;
         const qreal left=(width()-rows.front().size()*advance)/2,top=(height()-7*lineHeight)/2;
-        painter.setPen(QColor("#38ccff"));
+        painter.setPen(kbtheme::ink);
         for(int row=0;row<rows.size();++row)painter.drawText(QPointF(left,top+(row+1)*lineHeight),rows[row]);
     }
 };
@@ -270,13 +275,10 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);
         const auto surface=surfaceRect();
-        // Several translucent contours make a soft, low shadow without an outline.
-        for(int spread=11;spread>=1;--spread){
-            painter.setBrush(QColor(0,0,0,spread>6?3:5));
-            painter.drawRoundedRect(surface.adjusted(-spread*.65,-spread*.45,spread*.65,spread*.65).translated(0,3),24+spread*.6,24+spread*.6);
-        }
-        painter.setBrush(QColor(255,255,255,12));painter.drawRoundedRect(surface,24,24);
-        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(QColor(255,255,255,20),1));painter.drawRoundedRect(surface.adjusted(.45,.45,-.45,-.45),24,24);
+        // GoofyUI hard shadow: one flat ink plate offset down-right, no blur.
+        painter.setBrush(kbtheme::ink);painter.drawRoundedRect(surface.translated(6,8),24,24);
+        painter.setBrush(kbtheme::surface);painter.drawRoundedRect(surface,24,24);
+        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::ink,3));painter.drawRoundedRect(surface.adjusted(1.5,1.5,-1.5,-1.5),24,24);
     }
 };
 
@@ -303,7 +305,7 @@ public:
         if(page==currentWidget())return;
         QPixmap previous;
         if(isVisible()){
-            previous=QPixmap(size()*devicePixelRatioF());previous.setDevicePixelRatio(devicePixelRatioF());previous.fill(QColor("#1f1f1f"));
+            previous=QPixmap(size()*devicePixelRatioF());previous.setDevicePixelRatio(devicePixelRatioF());previous.fill(kbtheme::surface);
             QPainter painter(&previous);render(&painter,QPoint(),QRegion(),QWidget::DrawChildren);
         }
         settle();setCurrentWidget(page);
@@ -399,16 +401,39 @@ public:using QFrame::QFrame;
 protected:
     void mousePressEvent(QMouseEvent* e) override {if(e->button()==Qt::LeftButton&&window()->windowHandle()){window()->windowHandle()->startSystemMove();e->accept();}else QFrame::mousePressEvent(e);}
 };
+// GoofyUI sticker: a colour chip with a 2 px ink outline and a slight tilt,
+// used for the sidebar groups and section headings.
+class StickerLabel final : public QLabel {
+    QColor color_;
+public:
+    StickerLabel(const QString& text,const QColor& color,QWidget* parent=nullptr):QLabel(parent),color_(color){setText(text);setObjectName("sticker");}
+    QSize sizeHint() const override {const QFontMetrics metrics(stickerFont());return {metrics.horizontalAdvance(text().toUpper())+26,26};}
+    QSize minimumSizeHint() const override {return sizeHint();}
+    static QFont stickerFont(){QFont font("Geist");font.setPixelSize(11);font.setWeight(QFont::ExtraBold);font.setCapitalization(QFont::AllUppercase);font.setLetterSpacing(QFont::AbsoluteSpacing,1.0);return font;}
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setRenderHint(QPainter::TextAntialiasing);
+        const QRectF chip=QRectF(rect()).adjusted(2,2,-2,-2);
+        painter.translate(chip.center());painter.rotate(-2.0);painter.translate(-chip.center());
+        painter.setPen(QPen(kbtheme::ink,2));painter.setBrush(color_);painter.drawRoundedRect(chip.adjusted(1,1,-1,-1),9,9);
+        painter.setFont(stickerFont());painter.setPen(kbtheme::ink);painter.drawText(chip,Qt::AlignCenter,text().toUpper());
+    }
+};
+// Stable per-heading colour so a language rebuild keeps the same stickers.
+inline QColor sectionStickerColor(const QString& title){
+    static const QColor colors[]={kbtheme::yellow,kbtheme::blue,kbtheme::pink,kbtheme::lime};
+    return colors[qHash(title)%4];
+}
 class Section final : public QFrame {
 public:
     QVBoxLayout* body;QWidget* content;QPushButton* heading=nullptr;
-    explicit Section(const QString& title,bool collapsible,bool expanded,QWidget* parent=nullptr):QFrame(parent) {
+    explicit Section(const QString& title,bool collapsible,bool expanded,const QColor& stickerColor=QColor(),QWidget* parent=nullptr):QFrame(parent) {
         setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(12,11,12,12);layout->setSpacing(0);
         auto* header=new QWidget;auto* row=new QHBoxLayout(header);row->setContentsMargins(2,0,2,0);header->setMinimumHeight(24);
         if(collapsible){heading=new QPushButton(title);heading->setObjectName("sectionHeading");heading->setCursor(Qt::PointingHandCursor);row->addWidget(heading,1);
             auto* arrow=new QLabel(expanded?QString::fromUtf8("⌄"):QString::fromUtf8("›"));arrow->setObjectName("sectionArrow");row->addWidget(arrow);
             layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);content->setVisible(expanded);layout->addWidget(content);if(!expanded)layout->setContentsMargins(12,4,12,4);
             connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));layout->setContentsMargins(12,open?11:4,12,open?12:4);});
-        }else{auto* label=new QLabel(title);label->setObjectName("panelTitle");row->addWidget(label,1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);layout->addWidget(content);}
+        }else{auto* sticker=new StickerLabel(title,stickerColor.isValid()?stickerColor:sectionStickerColor(title));row->addWidget(sticker);row->addStretch(1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);layout->addWidget(content);}
     }
 };

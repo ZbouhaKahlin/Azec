@@ -2,6 +2,7 @@
 #include <QtWidgets>
 #include <algorithm>
 #include <cmath>
+#include "theme.hpp"
 #include "../third_party/qrcodegen/qrcodegen.hpp"
 
 // Click/Space reveals; leaving Settings, hiding the app, or a changed link conceals it.
@@ -118,11 +119,12 @@ protected:
                 // blur chain gently so neither startup nor section settling pops.
                 if(progress_<.15){painter.setOpacity(1-progress_/.15);painter.drawPixmap(target,obscured_,QRectF(obscured_.rect()));}
             }
-            painter.setOpacity(std::max(0.0,1-progress_*2));painter.setPen(QColor("#34343c"));painter.drawText(QRect(12,62,160,60),Qt::AlignCenter|Qt::TextWordWrap,reveal_text_);
+            painter.setOpacity(std::max(0.0,1-progress_*2));painter.setPen(kbtheme::ink);painter.drawText(QRect(12,62,160,60),Qt::AlignCenter|Qt::TextWordWrap,reveal_text_);
             painter.restore();
         }
-        painter.setPen(QColor("#bdbdc7"));QFont font=painter.font();font.setPixelSize(12);painter.setFont(font);
+        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::ink,2));painter.drawRoundedRect(QRectF(1,1,182,182),12,12);
+        painter.setPen(kbtheme::muted);QFont font=painter.font();font.setPixelSize(12);painter.setFont(font);
         painter.drawText(QRect(0,187,184,21),Qt::AlignCenter,revealed_?hide_text_:reveal_text_);
-        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(QColor("#909099"),1));painter.drawRoundedRect(QRectF(1,1,182,182),12,12);}
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::purple,2));painter.drawRoundedRect(QRectF(2,2,180,180),12,12);}
     }
 };

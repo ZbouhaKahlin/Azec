@@ -75,6 +75,7 @@
     <file alias="Geist-Medium.ttf">fonts/Geist-Medium.ttf</file>
     <file alias="Geist-SemiBold.ttf">fonts/Geist-SemiBold.ttf</file>
     <file alias="Geist-Bold.ttf">fonts/Geist-Bold.ttf</file>
+    <file alias="Fredoka.ttf">fonts/Fredoka.ttf</file>
 </qresource>
 <qresource prefix="/ui"><file alias="star.svg">star.svg</file><file alias="back.svg">back.svg</file><file alias="settings.svg">settings.svg</file><file alias="save.svg">save.svg</file><file alias="close.svg">close.svg</file><file alias="minimize.svg">minimize.svg</file><file alias="chevron.svg">chevron.svg</file></qresource>
 <qresource prefix="/ui"><file alias="phone.html">phone.html</file><file alias="manifest.webmanifest">manifest.webmanifest</file><file alias="app-icon.svg">app-icon.svg</file></qresource>

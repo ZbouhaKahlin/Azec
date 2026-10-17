@@ -5,7 +5,7 @@ TEMPLATE = app
 TARGET = KingBoss2004
 DESTDIR = $$OUT_PWD/release
 SOURCES += src/app.cpp src/phone_bridge.cpp src/profile_transfer.cpp src/engine.cpp src/core.cpp third_party/qrcodegen/qrcodegen.cpp
-HEADERS += src/engine.hpp src/core.hpp src/ui_widgets.hpp src/profile_store.hpp src/phone_server.hpp src/main_window.hpp src/app_style.hpp src/startup.hpp src/diagnostics.hpp src/pairing_qr.hpp src/hotkeys.hpp
+HEADERS += src/engine.hpp src/core.hpp src/ui_widgets.hpp src/profile_store.hpp src/phone_server.hpp src/main_window.hpp src/app_style.hpp src/theme.hpp src/startup.hpp src/diagnostics.hpp src/pairing_qr.hpp src/hotkeys.hpp
 HEADERS += src/strings.hpp src/profile_transfer.hpp third_party/qrcodegen/qrcodegen.hpp
 contains(CONFIG, verification) {
     TARGET = KingBoss2004-checks

@@ -56,12 +56,13 @@ For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json
 
 ## UI contracts
 
-- Retain the compact window, 200 px sidebar, custom window controls, rounded corners, the Atelier charcoal palette, the neutral chrome default accent (`#D2D2D2`), and stationary raised right panel.
-- Use bundled Geist for controls and operator names. The top-left King Boss wordmark is seven lines of Atelier-cyan ASCII artwork rendered with Consolas inside the existing header.
-- Header icons share 34 px hit targets and centered 20 px vector artwork. Hover changes only their ink subtly, without background tiles. Keep Save flat, without a glow, pulse, or checkmark swap; its tooltip confirms success.
-- Save stays neutral gray while saved and uses the current accent while unsaved, including after a failed save. Keep unsaved data state independent of temporary feedback. Pairing QR starts obscured, reveals on explicit click/keyboard activation, and conceals on leaving Settings, hiding the window, or changing the link.
-- Use 22 px outer window corners, 24 px panel corners, and soft 10-14 px button/input corners. Sliders have pill tracks and circular handles. Preserve the existing layout and hit targets.
-- Operator rows are 52 px tall with 44 px icons and 14 px Geist names. Keep long names readable within the existing sidebar width.
+- The interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): chunky 2-3 px ink outlines, flat colour, hard offset ink shadows without blur, no gradients or glow. Retain the compact window, 200 px sidebar, custom window controls, rounded corners, the cream `#FFFAEE` canvas with white surfaces, the yellow `#FFDD59` header band, the GoofyUI purple default accent (`#7248D7`), and the stationary raised right panel.
+- Use bundled Geist for controls, operator names, and body text, and bundled Fredoka for display headings. The top-left King Boss wordmark is seven lines of ink ASCII artwork rendered with Consolas inside the existing header.
+- Header icons share 34 px hit targets and centered 20 px vector artwork. Hover changes only their ink subtly, without background tiles. Keep Save flat, without a glow, pulse, or checkmark swap; its tooltip confirms success. Keyboard focus draws a 2 px accent outline, not a background tile.
+- Save stays neutral ink while saved and uses the current accent while unsaved, including after a failed save; text on the accent is chosen by luminance so it stays readable. Keep unsaved data state independent of temporary feedback. Pairing QR starts obscured, reveals on explicit click/keyboard activation, and conceals on leaving Settings, hiding the window, or changing the link.
+- Use 24 px outer window corners, 24 px panel corners, and 10-18 px button/input/card corners. Numbers are yellow mono chips, sliders have lavender pill tracks with white ink-rimmed handles, and switches are GoofyUI face toggles (lavender off, accent on, white knob showing `-` or `:)`). Preserve the existing layout and hit targets.
+- Sidebar groups and section headings render as GoofyUI stickers: slightly tilted colour chips (yellow, blue, pink, lime) with 2 px ink outlines.
+- Operator rows are 52 px tall with 44 px icons and 14 px Geist names; the selected row is a lavender pill with an ink outline. Keep long names readable within the existing sidebar width.
 - Favorites appear only when nonempty and matching search. Favorited operators are hidden from All operators, so each operator appears once. Removing a favorite returns it to All operators.
 - Right-click favorites use a compact context-menu action, without a nested push button; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
