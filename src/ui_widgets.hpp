@@ -17,8 +17,8 @@ protected:
         if(presentation::isRally()){QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setBrush(rally::panel);p.setPen(QPen(rally::line,1));p.drawRoundedRect(QRectF(rect()).adjusted(1,1,-5,-6),4,4);return;}
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
         const QRectF face(1.5,1.5,width()-7,height()-8);
-        painter.setPen(Qt::NoPen);painter.setBrush(QColor("#31204C"));painter.drawRoundedRect(face.translated(4,5),12,12);
-        painter.setPen(QPen(QColor("#31204C"),3));painter.setBrush(Qt::white);painter.drawRoundedRect(face,12,12);
+        painter.setPen(Qt::NoPen);painter.setBrush(kbtheme::outline);painter.drawRoundedRect(face.translated(4,5),12,12);
+        painter.setPen(QPen(kbtheme::outline,3));painter.setBrush(kbtheme::surface);painter.drawRoundedRect(face,12,12);
     }
 };
 
@@ -36,6 +36,8 @@ public:
         choices_->installEventFilter(this);connect(choices_,&QListWidget::clicked,this,[this]{choose();});
     }
     void showPopup() override{
+        choices_->setIconSize(iconSize());
+        if(!presentation::isRally())choices_->setStyleSheet(QString("QListWidget{background:transparent;border:0;outline:0;color:%1;} QListWidget::item{height:36px;padding:0 8px;border-radius:8px;background:transparent;} QListWidget::item:selected{background:%2;color:%1;} QListWidget::item:hover:!selected{background:transparent;}").arg(kbtheme::ink.name(),kbtheme::lavender.name()));
         choices_->clear();for(int i=0;i<count();++i)new QListWidgetItem(itemIcon(i),itemText(i),choices_);
         choices_->setCurrentRow(currentIndex());const auto screen=QGuiApplication::screenAt(mapToGlobal(rect().center()));const QRect bounds=(screen?screen:QGuiApplication::primaryScreen())->availableGeometry();
         popup_->resize(qMin(bounds.width(),qMax(width(),choices_->sizeHintForColumn(0)+36)),qMin(bounds.height()-16,count()*36+21));
@@ -44,6 +46,11 @@ public:
     }
     void hidePopup() override{popup_->hide();QComboBox::hidePopup();}
 protected:
+    void paintEvent(QPaintEvent* event) override{
+        QComboBox::paintEvent(event);if(presentation::isRally())return;
+        QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setPen(QPen(kbtheme::muted,2,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+        const int x=width()-17,y=height()/2;const QPolygon chevron{{x-4,y-2},{x,y+2},{x+4,y-2}};p.drawPolyline(chevron);
+    }
     bool eventFilter(QObject* watched,QEvent* event) override{
         if(watched==choices_&&event->type()==QEvent::KeyPress){const int key=static_cast<QKeyEvent*>(event)->key();if(key==Qt::Key_Return||key==Qt::Key_Enter||key==Qt::Key_Space){choose();return true;}if(key==Qt::Key_Escape||key==Qt::Key_Tab){hidePopup();setFocus(Qt::PopupFocusReason);return true;}}
         return QComboBox::eventFilter(watched,event);
@@ -81,7 +88,13 @@ protected:
         QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?kbtheme::danger:kbtheme::muted;
         if(isDown())color=mixColor(color,kbtheme::ink,.25);
         QPixmap ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);tint.end();
-        QPainter painter(this);if(!isEnabled())painter.setOpacity(.35);painter.drawPixmap(QPointF((width()-20)/2.0,(height()-20)/2.0),ink);
+        QPainter painter(this);if(!isEnabled())painter.setOpacity(.35);
+        const bool sidebarAction=property("sidebarAction").toBool();
+        painter.drawPixmap(QPointF(sidebarAction?18:(width()-20)/2.0,(height()-20)/2.0),ink);
+        if(sidebarAction&&!text().isEmpty()){
+            painter.setOpacity(std::clamp((width()-64.0)/124.0,0.0,1.0));painter.setPen(color);
+            painter.drawText(QRect(64,0,124,height()),Qt::AlignVCenter|Qt::AlignLeft,text());painter.setOpacity(1);
+        }
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),2));painter.drawRoundedRect(QRectF(rect()).adjusted(2,2,-2,-2),10,10);}
     }
 };
@@ -102,11 +115,11 @@ protected:
         const QRectF track=QRectF(1,4,46,20).adjusted(1,1,-1,-1);
         // Lavender well when off; the accent fill fades in over it when on.
         const QColor fill=mixColor(kbtheme::lavender,accent,clamped);
-        p.setPen(QPen(kbtheme::ink,2));p.setBrush(fill);p.drawRoundedRect(track,9,9);
+        p.setPen(QPen(kbtheme::outline,2));p.setBrush(fill);p.drawRoundedRect(track,9,9);
         // Knob: white puck with an ink rim, wearing the state face.
         const qreal knobX=12.0+24.0*position;
-        p.setBrush(kbtheme::surface);p.drawEllipse(QPointF(knobX,14),8,8);
-        QFont face("Geist");face.setPixelSize(9);face.setWeight(QFont::Black);p.setFont(face);p.setPen(kbtheme::ink);
+        p.setBrush(Qt::white);p.drawEllipse(QPointF(knobX,14),8,8);
+        QFont face("Geist");face.setPixelSize(9);face.setWeight(QFont::Black);p.setFont(face);p.setPen(kbtheme::chipInk);
         p.drawText(QRectF(knobX-8,14-8,16,16),Qt::AlignCenter,clamped>.5?QStringLiteral(":)"):QStringLiteral("-"));
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setBrush(Qt::NoBrush);p.setPen(QPen(accent,2));p.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),11,11);}
 
@@ -172,7 +185,7 @@ protected:
         const qreal amount=std::clamp(amount_,0.0,1.0);
         // GoofyUI pill: white surface with a 2 px ink outline; solid accent when chosen.
         const QColor fill=mixColor(kbtheme::surface,accent_(),amount);
-        painter.setPen(QPen(kbtheme::ink,2));painter.setBrush(fill);painter.drawRoundedRect(pill,12,12);
+        painter.setPen(QPen(kbtheme::outline,2));painter.setBrush(fill);painter.drawRoundedRect(pill,12,12);
         QColor ink=mixColor(kbtheme::ink,kbtheme::readableOn(accent_()),amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
         painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),2));painter.drawRoundedRect(pill,12,12);}
@@ -208,11 +221,14 @@ public:
         p->save();p->setRenderHint(QPainter::Antialiasing);p->setRenderHint(QPainter::TextAntialiasing);const QRect r=option.rect;
         const bool selected=option.state&QStyle::State_Selected;
         const QRectF pill=QRectF(r.adjusted(4,2,-4,-2));
-        if(selected){p->setPen(QPen(kbtheme::ink,2));p->setBrush(kbtheme::lavender);p->drawRoundedRect(pill.adjusted(1,1,-1,-1),12,12);}
-        qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(r.left()+12,r.top()+4,operatorIconSize,operatorIconSize));
+        if(selected){p->setPen(QPen(kbtheme::outline,2));p->setBrush(kbtheme::lavender);p->drawRoundedRect(pill.adjusted(1,1,-1,-1),12,12);}
+        // Anchor artwork and names while the sidebar clips/fades their right edge.
+        // Recentring icons or re-eliding text on every frame produces sideways jumps.
+        qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(r.left()+6,r.top()+4,operatorIconSize,operatorIconSize));
         QFont f=option.font;f.setFamily("Geist");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(14);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(kbtheme::ink);
-        const QRect textRect(r.left()+65,r.top(),r.width()-73,r.height());
-        p->drawText(textRect,Qt::AlignVCenter|Qt::AlignLeft,QFontMetrics(f).elidedText(index.data().toString(),Qt::ElideRight,textRect.width()));p->restore();
+        const QRect textRect(r.left()+65,r.top(),127,r.height());
+        p->setClipRect(r);p->setOpacity(std::clamp((r.width()-58.0)/116.0,0.0,1.0));
+        p->drawText(textRect,Qt::AlignVCenter|Qt::AlignLeft,index.data().toString());p->restore();
     }
 };
 
@@ -240,7 +256,7 @@ protected:
         for(const auto& poly:QList<QPolygonF>{QPolygonF{{34,0},{59,0},{59,6},{44,22},{60,22},{60,28},{33,28},{33,22},{49,6},{34,6}},QPolygonF{{65,0},{88,0},{88,6},{72,6},{72,11},{86,11},{86,17},{72,17},{72,22},{88,22},{88,28},{65,28}},QPolygonF{{117,0},{117,6},{101,6},{101,22},{117,22},{117,28},{99,28},{94,23},{94,5},{99,0}}})p.drawPolygon(poly);
     return;}
         QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);QFont pixel("Press Start 2P");pixel.setPixelSize(21);painter.setFont(pixel);
-        painter.setPen(kbtheme::ink);painter.drawText(rect().translated(2,2),Qt::AlignCenter,text());
+        painter.setPen(kbtheme::outline);painter.drawText(rect().translated(2,2),Qt::AlignCenter,text());
         painter.setPen(Qt::white);painter.drawText(rect(),Qt::AlignCenter,text());
     }
 };
@@ -279,9 +295,9 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);
         const auto surface=surfaceRect();
         // GoofyUI hard shadow: one flat ink plate offset down-right, no blur.
-        painter.setBrush(kbtheme::ink);painter.drawRoundedRect(surface.translated(6,8),24,24);
+        painter.setBrush(kbtheme::outline);painter.drawRoundedRect(surface.translated(6,8),24,24);
         painter.setBrush(kbtheme::surface);painter.drawRoundedRect(surface,24,24);
-        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::ink,3));painter.drawRoundedRect(surface.adjusted(1.5,1.5,-1.5,-1.5),24,24);
+        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,3));painter.drawRoundedRect(surface.adjusted(1.5,1.5,-1.5,-1.5),24,24);
     }
 };
 
@@ -363,11 +379,11 @@ protected:
 // cover the top edge when the list is scrolled away from its start.
 class ScrollFade final : public QWidget {
     QAbstractScrollArea* area_;
-    QColor color_;
+    bool on_surface_;
     bool top_;
     int strip_=46;
 public:
-    ScrollFade(QAbstractScrollArea* area,const QColor& color,bool top=false,QWidget* parent=nullptr):QWidget(parent?parent:area),area_(area),color_(color),top_(top){
+    ScrollFade(QAbstractScrollArea* area,const QColor& color,bool top=false,QWidget* parent=nullptr):QWidget(parent?parent:area),area_(area),on_surface_(color==kbtheme::surface),top_(top){
         setAttribute(Qt::WA_TransparentForMouseEvents);setAttribute(Qt::WA_NoSystemBackground);
         area_->viewport()->installEventFilter(this);
         if(auto* bar=area_->verticalScrollBar()){connect(bar,&QScrollBar::valueChanged,this,[this]{refresh();});connect(bar,&QScrollBar::rangeChanged,this,[this]{refresh();});}
@@ -391,6 +407,7 @@ protected:
     void showEvent(QShowEvent* event) override {QWidget::showEvent(event);refresh();}
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);QLinearGradient fade(0,0,0,height());
+        const QColor color_=on_surface_?kbtheme::surface:kbtheme::paper;
         QColor clear=color_;clear.setAlpha(0);
         QColor soft=color_;soft.setAlpha(150);
         if(top_){fade.setColorAt(0.0,color_);fade.setColorAt(0.25,soft);fade.setColorAt(0.65,clear);fade.setColorAt(1.0,clear);}
@@ -420,14 +437,14 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setRenderHint(QPainter::TextAntialiasing);
         const QRectF chip=QRectF(rect()).adjusted(2,2,-2,-2);
         painter.translate(chip.center());painter.rotate(-2.0);painter.translate(-chip.center());
-        painter.setPen(QPen(kbtheme::ink,2));painter.setBrush(color_);painter.drawRoundedRect(chip.adjusted(1,1,-1,-1),9,9);
-        const QFontMetrics metrics(stickerFont());painter.setFont(stickerFont());painter.setPen(kbtheme::ink);
+        painter.setPen(QPen(kbtheme::outline,2));painter.setBrush(color_);painter.drawRoundedRect(chip.adjusted(1,1,-1,-1),9,9);
+        const QFontMetrics metrics(stickerFont());painter.setFont(stickerFont());painter.setPen(kbtheme::chipInk);
         painter.drawText(chip,Qt::AlignCenter,metrics.elidedText(text().toUpper(),Qt::ElideRight,qMax(8.0,chip.width()-16.0)));
     }
 };
 // Stable per-heading colour so a language rebuild keeps the same stickers.
 inline QColor sectionStickerColor(const QString& title){
-    static const QColor colors[]={kbtheme::yellow,kbtheme::blue,kbtheme::pink,kbtheme::lime};
+    const QColor colors[]={kbtheme::yellow,kbtheme::blue,kbtheme::pink,kbtheme::lime};
     return colors[qHash(title)%4];
 }
 class Section final : public QFrame {

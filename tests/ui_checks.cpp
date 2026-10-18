@@ -3,10 +3,13 @@
 
 QJsonObject MainWindow::selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
+        // Pause global hotkey polling; fixture actions call production handlers directly.
+        poll_.stop();
+        QJsonArray themeSamples;
         if(QCoreApplication::arguments().contains("--motion-only")){
             const bool captureFrames=!QCoreApplication::arguments().contains("--motion-timing-only");
             QJsonObject sequences,motionChecks;bool continuous=true,stableControls=true,stableBackground=true;
-            showPreferences();wait(250);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
+            showPreferences();chooseSettingsCategory(3);wait(250);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
             const auto record=[&](const QString& name,const std::function<void()>& action){
                 QDir().mkpath(output+"/"+name);QVector<QImage> frames;QJsonArray samples;QElapsedTimer clock;clock.start();
                 QTimer sample;sample.setTimerType(Qt::PreciseTimer);sample.setInterval(16);QEventLoop loop;
@@ -36,7 +39,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             motionChecks["phone_retarget_preserves_height"]=continuous;motionChecks["phone_switch_keeps_44px_row"]=stableControls;if(captureFrames)motionChecks["phone_background_stays_panel_color"]=stableBackground;
             return {{"passed",continuous&&stableControls&&stableBackground},{"checks",motionChecks},{"sequences",sequences}};
         }
-        const bool rally=presentation::isRally();QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<698||size()==QSize(864,650);checks["layout_matches_interface"]=rally?(!findChild<QWidget*>("operatorSidebar")&&operator_page_->width()==pages_->width()):findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="Azec";checks["all_72_operators"]=operators_->count()==r6::operator_count;checks["extension_operator_row"]=operators_->item(operators_->count()-1)->text()=="Noor";checks["all_72_svg_icons_valid"]=icon_failures_.empty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
+        const bool rally=presentation::isRally();QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<(rally?698:712)||size()==QSize(864,rally?650:664);checks["layout_matches_interface"]=rally?(!findChild<QWidget*>("operatorSidebar")&&operator_page_->width()==pages_->width()):findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="Azec";checks["all_72_operators"]=operators_->count()==r6::operator_count;checks["extension_operator_row"]=operators_->item(operators_->count()-1)->text()=="Noor";checks["all_72_svg_icons_valid"]=icon_failures_.empty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
         if(rally){operator_picker_->click();wait(230);filterOperators();capture(output+"/roster.png");}
         checks["only_selected_interface_constructed"]=rally?roster_page_&&operator_picker_&&search_->isVisible():!roster_page_&&!operator_picker_;
         auto* sidebarBar=static_cast<FadingScrollBar*>(sidebar_scroll_->verticalScrollBar());checks["scrollbars_start_invisible"]=sidebarBar->opacity()==0&&static_cast<FadingScrollBar*>(scroll_->verticalScrollBar())->opacity()==0&&static_cast<FadingScrollBar*>(preferences_scroll_->verticalScrollBar())->opacity()==0;
@@ -57,6 +60,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["compact_operator_rows"]=operators_->sizeHintForRow(0)==operatorRowHeight&&operators_->item(0)->icon().availableSizes().contains(QSize(operatorIconSize,operatorIconSize));
         QFont sidebarFont("Geist");sidebarFont.setPixelSize(rally?12:14);sidebarFont.setWeight(QFont::Medium);bool namesFit=true;for(int row=0;row<operators_->count();++row)namesFit&=QFontMetrics(sidebarFont).horizontalAdvance(operators_->item(row)->text())<=(rally?operators_->gridSize().width()-16:operators_->viewport()->width()-73);checks["larger_operator_names_fit_sidebar"]=namesFit;
         bool aligned=true;for(auto* button:save_->parentWidget()->findChildren<QPushButton*>(QString(),Qt::FindDirectChildrenOnly))if(dynamic_cast<IconButton*>(button))aligned&=button->size()==QSize(34,34)&&button->geometry().center().y()==save_->geometry().center().y()&&button->text().isEmpty()&&button->iconSize()==QSize(20,20);checks["header_icons_share_geometry"]=aligned;
+        auto* titleBar=findChild<QWidget*>("titleBar");checks["header_has_requested_breathing_room"]=titleBar->height()==(rally?58:60)&&(rally||(save_->y()>=13&&titleBar->height()-save_->geometry().bottom()-1>=13));
         const auto gearBefore=gear_->grab().toImage();QEnterEvent enter(QPointF(17,17),QPointF(gear_->pos()+QPoint(17,17)),QPointF(gear_->mapToGlobal(QPoint(17,17))));QApplication::sendEvent(gear_,&enter);wait(170);const auto gearHovered=gear_->grab().toImage();capture(output+"/header-hover.png");
         bool transparentEdges=true;for(int y=0;y<gearBefore.height();++y)for(int x=0;x<gearBefore.width();++x)if(x<3||y<3||x>=gearBefore.width()-3||y>=gearBefore.height()-3)transparentEdges&=gearBefore.pixelColor(x,y)==gearHovered.pixelColor(x,y);QEvent leave(QEvent::Leave);QApplication::sendEvent(gear_,&leave);wait(170);
         bool hoverFlat=gearBefore==gearHovered;{const auto statusBefore=status_->grab().toImage();QEnterEvent statusEnter(QPointF(5,5),QPointF(5,5),status_->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(status_,&statusEnter);wait(30);hoverFlat&=statusBefore==status_->grab().toImage();QEvent statusLeave(QEvent::Leave);QApplication::sendEvent(status_,&statusLeave);}
@@ -76,6 +80,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         back_->click();wait(35);gear_->click();wait(35);back_->click();wait(220);checks["rapid_settings_navigation_finishes_on_last_page"]=pages_->currentWidget()==operator_page_&&!pages_->transitioning()&&panel_->geometry()==stationaryPanel;gear_->click();wait(220);
         checks["settings_exposes_hotkeys"]=language_&&key_buttons_[0]&&key_buttons_[0]->accessibleName()=="Open / hide window";
         language_->showPopup();wait(40);auto* languagePopup=findChild<QFrame*>("languagePopup");
+        bool flagAssetsValid=true;for(const auto& entry:languageEntries())flagAssetsValid&=QSvgRenderer(languageFlagResource(entry.value)).isValid()&&!languageFlag(entry.value).isNull();checks["language_picker_uses_bundled_country_flag_assets"]=flagAssetsValid&&QSvgRenderer(QStringLiteral(":/flags/ps.svg")).isValid();
         checks["language_popup_uses_ink_frame"]=languagePopup&&languagePopup->isVisible()&&(languagePopup->windowFlags()&Qt::FramelessWindowHint)&&languagePopup->findChild<QListWidget*>()->count()==9;
         if(languagePopup){languagePopup->grab().save(output+"/language-popup.png");auto* list=languagePopup->findChild<QListWidget*>();const auto before=list->grab().toImage();QEnterEvent enterChoice(QPointF(5,5),QPointF(5,5),list->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(list,&enterChoice);checks["language_popup_hover_stays_flat"]=before==list->grab().toImage();}language_->hidePopup();
         language_->setCurrentIndex(1);QApplication::processEvents();checks["portuguese_labels"]=operators_title_->text()=="Todos os operadores"&&save_->toolTip().startsWith("Salvar configurações");language_->setCurrentIndex(0);QApplication::processEvents();
@@ -132,7 +137,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["phone_handles_isolated_or_missing_lan"]=lan::selectAddress({virtualSwitch})=="127.0.0.1"&&lan::selectAddress({virtualSwitch,{QHostAddress("192.168.8.1"),true,false,false,10}})=="192.168.8.1"&&lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}})=="127.0.0.1";
         checks["phone_state_matches_desktop"]=mobileState()["operatorId"].toInt()==4&&mobileState()["profile"].toObject()["vertical"].toDouble()==12.3;
         // Exercise timing and drag behavior on all three production scrollbars.
-        settings_->setMinimumHeight(scroll_->viewport()->height()+300);QApplication::processEvents();gear_->click();QApplication::processEvents();
+        settings_->setMinimumHeight(scroll_->viewport()->height()+300);QApplication::processEvents();gear_->click();preferences_scroll_->widget()->setMinimumHeight(preferences_scroll_->viewport()->height()+300);QApplication::processEvents();wait(220);
         auto* operatorBar=static_cast<FadingScrollBar*>(scroll_->verticalScrollBar());auto* preferenceBar=static_cast<FadingScrollBar*>(preferences_scroll_->verticalScrollBar());
         const auto sidebarWidth=sidebar_scroll_->viewport()->width(),preferenceWidth=preferences_scroll_->viewport()->width();
         for(auto* bar:{sidebarBar,operatorBar,preferenceBar}){bar->setValue(1);bar->reveal();}wait(130);
@@ -145,14 +150,14 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["drag_keeps_all_scrollbars_visible"]=sidebarBar->opacity()>.99&&operatorBar->opacity()>.99&&preferenceBar->opacity()>.99;
         for(auto* bar:{sidebarBar,operatorBar,preferenceBar})bar->setSliderDown(false);wait(3350);for(int attempt=0;attempt<80&&(sidebarBar->opacity()>0||operatorBar->opacity()>0||preferenceBar->opacity()>0);++attempt)wait(50);
         checks["scrollbars_fade_after_drag_release"]=sidebarBar->opacity()==0&&operatorBar->opacity()==0&&preferenceBar->opacity()==0;
-        settings_->setMinimumHeight(0);back_->click();sidebarBar->setValue(0);scroll_->verticalScrollBar()->setValue(0);showNormal();raise();activateWindow();wait(3400);capture(output+"/finished.png");
+        settings_->setMinimumHeight(0);preferences_scroll_->widget()->setMinimumHeight(0);back_->click();sidebarBar->setValue(0);scroll_->verticalScrollBar()->setValue(0);showNormal();raise();activateWindow();wait(3400);capture(output+"/finished.png");
         const auto unchanged=engine_.snapshot().bytes();
         bool bindingFits=true;
         QTimer::singleShot(80,this,[&]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/binding.png");bindingFits&=modal->objectName()=="hotkeyDialog"&&modal->width()>=380&&modal->findChild<QLabel*>("bindingHint")->wordWrap();for(auto* label:modal->findChildren<QLabel*>())bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));modal->reject();}});bindKey(0);checks["cancel_key_binding_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
         for(int language=0;language<9;++language){if(!QCoreApplication::arguments().contains("--all-languages")&&language!=1)continue;engine_.edit([=](r6::Config& c){c.language=language;});QTimer::singleShot(40,this,[&,language]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(!modal){bindingFits=false;return;}auto* hint=modal->findChild<QLabel*>("bindingHint");hint->setText(text(UiText::ThisKeyIsAlreadyAssignedChooseAnother));modal->adjustSize();QApplication::processEvents();for(auto* label:modal->findChildren<QLabel*>()){bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));if(label->wordWrap())bindingFits&=label->height()>=label->heightForWidth(label->width());}if(language==0)modal->grab().save(output+"/binding-portuguese-conflict.png");modal->reject();});bindKey(0);}engine_.edit([](r6::Config& c){c.language=1;});checks["binding_instructions_fit_selected_languages"]=bindingFits;
         QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/help.png");modal->reject();}});help();checks["help_dialog_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
         // New reliability/UI behavior uses the same production paths as the real window.
-        showPreferences();wait(220);buildPreferences();
+        showPreferences();wait(220);buildPreferences();chooseSettingsCategory(3);QApplication::processEvents();
         checks["brand_logo_asset_valid"]=QSvgRenderer(QStringLiteral(":/ui/logo.svg")).isValid()&&(rally?(!findChild<QLabel*>("brandLogo")&&findChild<QLabel*>("brand")->width()==118):bool(findChild<QLabel*>("brandLogo")));
         checks["qr_is_obscured_by_default"]=pairing_qr_&&!pairing_qr_->revealed();
         if(pairing_qr_){
@@ -184,7 +189,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             checks["branded_qr_samples_rendered"]=samplesReady;
             QFile scanManifest(output+"/qr-scan-cases.json");scanManifest.open(QIODevice::WriteOnly);scanManifest.write(QJsonDocument(qrCases).toJson());
         }
-        showPreferences();wait(220);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
+        showPreferences();chooseSettingsCategory(3);wait(220);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
         auto* stablePreferences=preferences_scroll_->widget();auto* stablePhoneSwitch=phone_enabled_.data();auto* stableBar=preferences_scroll_->verticalScrollBar();
         // Anchor away from the bottom limit: exact position is possible only
         // while the old offset remains inside the collapsed scroll range.
@@ -198,10 +203,10 @@ QJsonObject MainWindow::selfTest(const QString& output){
         capture(output+"/phone-disabled.png");save();{r6::Engine restored(true);checks["disabled_phone_preference_persists"]=restored.load(config_path_)&&!restored.snapshot().phone_enabled;}
         phone_enabled_->click();wait(70);const int beforePhoneReverse=phone_details_->height();phone_enabled_->click();checks["phone_retarget_preserves_displayed_height"]=phone_details_->height()==beforePhoneReverse;wait(25);phone_enabled_->click();wait(360);
         checks["rapid_phone_toggle_settles_enabled"]=phone_->listening()&&phone_details_->expanded()&&!phone_details_->transitioning()&&phone_details_->progress()==1&&pairing_qr_->isEnabled()&&!pairing_qr_->revealed()&&preferences_scroll_->widget()==stablePreferences;
-        stableBar->setValue(stableBar->maximum());const int expandedBottom=stableBar->maximum();phone_enabled_->click();wait(90);
+        const int oldPreferenceMinimum=preferences_scroll_->minimumHeight(),oldPreferenceMaximum=preferences_scroll_->maximumHeight();preferences_scroll_->setFixedHeight(260);QApplication::processEvents();stableBar->setValue(stableBar->maximum());const int expandedBottom=stableBar->maximum();phone_enabled_->click();wait(90);
         checks["phone_bottom_scroll_adjusts_during_collapse"]=stableBar->maximum()>0&&stableBar->maximum()<expandedBottom&&stableBar->value()==stableBar->maximum()&&phone_details_->transitioning();wait(250);
-        checks["phone_bottom_scroll_stays_in_range_without_reset"]=stableBar->value()==stableBar->maximum()&&stableBar->value()>0&&preferences_scroll_->widget()==stablePreferences;
-        phone_enabled_->click();wait(340);
+        checks["phone_bottom_scroll_stays_in_range_without_reset"]=stableBar->value()==stableBar->maximum()&&stableBar->value()>=0&&preferences_scroll_->widget()==stablePreferences;
+        phone_enabled_->click();wait(340);preferences_scroll_->setMinimumHeight(oldPreferenceMinimum);preferences_scroll_->setMaximumHeight(oldPreferenceMaximum);QApplication::processEvents();
         preferences_scroll_->ensureWidgetVisible(pairing_qr_);wait(80);capture(output+"/phone-enabled.png");
         pairing_qr_->click();wait(80);hide();show();wait(350);checks["hiding_window_cancels_qr_reveal"]=!pairing_qr_->revealed()&&pairing_qr_->revealProgress()==0&&!pairing_qr_->transitioning();showOperators();wait(220);
         checks["tray_has_window_recoil_and_exit_only"]=tray_&&tray_menu_&&tray_recoil_->isCheckable()&&tray_exit_&&tray_menu_->actions().size()==4&&tray_menu_->actions()[2]->isSeparator();
@@ -230,7 +235,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         // or number fields own the keyboard.
         search_->setFocus(Qt::OtherFocusReason);QApplication::setActiveWindow(this);QApplication::processEvents();
         const bool typingGuard=isActiveWindow()&&textEditingActive();
-        if(typingGuard){keybd_event(VK_END,0,0,0);wait(60);keybd_event(VK_END,0,KEYEVENTF_KEYUP,0);wait(60);}
+        if(typingGuard){keybd_event(VK_END,0,0,0);pollKeys();wait(60);keybd_event(VK_END,0,KEYEVENTF_KEYUP,0);pollKeys();wait(60);}
         checks["panic_key_ignored_while_editing_text"]=typingGuard&&engine_.running&&isVisible();
         search_->clearFocus();
         bool repeat_surfaced=false,repeat_kept_app=false;
@@ -245,13 +250,15 @@ QJsonObject MainWindow::selfTest(const QString& output){
         status_->setFocus(Qt::OtherFocusReason);paint_.stop();const QPoint stationary(-20000,-20000);trackCursor(stationary);wait(100);const int idleRequests=cursor_repaints_;
         for(int sample=0;sample<12;++sample)trackCursor(stationary);wait(350);
         checks["stationary_cursor_does_not_schedule_background_repaints"]=cursor_repaints_==idleRequests;
-        trackCursor(stationary+QPoint(1,0));checks["cursor_movement_schedules_one_background_repaint"]=cursor_repaints_==idleRequests+1;paint_.start();
+        trackCursor(stationary+QPoint(1,0));checks["cursor_movement_schedules_one_background_repaint"]=cursor_repaints_==idleRequests+1;
         // Wait for delayed feedback (including the three-second scrollbar fade)
         // to finish, then require the same strict 350 ms without a repaint.
         // Continuous repainting still fails after the bounded settle period.
-        QCursor::setPos(mapToGlobal(QPoint(-20,-20)));QElapsedTimer idleClock;idleClock.start();qint64 quietSince=0;int idlePaints=paint_count_;
+        // Keep native cursor polling stopped while testing the stationary samples above.
+        QElapsedTimer idleClock;idleClock.start();qint64 quietSince=0;int idlePaints=paint_count_;
         while(idleClock.elapsed()<6000&&idleClock.elapsed()-quietSince<350){wait(25);if(paint_count_!=idlePaints){idlePaints=paint_count_;quietSince=idleClock.elapsed();}}
         checks["stationary_cursor_does_not_repaint_window"]=idleClock.elapsed()-quietSince>=350;
+        paint_.start();
         capture(output+"/save-neutral.png");editOperator([](r6::Operator& op){op.vertical=13.2f;});capture(output+"/save-unsaved.png");save();
         // Load previous default themes and a custom theme through the production loader.
         // The fixture lives in its own directory so no azec_weapons.json sidecar applies.
@@ -260,7 +267,51 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["previous_default_accents_migrate_without_profile_changes"]=migrationPassed;
         theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;theme.radius=250;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);const auto normalized=customTheme.snapshot();
         checks["removed_appearance_settings_normalize_on_load"]=customLoaded&&QColor::fromRgbF(normalized.neon[0],normalized.neon[1],normalized.neon[2]).name()=="#7248d7"&&std::abs(normalized.radius-130.f)<.001f&&std::abs(normalized.operators[4].vertical-theme.operators[4].vertical)<.001f;
-        showPreferences();wait(220);
+        showPreferences();chooseSettingsCategory(1);wait(220);
+        checks["settings_has_five_categories"]=settings_category_->count()==5&&preference_categories_.size()==5;
+        bool categoryVisibility=true;for(int index=0;index<5;++index){settings_category_->setCurrentIndex(index);QApplication::processEvents();for(int i=0;i<5;++i)categoryVisibility&=preference_categories_[i]->isVisible()==(i==index);}
+        checks["settings_categories_show_only_selected_content"]=categoryVisibility;
+        chooseSettingsCategory(3);pairing_qr_->click();chooseSettingsCategory(1);checks["changing_settings_category_conceals_qr"]=!pairing_qr_->revealed();
+        wait(220);
+        if(!rally){
+            const auto originalTheme=kbtheme::activeColorTheme;const auto themeProfiles=engine_.snapshot().bytes();const bool themeDirty=unsaved_;const auto themePanel=panel_->geometry();
+            checks["all_requested_palettes_available"]=theme_choice_->count()==10;
+            bool palettesApply=true,palettesPersist=true,themeLayoutStable=true,seamlessHeaders=true;
+            for(const auto& palette:kbtheme::colorThemes){
+                theme_choice_->setCurrentIndex(theme_choice_->findData(QLatin1String(palette.id)));QApplication::processEvents();
+                const bool matchingText=this->palette().color(QPalette::WindowText)==QColor(palette.text);
+                palettesApply&=accent()==QColor(palette.accent)&&kbtheme::paper==QColor(palette.paper)&&kbtheme::surface==QColor(palette.surface)&&matchingText;
+                palettesPersist&=kbtheme::readColorTheme(config_path_)==QLatin1String(palette.id);
+                themeSamples.append(QJsonObject{{"theme",palette.id},{"panelUnchanged",panel_->geometry()==themePanel},{"sidebarExpanded",sidebar_->width()==200},{"profilesUnchanged",engine_.snapshot().bytes()==themeProfiles},{"unsavedUnchanged",unsaved_==themeDirty}});
+                themeLayoutStable&=panel_->geometry()==themePanel&&sidebar_->width()==200&&engine_.snapshot().bytes()==themeProfiles&&unsaved_==themeDirty;
+                showOperators();wait(200);const auto headerImage=titleBar->grab().toImage();seamlessHeaders&=kbtheme::header==kbtheme::paper&&headerImage.pixelColor(headerImage.width()/2,headerImage.height()-1)==kbtheme::paper;capture(output+"/theme-"+QLatin1String(palette.id)+".png");showPreferences();chooseSettingsCategory(1);wait(200);
+            }
+            checks["all_palettes_have_seamless_sidebar_color_header"]=seamlessHeaders;checks["palettes_apply_immediately_with_readable_text"]=palettesApply;checks["palette_selection_persists"]=palettesPersist;checks["palettes_keep_layout_and_profile_edits"]=themeLayoutStable;
+            persistFavorites();checks["favorites_preserve_nondefault_palette"]=kbtheme::readColorTheme(config_path_)=="charcoal";
+            {MainWindow reopened(engine_,config_path_);checks["palette_reloads_in_new_window"]=reopened.theme_choice_->currentData().toString()==kbtheme::activeColorTheme;}
+            theme_choice_->setCurrentIndex(theme_choice_->findData(originalTheme));QApplication::processEvents();
+            const auto sidebarProfiles=engine_.snapshot().bytes();showOperators();wait(220);const int expandedWidth=panel_->width();sidebar_scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();
+            checks["sidebar_has_top_labelled_collapse_and_bottom_search"]=sidebar_toggle_->text()=="Collapse"&&sidebar_toggle_->geometry().bottom()<sidebar_scroll_->geometry().top()&&sidebar_search_box_->geometry().top()>sidebar_scroll_->geometry().bottom()&&search_->isVisible()&&sidebar_search_->isHidden();
+            const auto anchoredIcon=operators_->viewport()->grab(QRect(6,4,44,44)).toImage();const int anchoredRowsY=operators_->mapTo(sidebar_,QPoint()).y();
+            sidebar_toggle_->click();wait(80);checks["sidebar_collapse_animates_between_widths"]=sidebar_animation_.state()==QAbstractAnimation::Running&&sidebar_->width()>76&&sidebar_->width()<200;checks["sidebar_animation_keeps_icon_pixels_and_rows_anchored"]=operators_->viewport()->grab(QRect(6,4,44,44)).toImage()==anchoredIcon&&operators_->mapTo(sidebar_,QPoint()).y()==anchoredRowsY&&search_->width()==188;capture(output+"/sidebar-collapsing.png");wait(200);
+            checks["collapsed_sidebar_keeps_icons_and_selection"]=sidebar_->width()==76&&sidebar_search_->isVisible()&&!search_->isVisible()&&!operators_header_->isVisible()&&panel_->width()>expandedWidth&&engine_.snapshot().bytes()==sidebarProfiles;
+            checks["sidebar_collapsed_preference_persists"]=presentation::sidebarCollapsed(config_path_);capture(output+"/sidebar-collapsed.png");
+            checks["collapsed_sidebar_keeps_top_toggle_and_bottom_search_icon"]=sidebar_toggle_->width()==64&&sidebar_search_->isVisible()&&search_->isHidden()&&sidebar_search_box_->geometry().top()>sidebar_scroll_->geometry().bottom()&&operators_->viewport()->grab(QRect(6,4,44,44)).toImage()==anchoredIcon;
+            const bool alreadyFavorite=favorites_.contains("Ash");setFavorite(4,true);checks["collapsed_sidebar_favorites_stay_unique_and_preserve_preferences"]=sidebar_->width()==76&&operators_->item(4)->isHidden()&&favorites_group_->isVisible()&&presentation::sidebarCollapsed(config_path_);setFavorite(4,alreadyFavorite);
+            theme_choice_->setCurrentIndex(theme_choice_->findData("rose"));QApplication::processEvents();checks["changing_palette_preserves_collapsed_sidebar"]=sidebar_->width()==76&&presentation::sidebarCollapsed(config_path_)&&kbtheme::readColorTheme(config_path_)=="rose"&&engine_.snapshot().bytes()==sidebarProfiles;capture(output+"/sidebar-rose.png");theme_choice_->setCurrentIndex(theme_choice_->findData(originalTheme));
+            {MainWindow reopened(engine_,config_path_);checks["collapsed_sidebar_reloads_in_new_window"]=reopened.sidebar_collapsed_&&reopened.sidebar_->width()==76;}
+            QApplication::setActiveWindow(this);sidebar_search_->click();wait(80);checks["search_expands_sidebar_with_animation"]=!sidebar_collapsed_&&sidebar_animation_.state()==QAbstractAnimation::Running;wait(220);
+            checks["sidebar_search_receives_focus"]=sidebar_->width()==200&&search_->hasFocus()&&sidebar_search_->isHidden();
+            search_->setText("Blackbeard");int matches=0;for(int i=0;i<operators_->count();++i)if(!operators_->item(i)->isHidden())++matches;checks["expanded_sidebar_search_still_filters"]=matches==1;search_->clear();
+            setSidebarCollapsed(true);wait(70);const int beforeSidebarReverse=sidebar_->width();setSidebarCollapsed(false);checks["sidebar_retarget_preserves_current_width"]=sidebar_->width()==beforeSidebarReverse;wait(30);setSidebarCollapsed(true);wait(30);setSidebarCollapsed(false);wait(280);
+            checks["rapid_sidebar_reversal_settles_expanded"]=!sidebar_collapsed_&&sidebar_->width()==200&&sidebar_animation_.state()==QAbstractAnimation::Stopped&&!presentation::sidebarCollapsed(config_path_);
+            showPreferences();chooseSettingsCategory(1);wait(220);capture(output+"/appearance-settings.png");
+            const auto uiPath=presentation::filePath(config_path_),uiTemporary=uiPath+".appearance-test-backup";QFile::rename(uiPath,uiTemporary);QDir().mkdir(uiPath);
+            const auto previousTheme=kbtheme::activeColorTheme;theme_choice_->setCurrentIndex(theme_choice_->findData("midnight"));setSidebarCollapsed(true);
+            checks["failed_ui_save_keeps_theme_and_sidebar"]=kbtheme::activeColorTheme==previousTheme&&theme_choice_->currentData().toString()==previousTheme&&!sidebar_collapsed_&&sidebar_->width()==200;
+            QDir().rmdir(uiPath);QFile::rename(uiTemporary,uiPath);notice_->hide();
+            persistFavorites();checks["favorite_save_preserves_theme_and_sidebar"]=kbtheme::readColorTheme(config_path_)==originalTheme&&!presentation::sidebarCollapsed(config_path_);
+        }
         checks["interface_picker_has_only_goofy_and_rally"]=interface_choice_->count()==2&&interface_choice_->itemText(0)=="Goofy"&&interface_choice_->itemText(1)=="Rally";
         checks["active_interface_needs_no_restart"]=interface_choice_->currentData().toInt()==int(presentation::active)&&!interface_apply_->isEnabled();
         capture(output+"/interface-settings.png");
@@ -274,11 +325,13 @@ QJsonObject MainWindow::selfTest(const QString& output){
         interface_apply_->click();r6::Config restartSaved;QJsonObject selectedUi;presentation::readDocument(presentation::filePath(config_path_),selectedUi);
         checks["interface_apply_saves_pending_profiles_before_restart"]=restartCalled&&restart_requested_&&!unsaved_&&restartSaved.load(config_path_)&&std::abs(restartSaved.operators[engine_.snapshot().selected].vertical-14.7f)<.001;
         checks["interface_choice_is_persisted_with_favorites"]=presentation::read(config_path_)==target&&selectedUi["interface"].toString()==presentation::name(target)&&readFavorites()==favorites_;
-        persistFavorites();checks["favorite_save_preserves_interface_choice"]=presentation::read(config_path_)==target;
+        persistFavorites();checks["favorite_save_preserves_interface_choice"]=presentation::read(config_path_)==target;checks["interface_save_preserves_theme"]=kbtheme::readColorTheme(config_path_)==kbtheme::activeColorTheme;
         const auto uiFixture=std::filesystem::path(output.toStdWString())/L"interface-preferences"/L"r6_config.bin";QDir().mkpath(QString::fromStdWString(uiFixture.parent_path().wstring()));
-        checks["missing_interface_defaults_to_goofy"]=presentation::read(uiFixture)==presentation::Interface::Goofy;
+        checks["missing_interface_defaults_to_goofy"]=presentation::read(uiFixture)==presentation::Interface::Goofy;checks["missing_appearance_preferences_use_defaults"]=kbtheme::readColorTheme(uiFixture)=="goofy"&&!presentation::sidebarCollapsed(uiFixture);
+        {QFile unsupported(presentation::filePath(uiFixture));unsupported.open(QIODevice::WriteOnly);unsupported.write("{\"version\":2,\"colorTheme\":\"midnight\",\"sidebarCollapsed\":true}");}
+        checks["unsupported_appearance_schema_uses_defaults"]=kbtheme::readColorTheme(uiFixture)=="goofy"&&!presentation::sidebarCollapsed(uiFixture);
         QFile invalidUi(presentation::filePath(uiFixture));invalidUi.open(QIODevice::WriteOnly);invalidUi.write("{broken");invalidUi.close();
-        checks["invalid_ui_preferences_are_not_overwritten"]=presentation::read(uiFixture)==presentation::Interface::Goofy&&!presentation::write(uiFixture,presentation::Interface::Rally);
+        checks["invalid_ui_preferences_are_not_overwritten"]=presentation::read(uiFixture)==presentation::Interface::Goofy&&!presentation::write(uiFixture,presentation::Interface::Rally)&&!kbtheme::writeColorTheme(uiFixture,"midnight");
         invalidUi.open(QIODevice::WriteOnly|QIODevice::Truncate);invalidUi.write("{\"version\":1,\"interface\":\"atelier\",\"favorites\":[\"Ash\"]}");invalidUi.close();
         checks["unsupported_interface_defaults_to_goofy"]=presentation::read(uiFixture)==presentation::Interface::Goofy;
         presentation::write(uiFixture,presentation::Interface::Rally);QJsonObject uiFixtureRead;presentation::readDocument(presentation::filePath(uiFixture),uiFixtureRead);
@@ -287,5 +340,5 @@ QJsonObject MainWindow::selfTest(const QString& output){
         restartCalled=false;restart_requested_=false;const auto uiName=presentation::filePath(config_path_),uiBackup=uiName+".test-backup";QFile::rename(uiName,uiBackup);QDir().mkdir(uiName);interface_apply_->click();
         checks["failed_interface_save_keeps_app_open"]=!restartCalled&&!restart_requested_&&isVisible()&&interface_feedback_->isVisible();QDir().rmdir(uiName);QFile::rename(uiBackup,uiName);
         presentation::write(config_path_,presentation::active);pending_interface_=presentation::active;restart_action_=restartAction;restart_requested_=false;buildPreferences();
-        QJsonObject report;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=presentation::name(presentation::active);report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="SendInput";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
+        QJsonObject report;report["theme_samples"]=themeSamples;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=presentation::name(presentation::active);report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="SendInput";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }

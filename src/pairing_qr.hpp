@@ -65,7 +65,8 @@ class PairingQr final : public QPushButton {
             const QRectF outer(origin.x()*unit,origin.y()*unit,7*unit,7*unit);
             painter.setBrush(ink);painter.drawRoundedRect(outer,unit*.35,unit*.35);
             painter.setBrush(Qt::white);painter.drawRoundedRect(outer.adjusted(unit,unit,-unit,-unit),unit*.4,unit*.4);
-            painter.setBrush(kbtheme::purple);painter.drawRoundedRect(outer.adjusted(2*unit,2*unit,-2*unit,-2*unit),unit*.3,unit*.3);
+            // Finder centers must stay dark on white, even with a light UI accent.
+            painter.setBrush(QColor("#7248D7"));painter.drawRoundedRect(outer.adjusted(2*unit,2*unit,-2*unit,-2*unit),unit*.3,unit*.3);
         }
         // A small logo window consumes less than 6% of the symbol's modules.
         // The highest ECC level protects the obscured data. The finder and
@@ -139,7 +140,7 @@ protected:
             painter.setOpacity(std::max(0.0,1-progress_*2));painter.setPen(QColor("#31204C"));painter.drawText(QRect(12,62,160,60),Qt::AlignCenter|Qt::TextWordWrap,reveal_text_);
             painter.restore();
         }
-        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::ink,2));painter.drawRoundedRect(QRectF(1,1,182,182),12,12);
+        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,2));painter.drawRoundedRect(QRectF(1,1,182,182),12,12);
         painter.setPen(kbtheme::muted);QFont font=painter.font();font.setPixelSize(12);painter.setFont(font);
         painter.drawText(QRect(0,187,184,21),Qt::AlignCenter,revealed_?hide_text_:reveal_text_);
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::purple,2));painter.drawRoundedRect(QRectF(2,2,180,180),12,12);}

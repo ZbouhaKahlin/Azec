@@ -110,8 +110,18 @@ enum class UiText {
     InterfaceRestartHint,
     ApplyAndRestart,
     InterfaceSaveFailed,
+    SettingsCategory,
+    General,
+    Shortcuts,
+    ColorTheme,
+    ColorThemeHint,
+    ThemeSaveFailed,
+    CollapseSidebar,
+    ExpandSidebar,
+    SidebarSaveFailed,
+    Collapse,
 };
-inline constexpr int UiTextCount=106;
+inline constexpr int UiTextCount=116;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

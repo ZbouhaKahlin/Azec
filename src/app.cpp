@@ -9,8 +9,8 @@ int main(int argc,char** argv){
     QFont font("Geist");font.setPixelSize(13);font.setWeight(QFont::Normal);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
     const auto configPath=std::filesystem::current_path()/L"r6_config.bin";presentation::active=presentation::read(configPath);
     for(const auto& argument:app.arguments())if(argument.startsWith("--interface="))presentation::active=presentation::fromName(argument.mid(12));
-    kbtheme::initialize();operatorRowHeight=presentation::isRally()?102:52;
-    QPalette palette;palette.setColor(QPalette::Window,QColor("#FFFAEE"));palette.setColor(QPalette::WindowText,QColor("#31204C"));palette.setColor(QPalette::Base,QColor("#FFFFFF"));palette.setColor(QPalette::AlternateBase,QColor("#FFFAEE"));palette.setColor(QPalette::Text,QColor("#31204C"));palette.setColor(QPalette::Button,QColor("#FFFFFF"));palette.setColor(QPalette::ButtonText,QColor("#31204C"));palette.setColor(QPalette::Highlight,QColor("#7248D7"));palette.setColor(QPalette::HighlightedText,QColor("#FFFFFF"));palette.setColor(QPalette::PlaceholderText,QColor("#8A7EA0"));palette.setColor(QPalette::Disabled,QPalette::Text,QColor("#A79BB8"));app.setPalette(presentation::isRally()?rally::palette():palette);
+    kbtheme::initialize(kbtheme::readColorTheme(configPath));operatorRowHeight=presentation::isRally()?102:52;
+    app.setPalette(kbtheme::palette());
     const auto arguments=app.arguments();const bool selftest=arguments.contains("--ui-self-test"),dryrun=selftest||arguments.contains("--dry-run");QString output,phoneInfo;int duration=0;for(const auto& argument:arguments){if(argument.startsWith("--phone-info="))phoneInfo=argument.mid(13);if(argument.startsWith("--output="))output=argument.mid(9);if(argument.startsWith("--exit-after-ms="))duration=argument.mid(16).toInt();}if(output.isEmpty())output=QDir::currentPath();QDir().mkpath(output);
 #ifndef AZEC_UI_TESTS
     if(selftest){

@@ -68,6 +68,10 @@ def run(parent):
         process = None
         binary_hash = hashlib.sha256((folder / 'r6_config.bin').read_bytes()).hexdigest()
         weapon_bytes = (folder / 'azec_weapons.json').read_bytes()
+        ui_path = folder / 'azec_ui.json'
+        ui = json.loads(ui_path.read_text())
+        ui.update(colorTheme='deep-sea', sidebarCollapsed=True)
+        ui_path.write_text(json.dumps(ui))
         for target in ('rally', 'goofy'):
             path = folder / 'restart-info.json'
             path.unlink(missing_ok=True)
@@ -82,6 +86,8 @@ def run(parent):
             checks[target + '_preserves_binary_profiles'] = hashlib.sha256((folder / 'r6_config.bin').read_bytes()).hexdigest() == binary_hash
             checks[target + '_preserves_secondary_and_extension_profiles'] = (folder / 'azec_weapons.json').read_bytes() == weapon_bytes
             checks[target + '_preserves_favorites'] = json.loads((folder / 'azec_ui.json').read_text())['favorites'] == ['Ash']
+            restored_ui = json.loads(ui_path.read_text())
+            checks[target + '_preserves_theme_and_sidebar'] = restored_ui['colorTheme'] == 'deep-sea' and restored_ui['sidebarCollapsed'] is True
             request = urllib.request.Request('http://127.0.0.1:' + str(child['port']) + '/api/state',
                 headers={'Authorization': 'Bearer ' + child['token']})
             with urllib.request.urlopen(request, timeout=5) as response:

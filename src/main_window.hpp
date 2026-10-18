@@ -49,6 +49,10 @@ class MainWindow final : public QWidget {
     IconButton* back_=nullptr;QSet<QString> favorites_;
     PageStack* pages_=nullptr;QWidget* operator_page_=nullptr;
     RaisedPanel* panel_=nullptr;QScrollArea* sidebar_scroll_=nullptr;
+    QWidget *sidebar_=nullptr,*favorites_header_=nullptr,*operators_header_=nullptr,*sidebar_search_box_=nullptr;
+    IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;
+    QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false;
+    QComboBox *settings_category_=nullptr,*theme_choice_=nullptr;QVector<QWidget*> preference_categories_;int preference_category_=0;
     QVariantAnimation operator_transition_;
     FadeLabel *name_opacity_=nullptr,*icon_opacity_=nullptr;
     QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr,*subtitle_=nullptr;
@@ -78,7 +82,7 @@ class MainWindow final : public QWidget {
     int binding_=0,release_key_=0,paint_count_=0,cursor_repaints_=0;qint64 blocked_until_=0,last_tune_=0;
     QStringList icon_failures_;
     void trackCursor(const QPoint& current){if(current!=last_cursor_){last_cursor_=current;++cursor_repaints_;update();}}
-    QColor accent() const {const auto c=engine_.snapshot();const auto value=QColor::fromRgbF(c.neon[0],c.neon[1],c.neon[2]);return presentation::isRally()&&value.name()=="#7248d7"?rally::signal:value;}
+    QColor accent() const {return kbtheme::defaultAccent;}
     QString text(UiText id) const{return uiText(id,engine_.snapshot().language);}
     QString bindingName(int key) const{
         switch(key){case 0:return text(UiText::NoneKey);case VK_LEFT:return text(UiText::LeftKey);case VK_RIGHT:return text(UiText::RightKey);case VK_UP:return text(UiText::UpKey);case VK_DOWN:return text(UiText::DownKey);default:return keyName(key);}
@@ -157,7 +161,7 @@ class MainWindow final : public QWidget {
     void refreshFavorites(){
         QSignalBlocker blocked(favorites_list_);favorites_list_->clear();const auto c=engine_.snapshot();
         for(int i=0;i<operators_->count();++i){auto* original=operators_->item(i);const bool favorite=favorites_.contains(original->text());original->setData(Qt::UserRole+1,favorite);
-            if(favorite){auto* item=new QListWidgetItem(original->icon(),original->text());item->setData(Qt::UserRole,i);item->setData(Qt::UserRole+1,true);favorites_list_->addItem(item);if(i==c.selected)favorites_list_->setCurrentItem(item);}}
+            if(favorite){auto* item=new QListWidgetItem(original->icon(),original->text());item->setToolTip(original->text());item->setData(Qt::UserRole,i);item->setData(Qt::UserRole+1,true);favorites_list_->addItem(item);if(i==c.selected)favorites_list_->setCurrentItem(item);}}
         operators_->viewport()->update();filterOperators();
     }
     void setFavorite(int id,bool enabled){
@@ -206,7 +210,44 @@ class MainWindow final : public QWidget {
         connect(slider,&QSlider::valueChanged,value,[value](int n){value->setValue(n/10.0);});
         connect(value,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[=](double n){QSignalBlocker blocked(slider);slider->setValue(qRound(n*10));if(!refreshing_)editOperator([=](r6::Operator& op){if(vertical)op.vertical=float(n);else op.horizontal=float(n);});});
     }
-    void applyStyle(){if(presentation::isRally())setPalette(rally::palette(accent()));setStyleSheet(applicationStyle(accent()));operators_->viewport()->update();favorites_list_->viewport()->update();update();}
+    void applyStyle(){
+        pages_->settle();qApp->setPalette(kbtheme::palette());setStyleSheet(applicationStyle(accent()));setPalette(kbtheme::palette());
+        notice_->setStyleSheet(QString("color:%1;background:%2;font-weight:600;").arg(kbtheme::chipInk.name(),kbtheme::pink.name()));
+        for(auto* child:findChildren<QWidget*>())child->update();update();
+    }
+    void chooseColorTheme(const QString& id){
+        if(!kbtheme::writeColorTheme(config_path_,id)){
+            QSignalBlocker blocked(theme_choice_);theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));showNotice(text(UiText::ThemeSaveFailed));return;
+        }
+        kbtheme::initialize(id);applyStyle();
+    }
+    void chooseSettingsCategory(int index){
+        if(index<0||index>=preference_categories_.size())return;
+        if(pairing_qr_&&index!=3)pairing_qr_->conceal();preference_category_=index;
+        for(int i=0;i<preference_categories_.size();++i)preference_categories_[i]->setVisible(i==index);
+        {QSignalBlocker blocked(settings_category_);settings_category_->setCurrentIndex(index);}
+        preferences_scroll_->verticalScrollBar()->setValue(0);
+    }
+    void updateSidebarControls(){
+        if(!sidebar_)return;
+        const bool compact=sidebar_collapsed_;
+        search_->setVisible(!compact);sidebar_search_->setVisible(compact);
+        const bool labelsVisible=!compact&&sidebar_->width()==200;
+        favorites_header_->setVisible(labelsVisible);operators_header_->setVisible(labelsVisible);
+        const QString title=text(compact?UiText::ExpandSidebar:UiText::CollapseSidebar);
+        sidebar_toggle_->setToolTip(title);sidebar_toggle_->setAccessibleName(title);sidebar_toggle_->setChecked(compact);sidebar_toggle_->setText(text(UiText::Collapse));
+        sidebar_search_->setToolTip(text(UiText::SearchOperators));sidebar_search_->setAccessibleName(text(UiText::SearchOperators));
+    }
+    void setSidebarCollapsed(bool collapsed,bool animate=true,bool focusSearch=false){
+        if(!sidebar_)return;
+        if(collapsed!=sidebar_collapsed_&&!presentation::update(config_path_,[=](QJsonObject& root){root["sidebarCollapsed"]=collapsed;})){
+            updateSidebarControls();showNotice(text(UiText::SidebarSaveFailed));return;
+        }
+        sidebar_collapsed_=collapsed;focus_sidebar_search_=focusSearch&&!collapsed;updateSidebarControls();
+        const int target=collapsed?76:200;
+        if(!animate||sidebar_->width()==target){sidebar_animation_.stop();sidebar_->setFixedWidth(target);updateSidebarControls();if(focus_sidebar_search_){search_->setFocus(Qt::ShortcutFocusReason);focus_sidebar_search_=false;}return;}
+        retargetAnimation(sidebar_animation_,sidebar_->width(),target,240);
+    }
     void buildSettings(){
         refreshing_=true;const auto c=engine_.snapshot();const auto hint=[this](UiText id){return presentation::isRally()?QString():text(id);};if(settings_){scroll_->takeWidget();delete settings_;}
         settings_=new QWidget;settings_->setObjectName("settingsContent");cards_=new QVBoxLayout(settings_);if(presentation::isRally())cards_->setContentsMargins(0,0,8,0);else cards_->setContentsMargins(2,0,10,12);cards_->setSpacing(10);
@@ -234,8 +275,13 @@ class MainWindow final : public QWidget {
     void buildPreferences(){
         if(!preferences_)return;
         refreshing_=true;const auto c=engine_.snapshot();
-        delete preferences_scroll_->takeWidget();auto* content=new QWidget;
-        auto* preferencesLayout=new QVBoxLayout(content);preferencesLayout->setContentsMargins(2,0,10,0);preferencesLayout->setSpacing(14);
+        delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;
+        auto* outer=new QVBoxLayout(content);outer->setContentsMargins(2,0,10,0);outer->setSpacing(14);
+        settings_category_=new LanguageComboBox(nullptr,"settingsCategoryPopup");settings_category_->setObjectName("settingsCategory");settings_category_->setAccessibleName(text(UiText::SettingsCategory));
+        const UiText categories[]={UiText::General,UiText::Appearance,UiText::Shortcuts,UiText::PhoneControl,UiText::ProfileBackup};
+        for(auto category:categories)settings_category_->addItem(text(category));outer->addWidget(settings_category_);
+        const auto categoryLayout=[&]{auto* page=new QWidget;page->setMinimumWidth(0);auto* layout=new QVBoxLayout(page);layout->setContentsMargins(0,0,0,0);layout->setSpacing(14);outer->addWidget(page);preference_categories_.append(page);return layout;};
+        auto* generalLayout=categoryLayout();auto* preferencesLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();
         auto* design=new Section(text(UiText::InterfaceStyle),false,true,kbtheme::yellow);preferencesLayout->addWidget(design);
         auto* designRow=settingRow(design,text(UiText::Appearance),text(UiText::InterfaceRestartHint));
         interface_choice_=new LanguageComboBox(nullptr,"interfacePopup");interface_choice_->setObjectName("interfaceChoice");interface_choice_->setAccessibleName(text(UiText::InterfaceStyle));interface_choice_->addItem("Goofy",int(presentation::Interface::Goofy));interface_choice_->addItem("Rally",int(presentation::Interface::Rally));interface_choice_->setCurrentIndex(interface_choice_->findData(int(pending_interface_)));designRow->addWidget(interface_choice_);
@@ -243,15 +289,22 @@ class MainWindow final : public QWidget {
         interface_feedback_=label("","rowHint");interface_feedback_->setWordWrap(true);interface_feedback_->hide();design->body->addWidget(interface_feedback_);
         connect(interface_choice_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){pending_interface_=presentation::Interface(interface_choice_->itemData(index).toInt());interface_apply_->setEnabled(pending_interface_!=presentation::active);interface_feedback_->hide();});
         connect(interface_apply_,&QPushButton::clicked,this,[this]{applyInterface();});
-        auto* system=new Section(text(UiText::SystemSettings),false,true,kbtheme::lime);system_=system;preferencesLayout->addWidget(system);
+        auto* colors=new Section(text(UiText::ColorTheme),false,true,kbtheme::blue);preferencesLayout->addWidget(colors);
+        auto* colorHint=label(text(UiText::ColorThemeHint),"rowHint");colorHint->setWordWrap(true);colors->body->addWidget(colorHint);
+        theme_choice_=new LanguageComboBox(nullptr,"themePopup");theme_choice_->setObjectName("colorThemeChoice");theme_choice_->setAccessibleName(text(UiText::ColorTheme));theme_choice_->setIconSize(QSize(54,18));
+        for(const auto& theme:kbtheme::colorThemes){QPixmap swatch(54,18);swatch.fill(Qt::transparent);QPainter painter(&swatch);painter.fillRect(0,0,18,18,QColor(theme.paper));painter.fillRect(18,0,18,18,QColor(theme.selection));painter.fillRect(36,0,18,18,QColor(theme.accent));painter.end();theme_choice_->addItem(QIcon(swatch),QString::fromUtf8(theme.name),QLatin1String(theme.id));}
+        theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));theme_choice_->setEnabled(!presentation::isRally());colors->body->addWidget(theme_choice_);
+        connect(theme_choice_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){chooseColorTheme(theme_choice_->itemData(index).toString());});
+        auto* system=new Section(text(UiText::SystemSettings),false,true,kbtheme::lime);system_=system;generalLayout->addWidget(system);
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::BeepWhenHotkeyStatesChange)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         auto* langRow=settingRow(system,text(UiText::Language));language_=new LanguageComboBox;language_->setAccessibleName(text(UiText::Language));language_->setIconSize(QSize(22,15));
         for(const auto& entry:languageEntries())language_->addItem(languageFlag(entry.value),QString::fromUtf8(entry.label),entry.value);
         language_->setCurrentIndex(qMax(0,language_->findData(c.language)));langRow->addWidget(language_);
         connect(language_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){const int value=language_->itemData(index).toInt();engine_.edit([=](r6::Config& c){c.language=value;});dirty();if(value==6)QTimer::singleShot(0,this,[this]{showPalestineSurprise();});QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});});
+        auto* shortcuts=new Section(text(UiText::Shortcuts),false,true,kbtheme::blue);shortcutsLayout->addWidget(shortcuts);
         const QString titles[]={text(UiText::OpenHideWindow),text(UiText::RecoilToggle),text(UiText::PanicExitKey),text(UiText::PrimaryWeapon),text(UiText::SecondaryWeapon)};const int keys[]={c.menu_key,c.recoil_key,c.panic_key,c.primary_key,c.secondary_key};
-        for(int i=0;i<5;++i){auto* row=settingRow(system,titles[i],{},44);auto* button=new QPushButton(bindingName(keys[i]));button->setObjectName("keyButton");button->setFixedWidth(108);button->setAccessibleName(titles[i]);row->addWidget(button);key_buttons_[i]=button;connect(button,&QPushButton::clicked,this,[this,i]{bindKey(i);});}
-        auto* phoneSection=new Section(text(UiText::PhoneControl),false,true,kbtheme::yellow);phoneSection->body->setSpacing(0);preferencesLayout->addWidget(phoneSection);
+        for(int i=0;i<5;++i){auto* row=settingRow(shortcuts,titles[i],{},44);auto* button=new QPushButton(bindingName(keys[i]));button->setObjectName("keyButton");button->setFixedWidth(108);button->setAccessibleName(titles[i]);row->addWidget(button);key_buttons_[i]=button;connect(button,&QPushButton::clicked,this,[this,i]{bindKey(i);});}
+        auto* phoneSection=new Section(text(UiText::PhoneControl),false,true,kbtheme::yellow);phoneSection->body->setSpacing(0);phoneLayout->addWidget(phoneSection);
         phone_enabled_=toggle(settingRow(phoneSection,text(UiText::EnablePhoneAccess)),"Enable phone access",c.phone_enabled,[this](bool enabled){
             engine_.edit([&](r6::Config& c){c.phone_enabled=enabled;});
             if(pairing_qr_)pairing_qr_->conceal();
@@ -268,12 +321,13 @@ class MainWindow final : public QWidget {
             connectionLayout->addWidget(pairing_qr_,0,Qt::AlignLeft);
             phone_details_=new ExpandingContent(connection,300);phoneSection->body->addWidget(phone_details_);phone_details_->setExpanded(c.phone_enabled,false);
         }
-        auto* guide=new QPushButton(text(UiText::QuickGuide));guide->setObjectName("secondary");preferencesLayout->addWidget(guide,0,Qt::AlignLeft);connect(guide,&QPushButton::clicked,this,[this]{help();});
-        auto* transfer=new Section(text(UiText::ProfileBackup),false,true,kbtheme::pink);preferencesLayout->addWidget(transfer);
+        auto* guide=new QPushButton(text(UiText::QuickGuide));guide->setObjectName("secondary");generalLayout->addWidget(guide,0,Qt::AlignLeft);connect(guide,&QPushButton::clicked,this,[this]{help();});
+        auto* transfer=new Section(text(UiText::ProfileBackup),false,true,kbtheme::pink);backupLayout->addWidget(transfer);
         auto* transfers=new QHBoxLayout;auto* exportButton=new QPushButton(text(UiText::ExportProfiles));auto* importButton=new QPushButton(text(UiText::ImportProfiles));
         for(auto* button:{exportButton,importButton}){button->setObjectName("secondary");transfers->addWidget(button);}transfer->body->addLayout(transfers);
         connect(exportButton,&QPushButton::clicked,this,[this]{exportProfiles();});connect(importButton,&QPushButton::clicked,this,[this]{importProfiles();});
-        preferencesLayout->addStretch();preferences_scroll_->setWidget(content);refreshing_=false;
+        outer->addStretch();preferences_scroll_->setWidget(content);chooseSettingsCategory(preference_category_);
+        connect(settings_category_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){chooseSettingsCategory(index);});refreshing_=false;
     }
     void updatePhoneDetails(){
         if(!engine_.snapshot().phone_enabled){if(pairing_qr_){pairing_qr_->conceal();pairing_qr_->setEnabled(false);}return;}
@@ -287,6 +341,7 @@ class MainWindow final : public QWidget {
     void updateLanguage(){
         if(operator_picker_){operator_picker_->setText(text(UiText::AllOperators)+QString::fromUtf8("  ↗"));operator_picker_->setAccessibleName(text(UiText::AllOperators));roster_page_->findChild<QLabel*>("rosterTitle")->setText(text(UiText::AllOperators));roster_page_->findChild<QPushButton*>("rosterBack")->setAccessibleName(text(UiText::BackToOperators));}
         operators_title_->setText(text(UiText::AllOperators));favorites_title_->setText(text(UiText::Favorites));search_->setPlaceholderText(text(UiText::SearchOperators));subtitle_->setText(text(UiText::OperatorSettings));
+        updateSidebarControls();
         updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));filterOperators();syncSelection();updateStatus();
     }
     void syncSelection(){
@@ -414,18 +469,19 @@ protected:
     }
 public:
     explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path):engine_(engine),config_path_(std::move(config_path)){
-        setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setWindowIcon(QIcon(":/ui/app-icon.svg"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(650,area.height()-48));move(area.center()-rect().center());
-        auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(presentation::isRally()?58:46);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,10,0);top->setSpacing(5);
-        auto* logo=new QLabel;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));if(!presentation::isRally())top->addWidget(logo);else delete logo;
+        kbtheme::initialize(kbtheme::readColorTheme(config_path_));
+        setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setWindowIcon(QIcon(":/ui/app-icon.svg"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(presentation::isRally()?650:664,area.height()-48));move(area.center()-rect().center());
+        auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(presentation::isRally()?58:60);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,presentation::isRally()?10:20,0);top->setSpacing(5);
+        auto* logo=new QLabel;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));if(!presentation::isRally()){top->addWidget(logo);top->addSpacing(5);}else delete logo;
         top->addWidget(new BrandLabel);
         if(presentation::isRally()){top->addSpacing(26);operator_picker_=new QPushButton;operator_picker_->setObjectName("operatorPicker");operator_picker_->setMinimumWidth(150);top->addWidget(operator_picker_);connect(operator_picker_,&QPushButton::clicked,this,[this]{if(pages_->currentWidget()==roster_page_)showOperators();else showRoster();});}top->addStretch();status_=new QPushButton;status_->setObjectName("status");status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
-        save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save();});
+        save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));if(!presentation::isRally())top->addSpacing(7);top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save();});
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
-        gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
+        gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});if(!presentation::isRally())top->addSpacing(7);auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
         notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);notice_->setContentsMargins(18,8,18,8);notice_->setStyleSheet(presentation::isRally()?"color:#171C19;background:#FF967F;font-weight:600;":"color:#31204C;background:#FFA8C9;font-weight:600;");notice_->hide();layout->addWidget(notice_);
         if(presentation::isRally())buildRallyLayout(layout);else buildGoofyLayout(layout);
-        const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+name.toLower()+".svg");if(!renderer.isValid())icon_failures_<<name;}
+        const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);item->setToolTip(name);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+name.toLower()+".svg");if(!renderer.isValid())icon_failures_<<name;}
         operators_->setCurrentRow(c.selected);
         favorites_=readFavorites();refreshFavorites();
         connect(operators_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});connect(favorites_list_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});

@@ -20,6 +20,7 @@ inline bool readDocument(const QString& path,QJsonObject& root){
     root=document.object();return !root.contains("version")||root["version"].toInt(-1)==1;
 }
 inline Interface read(const std::filesystem::path& configuration){QJsonObject root;if(!readDocument(filePath(configuration),root))return Interface::Goofy;return fromName(root["interface"].toString());}
+inline bool sidebarCollapsed(const std::filesystem::path& configuration){QJsonObject root;return readDocument(filePath(configuration),root)&&root["sidebarCollapsed"].toBool(false);}
 inline bool update(const std::filesystem::path& configuration,const std::function<void(QJsonObject&)>& change){
     QJsonObject root;const auto path=filePath(configuration);
     if(!readDocument(path,root)){diagnostic("save UI preferences","Unreadable or invalid file; existing preferences retained");return false;}
