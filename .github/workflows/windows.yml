@@ -1,5 +1,10 @@
 name: Windows verification
-on: [push, pull_request, workflow_dispatch]
+# Manual only: this private repository's GitHub Actions jobs cannot start while
+# the account has a failed payment or a spending limit that blocks minutes
+# ("The job was not started because recent account payments have failed").
+# Automatic push/pull_request triggers therefore only produced failing checks.
+# Restore the previous trigger list once Actions billing is working again.
+on: workflow_dispatch
 permissions:
   contents: read
 jobs:
