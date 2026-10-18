@@ -1,1 +1,0 @@
-Rally UI 0.1.0. Vendored from the sibling rally-ui-library project. See qt/include/rally_ui.hpp for shared tokens, styling and reusable controls. MIT licensed. Azec keeps application state and localization in src; the kit contains no recoil or operator behavior.

@@ -11,16 +11,15 @@ Run from the repository root in PowerShell:
 | Build and deploy, no tests | `.\build.cmd` |
 | Build app + verifier; core, HTTP, recovery, restart checks | `.\build.cmd test` |
 | Repeat behavior checks against an already current build | `python tests/run_checks.py` |
-| Desktop checks at 100%, one interface | `python tests/run_checks.py --ui-only --interface goofy` |
-| Desktop checks at 100%, both interfaces | `python tests/run_checks.py --ui-only` |
-| Phone browser checks, one interface | `python tests/phone_browser_test.py --interface goofy` |
+| Desktop checks at 100% | `python tests/run_checks.py --ui-only` |
+| Phone browser checks | `python tests/phone_browser_test.py` |
 | Pairing expiry, including the real 61-second wait | `python tests/run_checks.py --slow` |
 | Extended desktop matrix | `python tests/run_checks.py --ui-only --full` |
 | Extended phone browser matrix | `python tests/phone_browser_test.py --full` |
 | Behavior + extended desktop matrix | `python tests/run_checks.py --ui --full` |
 | Decode rendered desktop QR images | `python tests/run_checks.py --ui-only --full --qr-scan` |
 
-Use `rally` instead of `goofy` to target Rally. Omitting `--interface` checks both. `--full` expands requested checks; it does not implicitly enable desktop checks. `build.cmd test --slow` includes expiry during a build. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`.
+`--full` expands requested checks; it does not implicitly enable desktop checks. `build.cmd test --slow` includes expiry during a build. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`.
 
 Build `runtime/Azec-checks.exe` with `build.cmd test` before running desktop checks. Rebuild after changes to C++ or embedded assets; testing a stale executable does not validate source edits. The release app delegates `--ui-self-test` to the separate verification executable.
 

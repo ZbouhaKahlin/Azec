@@ -75,7 +75,7 @@ def run_http(parent, slow=False):
         # Session credentials must never be uploaded as verification artifacts.
         (folder / 'phone-info.json').unlink(missing_ok=True)
 
-def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,interface='both'):
+def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False):
     started = time.monotonic()
     parent = ROOT / '.build' / 'verification'
     parent.mkdir(parents=True, exist_ok=True)
@@ -83,23 +83,22 @@ def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,interface='bo
         run_http(parent, slow=slow or full)
         from recovery_test import run as run_recovery
         run_recovery(parent)
-        from interface_restart_test import run as run_interfaces
-        run_interfaces(parent)
+        from preferences_restart_test import run as run_preferences
+        run_preferences(parent)
     if ui:
-        for interface in (('goofy', 'rally') if interface == 'both' else (interface,)):
-            for scale in (('1', '1.5') if full else ('1',)):
-                fixture = Path(tempfile.mkdtemp(prefix='ui-' + interface + '-' + scale + '-', dir=parent))
-                env = os.environ.copy()
-                env['QT_SCALE_FACTOR'] = scale
-                subprocess.run([str(ROOT / 'runtime' / 'Azec-checks.exe'), '--ui-self-test', '--interface='+interface]
-                               + (['--all-languages'] if full else []), cwd=fixture, env=env, check=True, timeout=150)
-                report = json.loads((fixture / 'ui-verification.json').read_text())
-                if not report['passed']:
-                    raise RuntimeError('UI report failed at scale ' + scale)
-                if qr_scan:
-                    from qr_scan import verify
-                    if not verify(fixture):
-                        raise RuntimeError('QR decoding failed at scale ' + scale)
+        for scale in (('1', '1.5') if full else ('1',)):
+            fixture = Path(tempfile.mkdtemp(prefix='ui-goofy-' + scale + '-', dir=parent))
+            env = os.environ.copy()
+            env['QT_SCALE_FACTOR'] = scale
+            subprocess.run([str(ROOT / 'runtime' / 'Azec-checks.exe'), '--ui-self-test']
+                           + (['--all-languages'] if full else []), cwd=fixture, env=env, check=True, timeout=150)
+            report = json.loads((fixture / 'ui-verification.json').read_text())
+            if not report['passed']:
+                raise RuntimeError('UI report failed at scale ' + scale)
+            if qr_scan:
+                from qr_scan import verify
+                if not verify(fixture):
+                    raise RuntimeError('QR decoding failed at scale ' + scale)
     print('Verification artifacts: ' + str(parent))
     print(f'Completed in {time.monotonic() - started:.1f}s')
 
@@ -110,6 +109,5 @@ if __name__ == '__main__':
     parser.add_argument('--qr-scan', action='store_true', help='Decode UI QR captures (requires opencv-python-headless)')
     parser.add_argument('--full', action='store_true', help='Include 150%% UI scaling, all UI languages, and real-time HTTP expiry')
     parser.add_argument('--slow', action='store_true', help='Include real-time HTTP expiry without expanding the UI matrix')
-    parser.add_argument('--interface', choices=('goofy', 'rally', 'both'), default='both', help='UI presentation to check')
     args=parser.parse_args()
-    run(args.ui or args.ui_only or args.qr_scan,args.ui_only,args.qr_scan,args.full,args.slow,args.interface)
+    run(args.ui or args.ui_only or args.qr_scan,args.ui_only,args.qr_scan,args.full,args.slow)

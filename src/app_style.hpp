@@ -6,7 +6,7 @@
 // palettes, chunky 2-3 px outlines, rounded controls and hard offset shadows.
 // Placeholders: %1 accent hex, %2 text on accent; material tokens follow below.
 inline QString applicationStyle(const QColor& accent){
-    if(presentation::isRally())return rally::style(accent);
+
     const QString accentHex=accent.name();
     const QString onAccent=kbtheme::readableOn(accent).name();
     QString style=QString::fromUtf8(R"CSS(

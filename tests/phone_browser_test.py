@@ -8,13 +8,12 @@ from playwright.sync_api import sync_playwright
 from run_checks import ROOT, start, stop
 
 
-def run(interface="goofy", full=False):
+def run(full=False):
     (ROOT / '.build' / 'verification').mkdir(parents=True, exist_ok=True)
-    folder = Path(tempfile.mkdtemp(prefix='phone-browser-'+interface+'-', dir=ROOT / '.build' / 'verification'))
+    folder = Path(tempfile.mkdtemp(prefix='phone-browser-goofy-', dir=ROOT / '.build' / 'verification'))
     process = None
     checks = {}
     try:
-        (folder / "azec_ui.json").write_text(json.dumps({"version":1,"interface":interface,"favorites":[]}))
         process, info = start(folder)
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(channel='chrome', headless=True)
@@ -28,8 +27,8 @@ def run(interface="goofy", full=False):
             page.get_by_role('button', name='Connect', exact=True).click()
             page.wait_for_selector('#controls:not([hidden])')
             checks['pairing_opens_controls_in_english'] = page.locator('html').get_attribute('lang') == 'en'
-            checks['embedded_font_loads'] = page.evaluate("document.fonts.ready.then(()=>document.fonts.check('16px " + ('Geist' if interface=='rally' else 'Fredoka') + "'))")
-            checks['accent_text_matches_interface'] = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim()") == ('#171c19' if interface=='rally' else '#ffffff')
+            checks['embedded_font_loads'] = page.evaluate("document.fonts.ready.then(()=>document.fonts.check('16px Fredoka'))")
+            checks['accent_text_is_readable'] = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim()") == '#ffffff'
             checks['nine_language_options'] = page.locator('#language option').count() == 9
             checks['removed_controls_absent'] = page.locator('#rapidMaster').count() == 0 and page.locator('#radius').count() == 0 and page.locator('#accent').count() == 0
             page.locator('summary').click()
@@ -113,7 +112,7 @@ def run(interface="goofy", full=False):
             checks['no_javascript_errors'] = not errors
             browser.close()
         report = {'passed': all(checks.values()), 'checks': checks, 'errors': errors,
-                  'coverage': {'interface': interface, 'languages': list(range(9)) if full else [1],
+                  'coverage': {'interface': 'goofy', 'languages': list(range(9)) if full else [1],
                                'widths': [320, 390, 430, 768] if full else [390]}}
         (folder / 'browser-verification.json').write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
@@ -127,7 +126,5 @@ def run(interface="goofy", full=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--full', action='store_true', help='Check all nine languages at four widths')
-    parser.add_argument('--interface', choices=('goofy', 'rally', 'both'), default='both')
     args = parser.parse_args()
-    results=[run(interface, args.full) for interface in (('goofy','rally') if args.interface == 'both' else (args.interface,))]
-    raise SystemExit(0 if all(results) else 1)
+    raise SystemExit(0 if run(args.full) else 1)

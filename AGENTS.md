@@ -28,8 +28,8 @@ Use PowerShell from the project root. Requires Visual Studio 2022 C++ tools, a W
 
 - Build-only: `.\build.cmd`.
 - Substantial behavior changes: `.\build.cmd test` runs core, isolated HTTP, recovery, and restart checks. It skips the real 61-second expiry wait.
-- Desktop layout/interaction changes: after building the verification executable with `build.cmd test`, run `python tests/run_checks.py --ui-only --interface goofy` (or `rally`; omit the option for both). Default: 100% scale, no exhaustive language sweep. Inspect relevant screenshots and JSON results.
-- Phone UI changes: `python tests/phone_browser_test.py --interface goofy` (or `rally`). Requires Python Playwright and Google Chrome. Default layout coverage is English at 390 CSS px; focused language-picker behavior remains checked.
+- Desktop layout/interaction changes: after building the verification executable with `build.cmd test`, run `python tests/run_checks.py --ui-only`. Default: 100% scale, no exhaustive language sweep. Inspect relevant screenshots and JSON results.
+- Phone UI changes: `python tests/phone_browser_test.py`. Requires Python Playwright and Google Chrome. Default layout coverage is English at 390 CSS px; focused language-picker behavior remains checked.
 - Use `--full` on either Python runner only for releases, broad layout/typography/localization changes, or a bug involving scaling/translations. UI coverage expands to 100% / 150% and all languages; browser coverage expands to nine languages at four widths. Do not run this matrix for unrelated small edits.
 - Pairing expiry changes: `python tests/run_checks.py --slow` includes the real timeout. CI retains extended coverage explicitly.
 
@@ -50,13 +50,11 @@ All fixture checks must use fresh isolated directories under `.build/verificatio
 - Use Engine synchronization when accessing configuration from worker threads. Keep UI updates on the Qt GUI thread.
 - Never replace, commit, or package the user's personal configuration files as defaults.
 
-## Interface selection
+## Presentation
 
-- Goofy is the default. Settings offers only Goofy and Rally, applied after saving and restarting. Do not restore Atelier or Glass as choices.
-- Both presentations use the same MainWindow bindings, Engine, hotkey handlers, phone server, validation, persistence, and profile transfer. Only the selected UI is constructed. Layout builders live in src/desktop_layouts.hpp; do not fork backend behavior for a design.
-- Store the interface name, named Goofy color theme (`colorTheme`), and collapsed-sidebar state (`sidebarCollapsed`) in azec_ui.json alongside favorites; changing any preference must preserve the others. Invalid or missing names fall back to Goofy. Preserve the 3,734-byte binary layout.
-- Restart only after pending profile changes and the UI preference are saved successfully; release the instance lock before relaunch. Preserve dry-run on restart.
-- The Goofy visual rules below apply to Goofy. Rally retains its dark green canvas, warm text, signal-orange default presentation accent, flat squared controls, full-width tuning deck and searchable operator grid. The same phone HTML/JS uses an alternate embedded stylesheet for Rally.
+- Goofy is the only desktop and phone UI. Keep the single desktop layout in `src/desktop_layout.hpp`; do not add interface selectors or restart-to-change-design flows.
+- Store the named color theme (`colorTheme`) and collapsed-sidebar state (`sidebarCollapsed`) in `azec_ui.json` alongside favorites. Every preference change must preserve the others. Ignore obsolete `interface` preferences and remove that key only during a successful atomic UI-preference save.
+- Themes change materials only. MainWindow bindings, Engine, hotkeys, phone server, validation, persistence, and profile transfer remain shared. Preserve the 3,734-byte binary layout.
 
 ## UI contracts
 
@@ -71,8 +69,8 @@ All fixture checks must use fresh isolated directories under `.build/verificatio
 - Right-click favorites use a compact context-menu action, without a nested push button; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
 - Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds.
-- Keep appearance choices limited to the ten named Goofy palettes in `theme.hpp`: original, Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush. Apply and save palette changes immediately without editing binary profile values or changing layout. Rally retains its signal-orange presentation accent. No free accent-color picker, global rapid-fire master, or reactive-radius slider; saved custom binary values are still normalized on load and the next save. Settings categories are General, Appearance, Shortcuts, Phone control, and Profile backup; conceal pairing QR when leaving its category.
-- Nine language entries ship in the picker with bundled flag SVG assets: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` and every `phoneTexts` map in `assets/phone.html` must keep the full 116 / 80 keys in enum order; the `static_assert`s enforce the desktop count.
+- Keep appearance choices limited to the ten named Goofy palettes in `theme.hpp`: original, Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush. Apply and save palette changes immediately without editing binary profile values or changing layout. No free accent-color picker, global rapid-fire master, or reactive-radius slider; saved custom binary values are still normalized on load and the next save. Settings categories are General, Appearance, Shortcuts, Phone control, and Profile backup; conceal pairing QR when leaving its category.
+- Nine language entries ship in the picker with bundled flag SVG assets: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` and every `phoneTexts` map in `assets/phone.html` must keep the full 112 / 80 keys in enum order; the `static_assert`s enforce the desktop count.
 - Localized text must never widen the fixed 200 px sidebar: sticker chips elide (`StickerLabel`), setting hints word-wrap, and `tests/ui_checks.cpp` asserts the sidebar fits for every language in the extended checks.
 
 ## Phone interface

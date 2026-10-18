@@ -106,10 +106,6 @@ enum class UiText {
     RightKey,
     UpKey,
     DownKey,
-    InterfaceStyle,
-    InterfaceRestartHint,
-    ApplyAndRestart,
-    InterfaceSaveFailed,
     SettingsCategory,
     General,
     Shortcuts,
@@ -121,7 +117,7 @@ enum class UiText {
     SidebarSaveFailed,
     Collapse,
 };
-inline constexpr int UiTextCount=116;
+inline constexpr int UiTextCount=112;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

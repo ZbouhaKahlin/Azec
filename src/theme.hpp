@@ -2,8 +2,7 @@
 #include <QColor>
 #include <QPalette>
 #include <array>
-#include "interface_preferences.hpp"
-#include "../third_party/rally_ui/qt/include/rally_ui.hpp"
+#include "ui_preferences.hpp"
 
 // GoofyUI design tokens (github.com/Azec-Zuckerberg/goofy-ui-library) adapted
 // for the desktop window: named palettes, chunky ink outlines, flat state
@@ -41,27 +40,24 @@ inline const std::array<ColorTheme,10> colorThemes{{
 }};
 inline QString activeColorTheme="goofy";
 inline const ColorTheme& colorTheme(const QString& id){for(const auto& theme:colorThemes)if(id==QLatin1String(theme.id))return theme;return colorThemes.front();}
-inline QString readColorTheme(const std::filesystem::path& path){QJsonObject root;if(!presentation::readDocument(presentation::filePath(path),root))return QStringLiteral("goofy");return QLatin1String(colorTheme(root["colorTheme"].toString()).id);}
-inline bool writeColorTheme(const std::filesystem::path& path,const QString& id){return presentation::update(path,[&](QJsonObject& root){root["colorTheme"]=QLatin1String(colorTheme(id).id);});}
+inline QString readColorTheme(const std::filesystem::path& path){QJsonObject root;if(!uiprefs::readDocument(uiprefs::filePath(path),root))return QStringLiteral("goofy");return QLatin1String(colorTheme(root["colorTheme"].toString()).id);}
+inline bool writeColorTheme(const std::filesystem::path& path,const QString& id){return uiprefs::update(path,[&](QJsonObject& root){root["colorTheme"]=QLatin1String(colorTheme(id).id);});}
 
 inline void initialize(const QString& id=QStringLiteral("goofy")){
     const auto& theme=colorTheme(id);activeColorTheme=QLatin1String(theme.id);
     paper=QColor(theme.paper);surface=QColor(theme.surface);card=QColor(theme.card);header=paper;
     purple=defaultAccent=QColor(theme.accent);lavender=QColor(theme.selection);ink=QColor(theme.text);muted=QColor(theme.muted);outline=QColor(theme.outline);
     yellow=QColor("#FFDD59");lime=QColor("#CCF47F");pink=QColor("#FFA8C9");blue=QColor("#BAE7FF");danger=QColor("#A6284D");
-    if(!presentation::isRally()){if(ink.lightness()>180)danger=QColor("#FFA8C9");return;}
-    paper=surface=rally::canvas;ink=rally::text;muted=rally::muted;purple=rally::signal;
-    lavender=rally::line;hover=rally::panel;yellow=rally::signal;lime=rally::muted;pink=danger=rally::danger;blue=rally::muted;defaultAccent=rally::signal;
-    card=rally::panel;header=rally::canvas;outline=rally::line;
+    if(ink.lightness()>180)danger=QColor("#FFA8C9");
 }
 
 // Text that stays readable on a filled surface (the library's 150-luminance rule).
 inline QColor readableOn(const QColor& background){
-    if(presentation::isRally())return rally::onColor(background);
+
     return (background.red()*299+background.green()*587+background.blue()*114)/1000>150?chipInk:QColor("#FFFFFF");
 }
 inline QPalette palette(){
-    if(presentation::isRally())return rally::palette();
+
     QPalette p;p.setColor(QPalette::Window,paper);p.setColor(QPalette::WindowText,ink);p.setColor(QPalette::Base,surface);p.setColor(QPalette::AlternateBase,card);
     p.setColor(QPalette::Text,ink);p.setColor(QPalette::Button,surface);p.setColor(QPalette::ButtonText,ink);p.setColor(QPalette::Highlight,defaultAccent);p.setColor(QPalette::HighlightedText,readableOn(defaultAccent));p.setColor(QPalette::PlaceholderText,muted);p.setColor(QPalette::Disabled,QPalette::Text,muted);p.setColor(QPalette::Disabled,QPalette::ButtonText,muted);return p;
 }
