@@ -7,19 +7,23 @@
 inline QJsonObject backupProfile(const r6::Operator& op){
     return {{"vertical",op.vertical},{"horizontal",op.horizontal},{"delay",op.delay},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)}};
 }
-inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favorites){
+// Version 1 keeps the six-key settings shape so older builds can still import
+// new backups; the removed settings are written normalized (accent/radius) or
+// preserved as raw bytes (rapid key/master).
+inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favorites,bool recoilMaster){
     QJsonArray operators;
     for(int i=0;i<r6::operator_count;++i)operators.append(QJsonObject{{"name",QString::fromUtf8(config.operators[i].name)},
         {"primary",backupProfile(config.operators[i])},{"secondary",backupProfile(config.secondary[i])},
         {"secondaryEnabled",config.secondary_enabled[i]},{"secondaryInitialized",config.secondary_initialized[i]}});
-    QJsonArray keys;for(const auto key:hotkeys(config))keys.append(key);
+    const int keys[]={config.menu_key,config.recoil_key,config.rapid_key,config.panic_key,config.primary_key,config.secondary_key};
+    QJsonArray keyArray;for(const auto key:keys)keyArray.append(key);
     QStringList names(favorites.begin(),favorites.end());names.sort();
     return {{"application","Azec"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
-        {"settings",QJsonObject{{"keys",keys},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
-            {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",config.radius},
-            {"accent",QJsonArray{config.neon[0],config.neon[1],config.neon[2]}}}}};
+        {"settings",QJsonObject{{"keys",keyArray},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
+            {"recoilMaster",recoilMaster},{"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",130.0},
+            {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
 }
-inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>& favorites){
+inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>& favorites,bool& recoilMaster){
     const auto number=[](const QJsonValue& value,double lo,double hi){return value.isDouble()&&std::isfinite(value.toDouble())&&value.toDouble()>=lo&&value.toDouble()<=hi;};
     const auto integer=[&](const QJsonValue& value,int lo,int hi){return number(value,lo,hi)&&std::floor(value.toDouble())==value.toDouble();};
     if(root["application"]!="Azec"||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
@@ -42,13 +46,24 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
         seen.insert(name);
     }
     if(!integer(settings["language"],0,8)||!integer(settings["selected"],0,r6::operator_count-1)||!number(settings["radius"],1,10000)||!settings["sound"].isBool()||!settings["rapidMaster"].isBool()||!settings["phoneEnabled"].isBool())return false;
+    if(settings.contains("recoilMaster")&&!settings["recoilMaster"].isBool())return false;
     const auto keys=settings["keys"].toArray();const auto accent=settings["accent"].toArray();
     if(keys.size()!=6||accent.size()!=3)return false;
     int* destinations[]={&next.menu_key,&next.recoil_key,&next.rapid_key,&next.panic_key,&next.primary_key,&next.secondary_key};
     for(int i=0;i<6;++i){if(!integer(keys[i],0,255))return false;*destinations[i]=keys[i].toInt();}
-    if(!uniqueHotkeys(next))return false;
-    for(int i=0;i<3;++i){if(!number(accent[i],0,1))return false;next.neon[i]=float(accent[i].toDouble());}
-    next.language=settings["language"].toInt();next.selected=settings["selected"].toInt();next.radius=float(settings["radius"].toDouble());next.sound=settings["sound"].toBool();next.rapid_master=settings["rapidMaster"].toBool();next.phone_enabled=settings["phoneEnabled"].toBool();
+    // Only the five live bindings must be unique; the frozen rapid slot may hold
+    // any legacy value without blocking an import.
+    const auto bindings=hotkeys(next);
+    for(size_t i=0;i<bindings.size();++i)for(size_t j=i+1;j<bindings.size();++j)if(bindings[i]&&bindings[i]==bindings[j])return false;
+    next.menu_key=r6::validHotkey(next.menu_key)?next.menu_key:0;next.recoil_key=r6::validHotkey(next.recoil_key)?next.recoil_key:0;
+    next.panic_key=r6::validHotkey(next.panic_key)?next.panic_key:0;next.primary_key=r6::validHotkey(next.primary_key)?next.primary_key:0;
+    next.secondary_key=r6::validHotkey(next.secondary_key)?next.secondary_key:0;next.rapid_key=r6::validHotkey(next.rapid_key)?next.rapid_key:0;
+    // Compatibility validation still requires the old fields, but the values
+    // themselves are normalized to the current fixed materials.
+    for(int i=0;i<3;++i)if(!number(accent[i],0,1))return false;
+    next.language=settings["language"].toInt();next.selected=settings["selected"].toInt();next.radius=130;next.sound=settings["sound"].toBool();next.rapid_master=settings["rapidMaster"].toBool();next.phone_enabled=settings["phoneEnabled"].toBool();
+    next.neon[0]=114.0f/255;next.neon[1]=72.0f/255;next.neon[2]=215.0f/255;
+    recoilMaster=settings.value("recoilMaster").toBool(true);
     QSet<QString> nextFavorites;
     for(const auto& name:root["favorites"].toArray()){if(!name.isString()||!seen.contains(name.toString()))return false;nextFavorites.insert(name.toString());}
     result=next;favorites=nextFavorites;return true;

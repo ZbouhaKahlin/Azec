@@ -27,6 +27,16 @@ constexpr int operator_count = 72;
 // The original writes exactly 71 operator records; extension operators (Noor)
 // keep r6_config.bin at 3,734 bytes and live in azec_weapons.json instead.
 constexpr int legacy_operator_count = 71;
+// Bindable keys reject mouse buttons, lone modifiers, and Windows keys.
+inline bool validHotkey(int key){
+    if(key==0)return true;
+    if(key<3||key>255)return false;
+    if(key>=4&&key<=6)return false;
+    if(key>=16&&key<=18)return false;
+    if(key==91||key==92)return false;
+    if(key>=160&&key<=165)return false;
+    return true;
+}
 struct Config {
     std::array<Operator, operator_count> operators;
     std::int32_t menu_key = 0x2d, recoil_key = 0x75, panic_key = 0x23;
@@ -61,6 +71,6 @@ public:
     Movement step(const Operator& op, int jitter);
     void reset() { x_ = y_ = 0; }
 };
-int recoil_interval(const Operator& op, bool rapid_master);
+int recoil_interval(const Operator& op);
 int rapid_interval(const Operator& op);
 }

@@ -100,6 +100,10 @@ bool Config::load(const std::filesystem::path& path) {
     for (auto c : next.neon) if (!std::isfinite(c) || c < 0 || c > 1) return false;
     for (auto key : {next.menu_key,next.recoil_key,next.panic_key,next.rapid_key})
         if (key < 0 || key > 255) return false;
+    // Legacy or hand-edited bindings that cannot be pressed safely fall back
+    // to "None" instead of rejecting the whole configuration.
+    const auto sanitize = [](std::int32_t& key) { if (!validHotkey(key)) key = 0; };
+    sanitize(next.menu_key); sanitize(next.recoil_key); sanitize(next.panic_key); sanitize(next.rapid_key);
     *this = next;
     return true;
 }
@@ -110,6 +114,8 @@ Movement RecoilAccumulator::step(const Operator& op, int jitter) {
     x_ -= float(movement.x); y_ -= float(movement.y);
     return movement;
 }
-int recoil_interval(const Operator& op, bool master) { return master && op.rapid ? 30 : 12; }
-int rapid_interval(const Operator& op) { return std::max(30, op.delay); }
+int recoil_interval(const Operator& op) { return op.rapid ? 30 : 12; }
+// The UI exposes a 30-150 ms shot delay; stored files keep their raw value,
+// but the worker honors the documented range so both always agree.
+int rapid_interval(const Operator& op) { return std::clamp(op.delay, 30, 150); }
 }

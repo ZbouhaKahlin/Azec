@@ -48,7 +48,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto saveIcon=save_->icon().cacheKey();save_->click();r6::Config saved;checks["save_button_writes_settings"]=saved.load(config_path_)&&saved.bytes()==engine_.snapshot().bytes();checks["save_icon_feedback"]=save_->property("saveState").toString()=="saved";
         wait(180);const auto saveAfterClick=save_->grab().toImage();capture(output+"/save-start.png");wait(1100);capture(output+"/save-feedback.png");
         checks["save_has_no_glow_or_icon_swap"]=save_->grab().toImage()==saveAfterClick&&save_->icon().cacheKey()==saveIcon;
-        const bool masterBefore=engine_.recoil_master;recoil_master_->click();checks["master_recoil_control"]=engine_.recoil_master.load()!=masterBefore;recoil_master_->click();const bool rapidBefore=engine_.rapid_master;rapid_master_->click();checks["global_rapid_control"]=engine_.rapid_master.load()!=rapidBefore&&bool(engine_.snapshot().rapid_master)==engine_.rapid_master.load();rapid_master_->click();
+        const bool masterBefore=engine_.recoil_master;recoil_master_->click();checks["master_recoil_control"]=engine_.recoil_master.load()!=masterBefore&&unsaved_;save();{r6::Engine restored(true);checks["recoil_master_preference_persists"]=restored.load(config_path_)&&restored.recoil_master.load()==engine_.recoil_master.load();}recoil_master_->click();save();
         const auto before=engine_.recoil_active.load();checks["initial_recoil_off"]=!before;status_->click();checks["activation_control"]=engine_.recoil_active.load()!=before;status_->click();checks["second_click_restores_off"]=!engine_.recoil_active.load();
         // Hidden harness windows need an active Qt focus context for Tab events.
         QApplication::setActiveWindow(this);status_->clearFocus();status_->setFocus(Qt::TabFocusReason);QApplication::processEvents();const bool keyboardIndicator=status_->property("keyboardFocus").toBool();
@@ -79,6 +79,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["language_popup_uses_ink_frame"]=languagePopup&&languagePopup->isVisible()&&(languagePopup->windowFlags()&Qt::FramelessWindowHint)&&languagePopup->findChild<QListWidget*>()->count()==9;
         if(languagePopup){languagePopup->grab().save(output+"/language-popup.png");auto* list=languagePopup->findChild<QListWidget*>();const auto before=list->grab().toImage();QEnterEvent enterChoice(QPointF(5,5),QPointF(5,5),list->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(list,&enterChoice);checks["language_popup_hover_stays_flat"]=before==list->grab().toImage();}language_->hidePopup();
         language_->setCurrentIndex(1);QApplication::processEvents();checks["portuguese_labels"]=operators_title_->text()=="Todos os operadores"&&save_->toolTip().startsWith("Salvar configurações");language_->setCurrentIndex(0);QApplication::processEvents();
+        if(QCoreApplication::arguments().contains("--all-languages")){
         bool localizedSidebarFits=true,hebrewPrankVisible=true;int frenchIndex=-1,prankIndex=-1;
         for(int i=0;i<language_->count();++i){language_->setCurrentIndex(i);QApplication::processEvents();if(auto* popup=findChild<QDialog*>("palestinePopup"))popup->close();const int id=language_->itemData(i).toInt();localizedSidebarFits&=sidebar_scroll_->widget()->width()<=sidebar_scroll_->viewport()->width();localizedSidebarFits&=operators_title_->width()<=sidebar_scroll_->viewport()->width();if(id==2)frenchIndex=i;if(id==6)prankIndex=i;}
         checks["localized_sidebar_fits_column"]=localizedSidebarFits;
@@ -86,6 +87,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         language_->setCurrentIndex(1);QApplication::processEvents();capture(output+"/sidebar-portuguese.png");
         hebrewPrankVisible=prankIndex>=0;if(prankIndex>=0){language_->setCurrentIndex(prankIndex);QApplication::processEvents();auto* popup=findChild<QDialog*>("palestinePopup");hebrewPrankVisible=popup&&popup->isVisible()&&!popup->isModal()&&!QApplication::activeModalWidget()&&operators_title_->text()==QString::fromUtf8(lang_he[static_cast<int>(UiText::AllOperators)]);if(popup){popup->grab().save(output+"/palestine-popup.png");popup->close();}capture(output+"/sidebar-prank.png");}
         checks["hebrew_prank_shows_palestine"]=hebrewPrankVisible;
+        }
         language_->setCurrentIndex(0);QApplication::processEvents();
         preferences_scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();capture(output+"/system.png");back_->click();checks["settings_back_preserves_profile"]=pages_->currentWidget()==operator_page_&&engine_.snapshot().selected==4&&vertical_->value()==12.3;
         if(rally){showRoster();wait(230);}const auto originalFavorites=favorites_;favorites_.clear();persistFavorites();refreshFavorites();wait(220);checks["empty_favorites_hide_entire_group"]=favorites_group_->isHidden()&&!favorites_title_->isVisible()&&favorites_list_->isHidden();capture(output+"/empty-favorites.png");
@@ -144,10 +146,10 @@ QJsonObject MainWindow::selfTest(const QString& output){
         for(auto* bar:{sidebarBar,operatorBar,preferenceBar})bar->setSliderDown(false);wait(3350);for(int attempt=0;attempt<80&&(sidebarBar->opacity()>0||operatorBar->opacity()>0||preferenceBar->opacity()>0);++attempt)wait(50);
         checks["scrollbars_fade_after_drag_release"]=sidebarBar->opacity()==0&&operatorBar->opacity()==0&&preferenceBar->opacity()==0;
         settings_->setMinimumHeight(0);back_->click();sidebarBar->setValue(0);scroll_->verticalScrollBar()->setValue(0);showNormal();raise();activateWindow();wait(3400);capture(output+"/finished.png");
-        const auto unchanged=engine_.snapshot().bytes();QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/color.png");modal->reject();}});chooseColor();checks["cancel_color_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
+        const auto unchanged=engine_.snapshot().bytes();
         bool bindingFits=true;
         QTimer::singleShot(80,this,[&]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/binding.png");bindingFits&=modal->objectName()=="hotkeyDialog"&&modal->width()>=380&&modal->findChild<QLabel*>("bindingHint")->wordWrap();for(auto* label:modal->findChildren<QLabel*>())bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));modal->reject();}});bindKey(0);checks["cancel_key_binding_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
-        for(int language=0;language<9;++language){engine_.edit([=](r6::Config& c){c.language=language;});QTimer::singleShot(40,this,[&,language]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(!modal){bindingFits=false;return;}auto* hint=modal->findChild<QLabel*>("bindingHint");hint->setText(text(UiText::ThisKeyIsAlreadyAssignedChooseAnother));modal->adjustSize();QApplication::processEvents();for(auto* label:modal->findChildren<QLabel*>()){bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));if(label->wordWrap())bindingFits&=label->height()>=label->heightForWidth(label->width());}if(language==0)modal->grab().save(output+"/binding-portuguese-conflict.png");modal->reject();});bindKey(0);}engine_.edit([](r6::Config& c){c.language=1;});checks["binding_instructions_fit_all_languages"]=bindingFits;
+        for(int language=0;language<9;++language){if(!QCoreApplication::arguments().contains("--all-languages")&&language!=1)continue;engine_.edit([=](r6::Config& c){c.language=language;});QTimer::singleShot(40,this,[&,language]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(!modal){bindingFits=false;return;}auto* hint=modal->findChild<QLabel*>("bindingHint");hint->setText(text(UiText::ThisKeyIsAlreadyAssignedChooseAnother));modal->adjustSize();QApplication::processEvents();for(auto* label:modal->findChildren<QLabel*>()){bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));if(label->wordWrap())bindingFits&=label->height()>=label->heightForWidth(label->width());}if(language==0)modal->grab().save(output+"/binding-portuguese-conflict.png");modal->reject();});bindKey(0);}engine_.edit([](r6::Config& c){c.language=1;});checks["binding_instructions_fit_selected_languages"]=bindingFits;
         QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/help.png");modal->reject();}});help();checks["help_dialog_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
         // New reliability/UI behavior uses the same production paths as the real window.
         showPreferences();wait(220);buildPreferences();
@@ -202,23 +204,35 @@ QJsonObject MainWindow::selfTest(const QString& output){
         phone_enabled_->click();wait(340);
         preferences_scroll_->ensureWidgetVisible(pairing_qr_);wait(80);capture(output+"/phone-enabled.png");
         pairing_qr_->click();wait(80);hide();show();wait(350);checks["hiding_window_cancels_qr_reveal"]=!pairing_qr_->revealed()&&pairing_qr_->revealProgress()==0&&!pairing_qr_->transitioning();showOperators();wait(220);
-        checks["tray_has_window_recoil_rapid_exit"]=tray_&&tray_menu_&&tray_recoil_->isCheckable()&&tray_rapid_->isCheckable()&&tray_exit_;
-        const auto baseline=engine_.snapshot();const auto backup=makeBackup(baseline,favorites_);r6::Config imported;QSet<QString> importedFavorites;
-        checks["complete_profile_backup_roundtrip"]=parseBackup(backup,imported,importedFavorites)&&imported.bytes()==baseline.bytes()&&importedFavorites==favorites_&&imported.secondary_enabled==baseline.secondary_enabled;
+        checks["tray_has_window_recoil_and_exit_only"]=tray_&&tray_menu_&&tray_recoil_->isCheckable()&&tray_exit_&&tray_menu_->actions().size()==4&&tray_menu_->actions()[2]->isSeparator();
+        const auto baseline=engine_.snapshot();const bool masterBaseline=engine_.recoil_master.load();const auto backup=makeBackup(baseline,favorites_,masterBaseline);r6::Config imported;QSet<QString> importedFavorites;bool importedMaster=false;
+        checks["complete_profile_backup_roundtrip"]=parseBackup(backup,imported,importedFavorites,importedMaster)&&imported.bytes()==baseline.bytes()&&importedFavorites==favorites_&&imported.secondary_enabled==baseline.secondary_enabled&&importedMaster==masterBaseline;
         auto malformedBackup=backup;auto entries=backup["operators"].toArray();entries.removeLast();entries.removeLast();malformedBackup["operators"]=entries;
         const auto unchangedBeforeImport=engine_.snapshot().bytes();
         checks["invalid_import_preserves_profiles"]=!applyBackup(QJsonDocument(malformedBackup).toJson())&&engine_.snapshot().bytes()==unchangedBeforeImport;
         checks["valid_import_updates_production_ui"]=applyBackup(QJsonDocument(backup).toJson())&&unsaved_&&engine_.snapshot().bytes()==baseline.bytes();
-        checks["all_hotkeys_checked_for_conflicts"]=hotkeyConflict(baseline,3,baseline.menu_key)==0&&hotkeyConflict(baseline,3,0)==-1;
-        checks["phone_rejects_global_hotkey_collision"]=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key3",baseline.menu_key}}}}).contains("error");
-        engine_.edit([](r6::Config& config){config.neon[0]=.2f;config.neon[1]=.4f;config.neon[2]=.8f;});applyStyle();dirty();wait(180);
-        const auto blueInk=[](const QImage& image){int count=0;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x){const auto color=image.pixelColor(x,y);if(color.blue()>color.red()+40&&color.blue()>color.green()+20)++count;}return count;};
-        checks["dirty_save_uses_custom_accent"]=unsaved_&&save_->property("unsaved").toBool()&&blueInk(save_->grab().toImage())>12;
-        save_blocked_=true;save();checks["failed_save_retains_accent_and_dirty_state"]=unsaved_&&save_->property("unsaved").toBool()&&blueInk(save_->grab().toImage())>12;
-        save_blocked_=false;save();wait(180);checks["successful_save_returns_to_neutral"]=!unsaved_&&!save_->property("unsaved").toBool()&&blueInk(save_->grab().toImage())==0;
+        checks["all_hotkeys_checked_for_conflicts"]=hotkeyConflict(baseline,2,baseline.menu_key)==0&&hotkeyConflict(baseline,2,0)==-1;
+        checks["phone_rejects_global_hotkey_collision"]=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key2",baseline.menu_key}}}}).contains("error");
+        checks["phone_rejects_unbindable_mouse_keys"]=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",1}}}}).contains("error");
+        {r6::Operator slow;slow.delay=500;checks["stored_delay_above_ui_range_clamps_for_workers"]=r6::rapid_interval(slow)==150;}
+        applyStyle();dirty();wait(180);
+        // Count pixels painted in the live accent so the check covers both the
+        // Goofy purple and Rally's signal-orange presentation accent.
+        const QColor standardAccent=accent();
+        const auto accentInk=[standardAccent](const QImage& image){int count=0;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x){const auto color=image.pixelColor(x,y);if(qAbs(color.red()-standardAccent.red())<=40&&qAbs(color.green()-standardAccent.green())<=40&&qAbs(color.blue()-standardAccent.blue())<=40)++count;}return count;};
+        checks["dirty_save_uses_the_standard_accent"]=unsaved_&&save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())>12;
+        save_blocked_=true;save();checks["failed_save_retains_accent_and_dirty_state"]=unsaved_&&save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())>12;
+        save_blocked_=false;save();wait(180);checks["successful_save_returns_to_neutral"]=!unsaved_&&!save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())==0;
         editOperator([](r6::Operator& op){op.vertical=13.1f;});
         QTimer::singleShot(80,this,[this,output]{if(auto* modal=QApplication::activeModalWidget()){modal->grab().save(output+"/unsaved-close.png");if(auto* cancel=modal->findChild<QPushButton*>("cancelClose"))cancel->click();}});
         close();checks["cancel_close_keeps_unsaved_app_running"]=isVisible()&&engine_.running&&unsaved_;
+        // The panic key keeps working everywhere except while Azec's own text
+        // or number fields own the keyboard.
+        search_->setFocus(Qt::OtherFocusReason);QApplication::setActiveWindow(this);QApplication::processEvents();
+        const bool typingGuard=isActiveWindow()&&textEditingActive();
+        if(typingGuard){keybd_event(VK_END,0,0,0);wait(60);keybd_event(VK_END,0,KEYEVENTF_KEYUP,0);wait(60);}
+        checks["panic_key_ignored_while_editing_text"]=typingGuard&&engine_.running&&isVisible();
+        search_->clearFocus();
         bool repeat_surfaced=false,repeat_kept_app=false;
         QTimer::singleShot(80,this,[this]{close();});
         QTimer::singleShot(130,this,[&]{repeat_surfaced=close_alert_!=nullptr&&QApplication::activeModalWidget()==close_alert_;});
@@ -244,7 +258,8 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto themeDirectory=std::filesystem::path(output.toStdWString())/L"theme-fixture";std::error_code themeError;std::filesystem::create_directories(themeDirectory,themeError);const auto themeFixture=themeDirectory/L"theme-test.bin";r6::Config theme;
         bool migrationPassed=true;for(const auto& legacy:std::array<std::array<float,3>,4>{{{0,1,.4f},{5.f/255,134.f/255,105.f/255},{1.f,91.f/255,99.f/255},{210.f/255,210.f/255,210.f/255}}}){for(int i=0;i<3;++i)theme.neon[i]=legacy[i];r6::Engine migrated(true);migrationPassed&=theme.save(themeFixture)&&migrated.load(themeFixture);const auto loaded=migrated.snapshot();migrationPassed&=QColor::fromRgbF(loaded.neon[0],loaded.neon[1],loaded.neon[2]).name()=="#7248d7"&&loaded.operators[4].vertical==theme.operators[4].vertical;}
         checks["previous_default_accents_migrate_without_profile_changes"]=migrationPassed;
-        theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);checks["custom_accent_is_preserved"]=customLoaded&&customTheme.snapshot().bytes()==theme.bytes();
+        theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;theme.radius=250;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);const auto normalized=customTheme.snapshot();
+        checks["removed_appearance_settings_normalize_on_load"]=customLoaded&&QColor::fromRgbF(normalized.neon[0],normalized.neon[1],normalized.neon[2]).name()=="#7248d7"&&std::abs(normalized.radius-130.f)<.001f&&std::abs(normalized.operators[4].vertical-theme.operators[4].vertical)<.001f;
         showPreferences();wait(220);
         checks["interface_picker_has_only_goofy_and_rally"]=interface_choice_->count()==2&&interface_choice_->itemText(0)=="Goofy"&&interface_choice_->itemText(1)=="Rally";
         checks["active_interface_needs_no_restart"]=interface_choice_->currentData().toInt()==int(presentation::active)&&!interface_apply_->isEnabled();
@@ -272,5 +287,5 @@ QJsonObject MainWindow::selfTest(const QString& output){
         restartCalled=false;restart_requested_=false;const auto uiName=presentation::filePath(config_path_),uiBackup=uiName+".test-backup";QFile::rename(uiName,uiBackup);QDir().mkdir(uiName);interface_apply_->click();
         checks["failed_interface_save_keeps_app_open"]=!restartCalled&&!restart_requested_&&isVisible()&&interface_feedback_->isVisible();QDir().rmdir(uiName);QFile::rename(uiBackup,uiName);
         presentation::write(config_path_,presentation::active);pending_interface_=presentation::active;restart_action_=restartAction;restart_requested_=false;buildPreferences();
-        QJsonObject report;report["interface"]=presentation::name(presentation::active);report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="SendInput";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
+        QJsonObject report;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=presentation::name(presentation::active);report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="SendInput";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }

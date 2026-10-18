@@ -21,13 +21,12 @@ class Engine {
     void rapid_worker();
 public:
     std::atomic_bool running{false}, recoil_active{false}, recoil_master{true};
-    std::atomic_bool rapid_master{true}, menu_visible{true};
+    std::atomic_bool menu_visible{true};
     std::atomic_uint injected_events{0};
     explicit Engine(bool dry_run);
     ~Engine();
     Config snapshot() const;
     void edit(const std::function<void(Config&)>& change);
-    void set_rapid_master(bool enabled);
     bool select_weapon(int slot);
     bool load(const std::filesystem::path& file);
     bool save(const std::filesystem::path& file) const;

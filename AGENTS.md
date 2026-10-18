@@ -24,35 +24,25 @@ Azec is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded loca
 
 Use PowerShell from the project root. Requires Visual Studio 2022 C++ tools, a Windows SDK, and Qt 6.8.3 MSVC x64. `setup-qt.ps1` installs the pinned Qt kit; `NEON_QT_ROOT` can override its location.
 
-```powershell
-.\build.cmd test
-```
+**Run the suite only for substantial changes.** Do not automatically run `build.cmd test`, UI checks, or browser matrices after every edit. Documentation, comments, screenshot presentation, wording, and other simple low-impact edits need only relevant lightweight checks (links, syntax, diff review, or a focused visual inspection). A small executable-code change may need a compile or targeted behavior check; line count alone does not establish risk. Authentication, persistence, concurrency, and input changes warrant behavior checks even if the diff is small.
 
-This builds and deploys the app, creates the root launcher and separate verification executable, and runs core plus isolated HTTP/restart checks. Build intermediates belong in `.build/`; deployed binaries belong in `runtime/`. Exclude `runtime/Azec-checks.exe` from runnable releases.
+- Build-only: `.\build.cmd`.
+- Substantial behavior changes: `.\build.cmd test` runs core, isolated HTTP, recovery, and restart checks. It skips the real 61-second expiry wait.
+- Desktop layout/interaction changes: after building the verification executable with `build.cmd test`, run `python tests/run_checks.py --ui-only --interface goofy` (or `rally`; omit the option for both). Default: 100% scale, no exhaustive language sweep. Inspect relevant screenshots and JSON results.
+- Phone UI changes: `python tests/phone_browser_test.py --interface goofy` (or `rally`). Requires Python Playwright and Google Chrome. Default layout coverage is English at 390 CSS px; focused language-picker behavior remains checked.
+- Use `--full` on either Python runner only for releases, broad layout/typography/localization changes, or a bug involving scaling/translations. UI coverage expands to 100% / 150% and all languages; browser coverage expands to nine languages at four widths. Do not run this matrix for unrelated small edits.
+- Pairing expiry changes: `python tests/run_checks.py --slow` includes the real timeout. CI retains extended coverage explicitly.
 
-Run UI checks in an isolated working directory because the checks write fixture configurations:
+See [docs/testing.md](docs/testing.md) for the complete command reference. Build intermediates belong in `.build/`; deployed binaries belong in `runtime/`. Exclude `runtime/Azec-checks.exe` from runnable releases.
 
-```powershell
-New-Item -ItemType Directory -Force .build\verification | Out-Null
-Push-Location .build\verification
-& '..\..\runtime\Azec.exe' --ui-self-test
-Pop-Location
-```
-
-Use separate fixture directories and `QT_SCALE_FACTOR=1` / `1.5` for both display scales. Inspect the JSON report and screenshots. Match testing to the change; UI changes require visual inspection, and profile/network changes require behavior checks. Use `--dry-run` for interactive inspection and browser tests so no mouse events or beeps are generated. Do not run fixture tests from the project root or use them against the user's live configuration.
-
-`python tests/run_checks.py --ui-only` creates fresh fixture directories and runs both scales. Build with `build.cmd test` first; the normal `--ui-self-test` command delegates to the separate verification executable.
-
-For phone checks, start the runtime with `--dry-run --phone-info=phone-info.json` in a fresh fixture directory, then run `python tests/phone_test.py <fixture-directory>`. The info file contains temporary session credentials and must remain local. Shut down test processes started by your work after verification.
-
-Optional browser checks use `python tests/phone_browser_test.py` with Python Playwright and Google Chrome installed. The runner creates an isolated dry-run instance, checks all nine languages at four widths, and stops its own process. Keep physical-phone testing distinct from browser emulation.
+All fixture checks must use fresh isolated directories under `.build/verification`; the Python runners create these automatically. Never run fixture tests from the project root or against personal configuration. Use `--dry-run` for interactive inspection and browser checks so no mouse events or beeps are generated. Pairing info and revealed QR captures contain session credentials and must remain local. Stop test processes started by your work. Report exactly what was checked and what was skipped; browser emulation is not a physical-phone test.
 
 ## Data and behavior contracts
 
 - Preserve the original 3,734-byte primary configuration layout in `r6_config.bin`. Keep backward compatibility when adding features.
 - The operator roster covers all 72 operators in id order: Ace, Alibi, Amaru, Aruni, Ash, Azami, Bandit, Blackbeard, Blitz, Brava, Buck, Capitao, Castle, Caveira, Clash, Deimos, Doc, Dokkaebi, Echo, Ela, Fenrir, Finka, Flores, Frost, Fuze, Glaz, Goyo, Gridlock, Grim, Hibana, Iana, IQ, Jackal, Jager, Kaid, Kali, Kapkan, Lesion, Lion, Maestro, Maverick, Melusi, Mira, Montagne, Mozzie, Mute, Nokk, Osa, Oryx, Pulse, Ram, Rook, Sens, Sentry, Skopos, Smoke, Solis, Striker, Sledge, Tachanka, Thatcher, Thermite, Thorn, Thunderbird, Tubarao, Twitch, Valkyrie, Vigil, Wamai, Warden, Ying, Noor. Keep this order: extend at the end only so existing records never shift.
 - `r6_config.bin` serializes only the original 71 records. Primary profiles for operators past the original list (Noor, id 71) and the selected operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`); the binary `selected` field still rejects indexes past the original list. Backups with 71 or 72 records import by name.
-- Store secondary profiles, weapon hotkeys, and the phone-access preference in `azec_weapons.json`. Favorites use `azec_ui.json`.
+- Store secondary profiles, weapon hotkeys, the phone-access preference, and the master recoil switch in `azec_weapons.json`. Favorites use `azec_ui.json`.
 - Fresh configurations and the unpaired phone page default to English. Preserve saved language IDs: Portuguese is 0 and English is 1; pairing follows the desktop's saved language.
 - Each operator has a primary profile and an optional independent secondary profile. First enable copies primary settings; disabling preserves secondary edits. Character selection starts on primary.
 - Default weapon keys are 1 and 2 and are configurable. Weapon shortcuts must not interrupt text/number editing or Ctrl/Alt/Windows-key shortcuts.
@@ -81,9 +71,9 @@ Optional browser checks use `python tests/phone_browser_test.py` with Python Pla
 - Right-click favorites use a compact context-menu action, without a nested push button; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
 - Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds.
-- Reactive radius remains a supported setting. Do not remove it as a typography cleanup.
-- Nine language entries ship in the picker with painted flags: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` and every `phoneTexts` map in `assets/phone.html` must keep the full 116 / 80 keys in enum order; the `static_assert`s enforce the desktop count.
-- Localized text must never widen the fixed 200 px sidebar: sticker chips elide (`StickerLabel`), setting hints word-wrap, and `tests/ui_checks.cpp` asserts the sidebar fits for every language.
+- Keep the appearance set fixed: no accent-color picker, no global rapid-fire master, and no reactive-radius slider. The accent is GoofyUI purple (Rally maps it to its signal-orange presentation accent) and the background radius keeps its standard value; saved custom values are normalized on load and the next save.
+- Nine language entries ship in the picker with painted flags: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` and every `phoneTexts` map in `assets/phone.html` must keep the full 106 / 80 keys in enum order; the `static_assert`s enforce the desktop count.
+- Localized text must never widen the fixed 200 px sidebar: sticker chips elide (`StickerLabel`), setting hints word-wrap, and `tests/ui_checks.cpp` asserts the sidebar fits for every language in the extended checks.
 
 ## Phone interface
 

@@ -37,7 +37,9 @@ public:
 struct ConfigurationRecovery {QString notice;bool blockSaving=false;};
 inline ConfigurationRecovery loadConfiguration(r6::Engine& engine,const std::filesystem::path& path){
     if(engine.load(path))return {};
-    engine.edit([&](r6::Config& config){config.language=1;readWeaponProfiles(config,path);});
+    bool master=engine.recoil_master.load();
+    engine.edit([&](r6::Config& config){config.language=1;readWeaponProfiles(config,master,path);});
+    engine.recoil_master=master;
     const QString filename=QString::fromStdWString(path.wstring());QFile file(filename);
     if(!file.exists())return {};
     if(!file.open(QIODevice::ReadOnly)){

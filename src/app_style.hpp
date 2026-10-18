@@ -5,7 +5,7 @@
 // GoofyUI materials (github.com/Azec-Zuckerberg/goofy-ui-library): one cream
 // paper canvas, white surfaces, chunky 2-3 px ink outlines, big radii, flat
 // state colour and hard offset shadows. No gradients, no glow. Colour is
-// reserved for live state (the accent, user-selectable) and the semantic
+// reserved for live state (the fixed accent) and the semantic
 // palette. Placeholders: %1 accent hex, %2 text on accent.
 inline QString applicationStyle(const QColor& accent){
     if(presentation::isRally())return rally::style(accent);

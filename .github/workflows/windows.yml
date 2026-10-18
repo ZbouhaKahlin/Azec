@@ -21,12 +21,12 @@ jobs:
           if (!(Test-Path "$env:LOCALAPPDATA/NeonManagerR6/Qt/6.8.3/msvc2022_64/bin/qmake.exe")) { ./setup-qt.ps1 }
       - name: Build and check core, HTTP, restart, and single-instance behavior
         shell: pwsh
-        run: ./build.cmd test
+        run: ./build.cmd test --slow
       - name: Verify Goofy and Rally at 100% and 150%
         shell: pwsh
         run: |
           python -m pip install opencv-python-headless
-          python tests/run_checks.py --ui-only --qr-scan
+          python tests/run_checks.py --ui-only --qr-scan --full
       - name: Upload verification reports and screenshots
         if: always()
         uses: actions/upload-artifact@v4

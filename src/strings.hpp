@@ -6,7 +6,6 @@
 enum class UiText {
     OpenHideWindow,
     RecoilActive,
-    GlobalRapidFire,
     Exit,
     SaveConfigurationUnsavedChanges,
     ConfigurationSaved,
@@ -27,7 +26,6 @@ enum class UiText {
     HumanizeMovement,
     VaryMovementSlightlyOnBothAxes,
     RapidFire,
-    MasterControlForEveryOperator,
     EnableForThisOperator,
     ShotDelay,
     DelayBetweenRepeatedShots,
@@ -37,7 +35,6 @@ enum class UiText {
     BeepWhenHotkeyStatesChange,
     Language,
     RecoilToggle,
-    RapidFireToggle,
     PanicExitKey,
     PrimaryWeapon,
     SecondaryWeapon,
@@ -51,11 +48,6 @@ enum class UiText {
     ClickToRevealQR,
     ClickToHideQR,
     Appearance,
-    AccentColor,
-    UsedForSwitchesAndSelectedStates,
-    ReactiveRadius,
-    MouseResponseInTheBackground,
-    ResetAppearance,
     QuickGuide,
     ProfileBackup,
     ExportProfiles,
@@ -71,7 +63,6 @@ enum class UiText {
     RecoilOn,
     RecoilOff,
     Cancel,
-    ApplyColor,
     KeyBinding,
     SetAHotkey,
     CancelHotkeyBinding,
@@ -90,8 +81,7 @@ enum class UiText {
     YourOperatorProfilesAndControlsInOnePlace,
     SelectANameInTheSidebarOrSearchForAnOperator,
     SetVerticalAndHorizontalForceUseArrowKeysForFineAdjustments,
-    EnableTheGlobalControlThenEnableRapidFireForTheSelectedOperator,
-    OpenTheSettingsGearToChangeTheAccentColorAndReactiveRadius,
+    EnableRapidFireForTheSelectedWeapon,
     SetYourHotkeysInSystemSettingsSaveConfigurationToKeepYourChanges,
     Done,
     UnsavedChanges,
@@ -121,7 +111,7 @@ enum class UiText {
     ApplyAndRestart,
     InterfaceSaveFailed,
 };
-inline constexpr int UiTextCount=116;
+inline constexpr int UiTextCount=106;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

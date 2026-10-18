@@ -50,7 +50,7 @@ if /I "%~1"=="test" (
     popd
     copy /y ".build\verification-build\release\Azec-checks.exe" "runtime\Azec-checks.exe" > nul
     if errorlevel 1 exit /b 1
-    python tests\run_checks.py
+    python tests\run_checks.py %2
     if errorlevel 1 exit /b 1
 )
 echo Build complete: Azec.exe

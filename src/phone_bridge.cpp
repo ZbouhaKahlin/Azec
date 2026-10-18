@@ -3,10 +3,10 @@
 QJsonObject MainWindow::mobileState() const {
         const auto c=engine_.snapshot();QJsonArray operators;
         for(int id=0;id<r6::operator_count;++id){const auto name=QString::fromUtf8(c.operators[id].name);operators.append(QJsonObject{{"id",id},{"name",name},{"favorite",favorites_.contains(name)},{"dual",c.secondary_enabled[id]}});}
-        QJsonArray keys;const int values[]={c.menu_key,c.recoil_key,c.rapid_key,c.panic_key,c.primary_key,c.secondary_key};const char* labels[]={"Open / hide window","Recoil toggle","Rapid fire toggle","Exit key","Primary weapon","Secondary weapon"};
-        for(int i=0;i<6;++i)keys.append(QJsonObject{{"label",labels[i]},{"value",values[i]},{"name",bindingName(values[i])}});
+        QJsonArray keys;const int values[]={c.menu_key,c.recoil_key,c.panic_key,c.primary_key,c.secondary_key};const char* labels[]={"Open / hide window","Recoil toggle","Exit key","Primary weapon","Secondary weapon"};
+        for(int i=0;i<5;++i)keys.append(QJsonObject{{"label",labels[i]},{"value",values[i]},{"name",bindingName(values[i])}});
         return {{"operators",operators},{"operatorId",c.selected},{"weaponSlot",c.active_slot()},{"dual",c.secondary_enabled[c.selected]},{"profile",profileJson(c.active_operator())},{"dirty",unsaved_},{"keys",keys},
-            {"globals",QJsonObject{{"recoilMaster",engine_.recoil_master.load()},{"rapidMaster",engine_.rapid_master.load()},{"recoilActive",engine_.recoil_active.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()},{"radius",c.radius}}}};
+            {"globals",QJsonObject{{"recoilMaster",engine_.recoil_master.load()},{"recoilActive",engine_.recoil_active.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()}}}};
     }
 QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
         const auto fail=[](const QString& message){return QJsonObject{{"error",message}};};
@@ -41,20 +41,17 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
         if(action=="setGlobal"){
             const auto before=next;
             const auto values=request["values"].toObject();if(values.isEmpty())return fail("No settings values");
-            bool master=engine_.recoil_master,rapid=engine_.rapid_master,active=engine_.recoil_active;bool rebuild=false,keysChanged=false;
+            bool master=engine_.recoil_master,active=engine_.recoil_active;bool rebuild=false,keysChanged=false;
             for(auto it=values.begin();it!=values.end();++it){const auto key=it.key();const auto value=it.value();
-                if((key=="recoilMaster"||key=="rapidMaster"||key=="recoilActive"||key=="sound")&&value.isBool()){
-                    if(key=="recoilMaster")master=value.toBool();else if(key=="rapidMaster")rapid=value.toBool();else if(key=="recoilActive")active=value.toBool();else {next.sound=value.toBool();rebuild=true;}
+                if((key=="recoilMaster"||key=="recoilActive"||key=="sound")&&value.isBool()){
+                    if(key=="recoilMaster")master=value.toBool();else if(key=="recoilActive")active=value.toBool();else {next.sound=value.toBool();rebuild=true;}
                 }else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
-                else if(key=="radius"&&validNumber(value,50,400)){next.radius=float(value.toDouble());rebuild=true;}
-                else if(key=="accent"&&value.isString()&&QRegularExpression("^#[0-9a-fA-F]{6}$").match(value.toString()).hasMatch()){const QColor color(value.toString());next.neon[0]=color.redF();next.neon[1]=color.greenF();next.neon[2]=color.blueF();rebuild=true;}
-                else if(key.startsWith("key")&&key.size()==4&&key[3]>='0'&&key[3]<='5'&&validInteger(value,0,255)){int* keys[]={&next.menu_key,&next.recoil_key,&next.rapid_key,&next.panic_key,&next.primary_key,&next.secondary_key};*keys[key[3].digitValue()]=value.toInt();rebuild=keysChanged=true;}
+                else if(key.startsWith("key")&&key.size()==4&&key[3]>='0'&&key[3]<='4'&&validInteger(value,0,255)&&r6::validHotkey(value.toInt())){int* keys[]={&next.menu_key,&next.recoil_key,&next.panic_key,&next.primary_key,&next.secondary_key};*keys[key[3].digitValue()]=value.toInt();rebuild=keysChanged=true;}
                 else return fail("Invalid setting: "+key);
             }
             if(!uniqueHotkeys(next))return fail("Each action must use a different hotkey");
-            next.rapid_master=rapid;
-            const bool persistenceChanged=next.bytes()!=before.bytes()||next.primary_key!=before.primary_key||next.secondary_key!=before.secondary_key;
-            engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_master=master;engine_.rapid_master=rapid;engine_.recoil_active=active;if(persistenceChanged)dirty();applyStyle();syncSelection();updateStatus();
+            const bool persistenceChanged=next.bytes()!=before.bytes()||next.primary_key!=before.primary_key||next.secondary_key!=before.secondary_key||master!=engine_.recoil_master;
+            engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_master=master;engine_.recoil_active=active;if(persistenceChanged)dirty();applyStyle();syncSelection();updateStatus();
             if(rebuild)QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});if(keysChanged)save();return mobileState();
         }
         return fail("Unknown action");

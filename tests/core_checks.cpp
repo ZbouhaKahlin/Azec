@@ -33,8 +33,14 @@ bool self_test(const std::filesystem::path& output) {
     auto m = accumulator.step(op, -1);
     ok &= check(m.x == -1 && m.y == 0, "shared signed humanization jitter");
     op.rapid=1; op.delay=10;
-    ok &= check(recoil_interval(op,true)==30 && recoil_interval(op,false)==12 &&
-                rapid_interval(op)==30, "worker timing and delay floor");
+    ok &= check(recoil_interval(op)==30 && rapid_interval(op)==30, "worker timing and delay floor");
+    op.rapid=0;
+    ok &= check(recoil_interval(op)==12, "recoil timing uses the base speed without rapid fire");
+    op.rapid=1; op.delay=500;
+    ok &= check(rapid_interval(op)==150, "stored delays above the UI range use the 150 ms ceiling");
+    ok &= check(validHotkey(0)&&validHotkey(0x75)&&validHotkey('1')&&!validHotkey(1)&&!validHotkey(2)&&!validHotkey(4)&&!validHotkey(5)&&!validHotkey(6)&&
+                !validHotkey(16)&&!validHotkey(17)&&!validHotkey(18)&&!validHotkey(91)&&!validHotkey(92)&&!validHotkey(160)&&!validHotkey(165),
+                "hotkey whitelist rejects mouse buttons, modifiers and Windows keys");
     config.operators[4].horizontal=-4.5f;
     config.selected=4; config.language=1; config.neon[0]=0.25f;
     Config loaded;
@@ -75,6 +81,8 @@ bool self_test(const std::filesystem::path& output) {
     ok &= check(replacement.save(garbage)&&after.load(garbage)&&after.bytes()==replacement.bytes(),"atomic replacement writes the complete compatible record");
     replacement.rapid_key=0;
     ok &= check(replacement.save(garbage)&&after.load(garbage)&&after.rapid_key==0,"explicitly cleared rapid hotkey persists");
+    replacement.menu_key=1;
+    ok &= check(replacement.save(garbage)&&after.load(garbage)&&after.menu_key==0,"mouse-button bindings sanitize to None on load");
     std::error_code ignored;std::filesystem::remove(garbage,ignored);
     std::cout << "CONFIG " << output.string() << '\n';
     return ok;
