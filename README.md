@@ -2,9 +2,7 @@
 
 A Windows desktop app with 72 operator profiles, independent primary and secondary weapon settings, and phone controls over your local network.
 
-![Azec desktop and phone controls side by side](docs/showcase.png)
-
-*Real application screenshots in illustrative desktop and iPhone-style frames. The phone frame is not a specific hardware model.*
+![Matching Azec themes on desktop and phone](docs/showcase.png)
 
 ## Get started
 
@@ -20,7 +18,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 
 ## Make it yours
 
-- **Goofy color themes:** choose the original palette or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush in **Settings → Appearance**. Colors apply immediately and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
+- **Goofy color themes:** choose the original palette or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush in **Settings → Appearance**. Choose the same ten themes on the phone in **Settings → Color theme**. Changes from either screen sync to both and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
 - **Collapsible sidebar:** the **Collapse** button at the top of the Goofy sidebar switches between operator names and a compact icon rail. Search stays at the bottom; click its compact icon to expand smoothly and start searching. The sidebar remembers your choice.
 - **Settings categories:** General, Appearance, Shortcuts, Phone control, and Profile backup keep related options together.
 - **Independent profiles:** enabling a secondary profile copies the primary once, then keeps edits separate. Disabling it preserves those edits.

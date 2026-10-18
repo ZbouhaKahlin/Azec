@@ -50,6 +50,7 @@ def run(parent):
             checks[phase + '_preserves_secondary_and_extension_profiles'] = (folder / 'azec_weapons.json').read_bytes() == weapon_bytes
             state = api({'action': 'setFavorite', 'operator': 4, 'enabled': True})
             checks[phase + '_restores_extension_selection'] = state['operatorId'] == 71 and state['profile']['vertical'] == 31.5
+            checks[phase + '_restores_phone_theme_materials'] = state['appearance']['id'] == 'deep-sea' and state['appearance']['colors']['paper'] == '#14242c' and state['appearance']['scheme'] == 'dark'
             restored_ui = json.loads(ui_path.read_text())
             checks[phase + '_preserves_preferences'] = restored_ui['favorites'] == ['Ash'] and restored_ui['colorTheme'] == 'deep-sea' and restored_ui['sidebarCollapsed'] is True
             checks[phase + '_drops_obsolete_interface_choice'] = 'interface' not in restored_ui

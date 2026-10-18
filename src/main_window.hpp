@@ -196,11 +196,11 @@ class MainWindow final : public QWidget {
         notice_->setStyleSheet(QString("color:%1;background:%2;font-weight:600;").arg(kbtheme::chipInk.name(),kbtheme::pink.name()));
         for(auto* child:findChildren<QWidget*>())child->update();update();
     }
-    void chooseColorTheme(const QString& id){
+    bool chooseColorTheme(const QString& id){
         if(!kbtheme::writeColorTheme(config_path_,id)){
-            QSignalBlocker blocked(theme_choice_);theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));showNotice(text(UiText::ThemeSaveFailed));return;
+            QSignalBlocker blocked(theme_choice_);theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));showNotice(text(UiText::ThemeSaveFailed));return false;
         }
-        kbtheme::initialize(id);applyStyle();
+        kbtheme::initialize(id);{QSignalBlocker blocked(theme_choice_);theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));}applyStyle();return true;
     }
     void chooseSettingsCategory(int index){
         if(index<0||index>=preference_categories_.size())return;

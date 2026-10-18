@@ -21,6 +21,15 @@ checks['page_available']=call('/',auth=False)[0]==200
 page_html=urllib.request.urlopen(base+'/',timeout=5).read()
 checks['page_removed_controls_and_has_quick_strip']=b'id="rapidMaster"' not in page_html and b'id="radius"' not in page_html and b'id="accent"' not in page_html and b'id="quickStrip"' in page_html
 checks['fresh_default_language_is_english']=json.loads(call('/api/state')[1])['globals']['language']==1
+initial=json.loads(call('/api/state')[1])
+checks['all_ten_phone_themes_available']=len(initial['appearance']['themes'])==10 and initial['appearance']['id']=='goofy'
+checks['theme_updates_require_pairing']=call('/api/update',{'action':'setTheme','theme':'midnight'},auth=False)[0]==401
+checks['invalid_theme_is_rejected']=all(call('/api/update',{'action':'setTheme','theme':value})[0]==400 for value in ['unknown','',12,None])
+night=json.loads(call('/api/update',{'action':'setTheme','theme':'midnight'})[1])
+checks['phone_theme_applies_matching_materials']=night['appearance']['colors']['paper']=='#171522' and night['appearance']['colors']['ink']=='#f2eafb' and night['appearance']['scheme']=='dark'
+checks['theme_change_preserves_profiles_and_dirty_state']=night['profile']==initial['profile'] and night['operatorId']==initial['operatorId'] and night['dirty']==initial['dirty']
+checks['theme_is_saved_without_profile_save']=json.loads((folder/'azec_ui.json').read_text())['colorTheme']=='midnight'
+call('/api/update',{'action':'setTheme','theme':'goofy'})
 with urllib.request.urlopen(info['address']+'/',timeout=5) as response:
  checks['advertised_lan_page_available']=response.status==200 and b'pairForm' in response.read()
 checks['requires_pairing']=call('/api/state',auth=False)[0]==401

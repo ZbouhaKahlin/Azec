@@ -31,6 +31,33 @@ def run(full=False):
             checks['accent_text_is_readable'] = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim()") == '#ffffff'
             checks['nine_language_options'] = page.locator('#language option').count() == 9
             checks['removed_controls_absent'] = page.locator('#rapidMaster').count() == 0 and page.locator('#radius').count() == 0 and page.locator('#accent').count() == 0
+            initial_profile = page.evaluate('JSON.stringify(state.profile)')
+            initial_dirty = page.evaluate('state.dirty')
+            themes = page.evaluate('state.appearance.themes')
+            page.locator('summary').click()
+            theme_materials = True
+            theme_persistence = True
+            for theme in themes:
+                page.locator('#colorThemePicker').click()
+                page.get_by_role('option', name=theme['name'], exact=True).click()
+                page.wait_for_function('(id)=>state.appearance.id===id&&pending===0', arg=theme['id'])
+                theme_materials &= page.evaluate("""()=>{const a=state.appearance,r=document.documentElement,s=getComputedStyle(r),rgb=hex=>'rgb('+[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)).join(', ')+')';return r.dataset.theme===a.id&&s.backgroundColor===rgb(a.colors.paper)&&s.color===rgb(a.colors.ink)&&getComputedStyle(document.querySelector('.card')).backgroundColor===rgb(a.colors.surface)&&getComputedStyle(document.querySelector('h2')).color===rgb(a.colors['chip-ink'])&&s.colorScheme===a.scheme}""")
+                theme_persistence &= json.loads((folder / 'azec_ui.json').read_text())['colorTheme'] == theme['id']
+            checks['all_ten_themes_match_desktop_materials'] = len(themes) == 10 and theme_materials
+            checks['phone_theme_changes_save_automatically'] = theme_persistence
+            checks['theme_changes_preserve_profile_and_dirty_state'] = page.evaluate('JSON.stringify(state.profile)') == initial_profile and page.evaluate('state.dirty') == initial_dirty
+            page.locator('#colorThemePicker').click()
+            page.screenshot(path=str(folder / 'phone-themes.png'))
+            page.keyboard.press('Escape')
+            page.locator('#vertical').fill('17.8')
+            response = page.request.post(info['address'] + '/api/update', headers={'Authorization': 'Bearer ' + info['token']}, data={'action': 'setTheme', 'theme': 'rose'})
+            checks['second_client_theme_request_succeeds'] = response.ok
+            page.wait_for_function("()=>document.documentElement.dataset.theme==='rose'")
+            checks['remote_theme_poll_preserves_in_progress_number_entry'] = page.locator('#vertical').input_value() == '17.8' and page.evaluate('document.activeElement.id') == 'vertical' and page.evaluate('JSON.stringify(state.profile)') == initial_profile
+            page.locator('#vertical').fill(str(json.loads(initial_profile)['vertical']))
+            page.locator('#vertical').press('Tab')
+            page.evaluate("()=>mutate({action:'setTheme',theme:'goofy'})")
+            page.locator('summary').click()
             page.locator('summary').click()
             page.locator('#languagePicker').click()
             page.locator('#pickerOptions button').filter(has_text='Português').click()
@@ -112,7 +139,7 @@ def run(full=False):
             checks['no_javascript_errors'] = not errors
             browser.close()
         report = {'passed': all(checks.values()), 'checks': checks, 'errors': errors,
-                  'coverage': {'interface': 'goofy', 'languages': list(range(9)) if full else [1],
+                  'coverage': {'interface': 'goofy', 'themes': [theme['id'] for theme in themes], 'languages': list(range(9)) if full else [1],
                                'widths': [320, 390, 430, 768] if full else [390]}}
         (folder / 'browser-verification.json').write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))

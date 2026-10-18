@@ -14,7 +14,7 @@ Goofy is the only desktop and phone presentation. Older interface preferences ar
 
 Settings groups its controls into General, Appearance, Shortcuts, Phone control, and Profile backup. Changing categories retains edits and conceals any revealed pairing QR when leaving Phone control.
 
-Goofy offers ten fixed color palettes in Appearance: its original colors, Pistachio & coral, Ice blue & cobalt, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush. These change the canvas, surfaces, header, accent, selection, and text colors while retaining one layout. Theme changes apply immediately and save automatically; they do not change weapon settings or require a restart. The header always matches the sidebar canvas, without a divider.
+Goofy offers ten fixed color palettes in Appearance: its original colors, Pistachio & coral, Ice blue & cobalt, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush. These change the canvas, surfaces, header, accent, selection, and text colors while retaining one layout. Theme changes apply immediately and save automatically; they do not change weapon settings or require a restart. The phone offers the same choices in **Settings → Color theme**. Either screen updates the same preference: the phone uses the desktop palette for its canvas, cards, text, outlines, and controls. Other connected phones follow through the existing state polling, including while a number is being edited. The header always matches the sidebar canvas, without a divider.
 
 The **Collapse** button at the top of Goofy's sidebar animates between its expanded 200 px width and a compact 76 px icon rail. Operator names remain available as tooltips. Search stays at the bottom. Its icon in the compact rail expands the sidebar and focuses the search field after the animation. Favorites, filtering, selection, and right-click actions work in either state. Rapid toggles reverse from the current width. `colorTheme` and `sidebarCollapsed` persist in `azec_ui.json`, preserving favorites; invalid or missing values fall back to the original theme and expanded sidebar. Failed writes retain the previous state and show an error.
 
@@ -23,6 +23,8 @@ The desktop layout is built in `src/desktop_layout.hpp`. Bindings and applicatio
 ![Appearance settings](ui-appearance.png)
 
 ## Screenshots
+
+![Mobile theme selector](mobile-theme-selector.png)
 
 ![Azec desktop interface](ui-desktop.png)
 
