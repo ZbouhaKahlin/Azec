@@ -2,7 +2,9 @@
 
 A Windows desktop app with 72 operator profiles, independent primary and secondary weapon settings, and phone controls over your local network.
 
-![Matching Azec themes on desktop and phone](docs/showcase.png)
+![Azec C6: pastel desktop and phone themes on a lilac grid background](docs/showcase-pastel.png)
+
+![Azec A6: original and dark desktop and phone themes on a lilac grid background](docs/showcase.png)
 
 ## Get started
 
@@ -62,7 +64,7 @@ This runs core, HTTP, recovery, and restart checks without the 61-second expiry 
 - [Testing and verification](docs/testing.md) — fast defaults, targeted checks, extended coverage, and safe fixtures.
 - [Application reference](docs/reference.md) — detailed UI, phone pairing, persistence, and input behavior.
 - [Agent instructions](AGENTS.md) — architecture, compatibility contracts, and change-based testing rules. [CLAUDE.md](CLAUDE.md) shares these instructions.
-- Screenshot presentations: [04-A](docs/showcase.html), used for the README image, and [04-C](docs/showcase-pastel.html), the pastel alternative. Both show two iPhone screens to the left of the desktop windows.
+- README screenshot presentations: [C6, pastel themes](docs/showcase-pastel.html), and [A6, original and dark themes](docs/showcase.html). Both use the lilac grid background, with cascading iPhone screens to the left of the desktop windows.
 
 Personal settings (`r6_config.bin`, `azec_weapons.json`, `azec_ui.json`), logs, pairing credentials, and generated binaries stay out of Git. Runnable releases contain the launcher, `runtime/`, and licenses; they exclude `Azec-checks.exe` and personal data.
 
