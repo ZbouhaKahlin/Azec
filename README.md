@@ -62,12 +62,14 @@ This runs core, HTTP, recovery, and restart checks without the 61-second expiry 
 - [Testing and verification](docs/testing.md) — fast defaults, targeted checks, extended coverage, and safe fixtures.
 - [Application reference](docs/reference.md) — detailed UI, phone pairing, persistence, and input behavior.
 - [Agent instructions](AGENTS.md) — architecture, compatibility contracts, and change-based testing rules. [CLAUDE.md](CLAUDE.md) shares these instructions.
-- [Screenshot presentation](docs/showcase.html) — editable device-frame layout used for the README image.
+- Screenshot presentations: [04-A](docs/showcase.html), used for the README image, and [04-C](docs/showcase-pastel.html), the pastel alternative. Both show two iPhone screens to the left of the desktop windows.
 
 Personal settings (`r6_config.bin`, `azec_weapons.json`, `azec_ui.json`), logs, pairing credentials, and generated binaries stay out of Git. Runnable releases contain the launcher, `runtime/`, and licenses; they exclude `Azec-checks.exe` and personal data.
 
 ## Attribution and limitations
 
 Fonts, operator icons, country flags, Qt, and bundled QR code generation retain their notices in [licenses](licenses/). Qt is dynamically linked; pinned upstream sources are [Qt Base](https://code.qt.io/cgit/qt/qtbase.git/tree/?h=v6.8.3) and [Qt SVG](https://code.qt.io/cgit/qt/qtsvg.git/tree/?h=v6.8.3). Goofy follows [GoofyUI](https://github.com/Azec-Zuckerberg/goofy-ui-library).
+
+README iPhone frames come from [weirdapps/mockups](https://github.com/weirdapps/mockups), under the [MIT license](licenses/iphone-mockup-MIT.txt). [Frame source and screen geometry](docs/showcase-assets/devices/SOURCE.md) document the presentation assets. Mobile screens are browser captures in a device mockup.
 
 Azec is a reconstruction. Browser emulation and automated checks do not establish physical iPhone compatibility or in-game behavior. Real mouse output, hardware behavior, and in-game latency have not been verified.
