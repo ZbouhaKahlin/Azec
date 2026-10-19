@@ -28,9 +28,10 @@ bool Engine::load(const std::filesystem::path& file){
     // The accent and the background response radius are fixed materials now;
     // old custom values are normalized on load and on the next save.
     config_.neon[0]=114.0f/255;config_.neon[1]=72.0f/255;config_.neon[2]=215.0f/255;config_.radius=130;
-    bool focusOnly=true;
-    readWeaponProfiles(config_,focusOnly,file);
+    bool focusOnly=true,adsOnly=false;
+    readWeaponProfiles(config_,focusOnly,adsOnly,file);
     game_focus_only=focusOnly;
+    ads_only=adsOnly;
     return true;
 }
 bool Engine::save(const std::filesystem::path& file) const {
@@ -46,7 +47,7 @@ bool Engine::save(const std::filesystem::path& file) const {
     // Prepare the JSON sidecar first; if the binary write fails, the sidecar is
     // discarded so the two files never disagree about the saved state.
     QSaveFile sidecar;
-    if(!stageWeaponProfiles(config,game_focus_only.load(),file,sidecar)){
+    if(!stageWeaponProfiles(config,game_focus_only.load(),ads_only.load(),file,sidecar)){
         diagnostic("save weapon profiles",sidecar.errorString());return false;
     }
     if(!config.save(file)){
@@ -87,6 +88,8 @@ void Engine::recoil_worker(){
     while(running){
         const auto [op,profile]=current_profile();if(profile!=previous_profile){accumulator.reset();previous_profile=profile;}
         if(!recoil_active||!input_allowed||menu_visible){accumulator.reset();sleep(8);continue;}
+        // ADS gate: aiming down sights means physically holding the right button.
+        if(ads_only&&!(GetAsyncKeyState(VK_RBUTTON)&0x8000)){accumulator.reset();sleep(8);continue;}
         if(!(GetAsyncKeyState(VK_LBUTTON)&0x8000)){accumulator.reset();sleep(4);continue;}
         const auto movement=accumulator.step(op,op.humanize?jitter(random):0);
         input(MOUSEEVENTF_MOVE,movement.x,movement.y);sleep(recoil_interval(op.rapid!=0));
@@ -96,7 +99,7 @@ void Engine::rapid_worker(){
     bool enabled=false;
     while(running){
         const auto op=current_profile().first;
-        if(!op.rapid||!input_allowed){
+        if(!op.rapid||!input_allowed||(ads_only&&!(GetAsyncKeyState(VK_RBUTTON)&0x8000))){
             // Rapid fire stopped mid-burst: hand the trigger back to the player
             // instead of leaving our injected release as the last button event.
             // Never inject the hand-back into another application.

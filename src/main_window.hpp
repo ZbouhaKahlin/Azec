@@ -72,7 +72,7 @@ class MainWindow final : public QWidget {
     QWidget* preferences_=nullptr;QScrollArea* preferences_scroll_=nullptr;
     QScrollArea* scroll_=nullptr;QWidget* settings_=nullptr;QVBoxLayout* cards_=nullptr;
     Section *system_=nullptr;
-    Toggle *rapid_active_=nullptr,*game_focus_only_=nullptr,*humanize_=nullptr,*dual_=nullptr;
+    Toggle *rapid_active_=nullptr,*game_focus_only_=nullptr,*ads_only_=nullptr,*humanize_=nullptr,*dual_=nullptr;
     ExpandingContent* weapon_selector_=nullptr;WeaponButton *primary_=nullptr,*secondary_=nullptr;
     PhoneServer* phone_=nullptr;
     QPointer<PairingQr> pairing_qr_;
@@ -212,12 +212,19 @@ class MainWindow final : public QWidget {
     }
     QSlider* makeSlider(){return new QSlider(Qt::Horizontal);}
     void amount(Section* section,const QString& title,bool vertical){
-        auto* slider=makeSlider();slider->setRange(vertical?0:-500,vertical?1000:500);slider->setAccessibleName(title);
+        auto* slider=makeSlider();slider->setRange(vertical?0:-500,vertical?1000:500);slider->setSingleStep(1);slider->setPageStep(5);slider->setAccessibleName(title);
         auto* value=new QDoubleSpinBox;value->setDecimals(1);value->setSingleStep(.1);value->setRange(vertical?0:-50,vertical?100:50);value->setButtonSymbols(QAbstractSpinBox::NoButtons);value->setAccessibleName(title+text(UiText::Value));
-        auto* row=settingRow(section,title,{},44);row->itemAt(0)->widget()->setFixedWidth(144);value->setFixedWidth(65);value->setAlignment(Qt::AlignCenter);row->addWidget(slider,1);row->addWidget(value);
+        auto* row=settingRow(section,title,{},44);row->itemAt(0)->widget()->setFixedWidth(144);value->setFixedWidth(65);value->setAlignment(Qt::AlignCenter);
+        // One step is 0.1; the arrows flank the slider and holding repeats.
+        const auto nudge=[slider](int direction){slider->setValue(std::clamp(slider->value()+direction,slider->minimum(),slider->maximum()));};
+        auto* minus=new StepButton(QString::fromUtf8("−"),-1,nudge);minus->setAccessibleName(title+QStringLiteral(" -0.1"));minus->setToolTip(QStringLiteral("-0.1"));
+        auto* plus=new StepButton("+",1,nudge);plus->setAccessibleName(title+QStringLiteral(" +0.1"));plus->setToolTip(QStringLiteral("+0.1"));
+        row->addWidget(minus);row->addWidget(slider,1);row->addWidget(plus);row->addWidget(value);
         if(vertical){vertical_=value;vertical_slider_=slider;}else{horizontal_=value;horizontal_slider_=slider;}
-        connect(slider,&QSlider::valueChanged,value,[value](int n){value->setValue(n/10.0);});
-        connect(value,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[=](double n){QSignalBlocker blocked(slider);slider->setValue(qRound(n*10));if(!refreshing_)editOperator([=](r6::Operator& op){if(vertical)op.vertical=float(n);else op.horizontal=float(n);});});
+        const auto syncSteps=[=]{minus->setEnabled(slider->value()>slider->minimum());plus->setEnabled(slider->value()<slider->maximum());};
+        connect(slider,&QSlider::valueChanged,value,[value,syncSteps](int n){value->setValue(n/10.0);syncSteps();});
+        syncSteps();
+        connect(value,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[=](double n){QSignalBlocker blocked(slider);slider->setValue(qRound(n*10));syncSteps();if(!refreshing_)editOperator([=](r6::Operator& op){if(vertical)op.vertical=float(n);else op.horizontal=float(n);});});
     }
     void styleNotice(){
         if(!notice_bar_)return;
@@ -332,6 +339,7 @@ class MainWindow final : public QWidget {
         auto* system=new Section(text(UiText::SystemSettings),false,true,kbtheme::lime);system_=system;generalLayout->addWidget(system);
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::BeepWhenHotkeyStatesChange)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         game_focus_only_=toggle(settingRow(system,text(UiText::OnlyWhileGameIsActive),text(UiText::OnlyWhileGameIsActiveHint)),"Only in Rainbow Six",engine_.game_focus_only,[this](bool on){engine_.game_focus_only=on;dirty();});
+        ads_only_=toggle(settingRow(system,text(UiText::OnlyWhileAiming),text(UiText::OnlyWhileAimingHint)),"Only while aiming",engine_.ads_only,[this](bool on){engine_.ads_only=on;dirty();});
         auto* langRow=settingRow(system,text(UiText::Language));language_=new LanguageComboBox;language_->setAccessibleName(text(UiText::Language));language_->setIconSize(QSize(22,15));
         for(const auto& entry:languageEntries())language_->addItem(languageFlag(entry.value),QString::fromUtf8(entry.label),entry.value);
         language_->setCurrentIndex(qMax(0,language_->findData(c.language)));langRow->addWidget(language_);
@@ -493,7 +501,7 @@ class MainWindow final : public QWidget {
     }
     void updateStatus(){const bool active=engine_.recoil_active;status_->setText(active?text(UiText::RecoilOn):text(UiText::RecoilOff));status_->setProperty("active",active);status_->style()->unpolish(status_);status_->style()->polish(status_);
         const bool rapid=engine_.rapid_active();rapid_status_->setText(rapid?text(UiText::RapidFireOn):text(UiText::RapidFireOff));rapid_status_->setProperty("active",rapid);rapid_status_->style()->unpolish(rapid_status_);rapid_status_->style()->polish(rapid_status_);
-        if(rapid_active_){rapid_active_->syncChecked(rapid);auto* surface=rapid_active_->parentWidget();surface->setProperty("enabledSetting",rapid_active_->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}if(game_focus_only_)game_focus_only_->syncChecked(engine_.game_focus_only);if(delay_)delay_->setEnabled(rapid);if(tray_rapid_)tray_rapid_->setChecked(rapid);}
+        if(rapid_active_){rapid_active_->syncChecked(rapid);auto* surface=rapid_active_->parentWidget();surface->setProperty("enabledSetting",rapid_active_->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}if(game_focus_only_)game_focus_only_->syncChecked(engine_.game_focus_only);if(ads_only_)ads_only_->syncChecked(engine_.ads_only);if(delay_)delay_->setEnabled(rapid);if(tray_rapid_)tray_rapid_->setChecked(rapid);}
     void feedback(bool on){if(!engine_.dry_run()&&engine_.snapshot().sound)sound::playToggle(on);}
     void toggleRecoil(){engine_.recoil_active=!engine_.recoil_active;feedback(engine_.recoil_active);updateStatus();}
     void toggleRapid(){const bool on=!engine_.rapid_active();engine_.set_rapid_active(on);feedback(on);dirty();updateStatus();}

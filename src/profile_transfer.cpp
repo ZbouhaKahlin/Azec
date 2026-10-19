@@ -5,7 +5,7 @@ void MainWindow::exportProfiles(){
     const auto path=QFileDialog::getSaveFileName(this,text(UiText::ExportProfiles),"azec-profiles.json","JSON (*.json)",nullptr,QFileDialog::DontUseNativeDialog);
     if(path.isEmpty())return;
     const auto bytes=QJsonDocument(makeBackup(engine_.snapshot(),favorites_,engine_.game_focus_only.load(),
-        kbtheme::activeColorTheme,sidebar_collapsed_)).toJson();QSaveFile file(path);
+        kbtheme::activeColorTheme,sidebar_collapsed_,engine_.ads_only.load())).toJson();QSaveFile file(path);
     if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){
         diagnostic("export profiles",file.errorString());showNotice(text(UiText::CouldNotExportProfilesCheckTheDestinationPermissions),true,true);
     }else showNotice(text(UiText::ProfilesExported));
@@ -18,6 +18,7 @@ bool MainWindow::applyBackup(const QByteArray& bytes){
     if(!persistFavorites()){favorites_=old;return false;}
     engine_.edit([&](r6::Config& current){current=config;});
     if(options.gameFocusOnly)engine_.game_focus_only=*options.gameFocusOnly;
+    if(options.adsOnly)engine_.ads_only=*options.adsOnly;
     if(config.phone_enabled)phone_->start();else phone_->stop();
     if(!options.colorTheme.isEmpty())chooseColorTheme(options.colorTheme);
     if(options.sidebarCollapsed)setSidebarCollapsed(*options.sidebarCollapsed,false);

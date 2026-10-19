@@ -10,7 +10,7 @@ QJsonObject MainWindow::mobileState() const {
         const QJsonObject appearance{{"id",kbtheme::activeColorTheme},{"scheme",kbtheme::paper.lightness()<128?"dark":"light"},{"colors",colors},{"themes",themes}};
         return {{"operators",operators},{"operatorId",c.selected},{"weaponSlot",c.active_slot()},{"dual",c.secondary_enabled[c.selected]},{"profile",profileJson(c.active_operator())},{"dirty",unsaved_},{"keys",keys},{"appearance",appearance},
             {"globals",QJsonObject{{"recoilActive",engine_.recoil_active.load()},{"rapidActive",c.active_operator().rapid!=0},
-                {"gameFocusOnly",engine_.game_focus_only.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()}}}};
+                {"gameFocusOnly",engine_.game_focus_only.load()},{"adsOnly",engine_.ads_only.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()}}}};
     }
 QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
         const auto fail=[](const QString& message){return QJsonObject{{"error",message}};};
@@ -50,13 +50,14 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
         if(action=="setGlobal"){
             const auto before=next;
             const auto values=request["values"].toObject();if(values.isEmpty())return fail("No settings values");
-            bool rapid=false,rapidSet=false,rapidChanged=false,active=engine_.recoil_active,focus=engine_.game_focus_only;
+            bool rapid=false,rapidSet=false,rapidChanged=false,active=engine_.recoil_active,focus=engine_.game_focus_only,ads=engine_.ads_only;
             bool rebuild=false,keysChanged=false;
             for(auto it=values.begin();it!=values.end();++it){const auto key=it.key();const auto value=it.value();
-                if((key=="recoilActive"||key=="rapidActive"||key=="gameFocusOnly"||key=="sound")&&value.isBool()){
+                if((key=="recoilActive"||key=="rapidActive"||key=="gameFocusOnly"||key=="adsOnly"||key=="sound")&&value.isBool()){
                     if(key=="recoilActive")active=value.toBool();
                     else if(key=="rapidActive"){rapid=value.toBool();rapidSet=true;}
                     else if(key=="gameFocusOnly")focus=value.toBool();
+                    else if(key=="adsOnly")ads=value.toBool();
                     else {next.sound=value.toBool();rebuild=true;}
                 }else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
                 else if(key.startsWith("key")&&key.size()==4&&key[3]>='0'&&key[3]<='4'&&validInteger(value,0,255)){
@@ -70,8 +71,8 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
             if(!uniqueHotkeys(next))return fail("Each action must use a different hotkey");
             if(rapidSet){auto& op=next.active_operator();if((op.rapid!=0)!=rapid){op.rapid=rapid?1:0;rapidChanged=true;}}
             const bool persistenceChanged=next.bytes()!=before.bytes()||next.primary_key!=before.primary_key||next.secondary_key!=before.secondary_key||
-                rapidChanged||focus!=engine_.game_focus_only;
-            engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_active=active;engine_.game_focus_only=focus;
+                rapidChanged||focus!=engine_.game_focus_only||ads!=engine_.ads_only;
+            engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_active=active;engine_.game_focus_only=focus;engine_.ads_only=ads;
             if(persistenceChanged)dirty();applyStyle();syncSelection();updateStatus();
             if(rebuild)QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});
             if(keysChanged&&!save())return fail("Could not save configuration");

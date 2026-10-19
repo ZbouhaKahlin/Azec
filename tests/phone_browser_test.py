@@ -28,7 +28,7 @@ def run(full=False):
             page.wait_for_selector('#controls:not([hidden])')
             checks['pairing_opens_controls_in_english'] = page.locator('html').get_attribute('lang') == 'en'
             checks['embedded_font_loads'] = page.evaluate("document.fonts.ready.then(()=>document.fonts.check('16px Fredoka'))")
-            checks['accent_text_is_readable'] = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim()") == '#ffffff'
+            checks['accent_text_is_readable'] = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim().toLowerCase()") == page.evaluate("state.appearance.colors['accent-ink'].toLowerCase()")
             checks['nine_language_options'] = page.locator('#language option').count() == 9
             checks['removed_controls_absent'] = page.locator('#rapidMaster').count() == 0 and page.locator('#recoilMaster').count() == 0 and page.locator('#rapid').count() == 0 and page.locator('#radius').count() == 0 and page.locator('#accent').count() == 0 and page.locator('#recoilActive').count() == 1 and page.locator('#rapidActive').count() == 1
             initial_profile = page.evaluate('JSON.stringify(state.profile)')

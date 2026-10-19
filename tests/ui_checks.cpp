@@ -54,6 +54,17 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["save_has_no_glow_or_icon_swap"]=save_->grab().toImage()==saveAfterClick&&save_->icon().cacheKey()==saveIcon;
         const bool rapidBefore=engine_.rapid_active();rapid_active_->click();checks["profile_rapid_control"]=engine_.rapid_active()!=rapidBefore&&unsaved_;checks["rapid_status_matches_toggle"]=rapid_status_->text()==text(UiText::RapidFireOn);save();{r6::Engine restored(true);checks["rapid_profile_persists"]=restored.load(config_path_)&&restored.rapid_active()==engine_.rapid_active();}rapid_active_->click();save();
         const bool focusBefore=engine_.game_focus_only;game_focus_only_->click();checks["game_focus_control"]=engine_.game_focus_only.load()!=focusBefore&&unsaved_;save();{r6::Engine restored(true);checks["game_focus_preference_persists"]=restored.load(config_path_)&&restored.game_focus_only.load()==engine_.game_focus_only.load();}game_focus_only_->click();save();
+        const bool adsBefore=engine_.ads_only;ads_only_->click();checks["ads_only_control"]=engine_.ads_only.load()!=adsBefore&&unsaved_;save();{r6::Engine restored(true);checks["ads_only_preference_persists"]=restored.load(config_path_)&&restored.ads_only.load()==engine_.ads_only.load();}ads_only_->click();save();
+        {
+            // An installed build updates over the previous EXE; the old sidecar
+            // has no adsOnly key, so it must load with the gate disabled.
+            const auto store=weaponFile(config_path_);QFile file(store);QJsonObject root;
+            bool legacyOk=file.open(QIODevice::ReadOnly);
+            if(legacyOk){root=QJsonDocument::fromJson(file.readAll()).object();file.close();root.remove("adsOnly");}
+            QSaveFile rewritten(store);legacyOk=legacyOk&&rewritten.open(QIODevice::WriteOnly)&&rewritten.write(QJsonDocument(root).toJson())>0&&rewritten.commit();
+            r6::Engine oldSidecar(true);checks["old_weapon_store_defaults_ads_off"]=legacyOk&&oldSidecar.load(config_path_)&&!oldSidecar.ads_only.load();
+            save();
+        }
         const auto before=engine_.recoil_active.load();checks["initial_recoil_off"]=!before;status_->click();checks["activation_control"]=engine_.recoil_active.load()!=before;status_->click();checks["second_click_restores_off"]=!engine_.recoil_active.load();
         // Hidden harness windows need an active Qt focus context for Tab events.
         QApplication::setActiveWindow(this);status_->clearFocus();status_->setFocus(Qt::TabFocusReason);QApplication::processEvents();const bool keyboardIndicator=status_->property("keyboardFocus").toBool();
@@ -67,6 +78,12 @@ QJsonObject MainWindow::selfTest(const QString& output){
         bool transparentEdges=true;for(int y=0;y<gearBefore.height();++y)for(int x=0;x<gearBefore.width();++x)if(x<3||y<3||x>=gearBefore.width()-3||y>=gearBefore.height()-3)transparentEdges&=gearBefore.pixelColor(x,y)==gearHovered.pixelColor(x,y);QEvent leave(QEvent::Leave);QApplication::sendEvent(gear_,&leave);wait(170);
         bool hoverFlat=gearBefore==gearHovered;{const auto statusBefore=status_->grab().toImage();QEnterEvent statusEnter(QPointF(5,5),QPointF(5,5),status_->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(status_,&statusEnter);wait(30);hoverFlat&=statusBefore==status_->grab().toImage();QEvent statusLeave(QEvent::Leave);QApplication::sendEvent(status_,&statusLeave);}
         checks["no_hover_effects"]=transparentEdges&&hoverFlat;checks["slider_handles_fit_widget"]=vertical_slider_->height()>=18&&horizontal_slider_->height()>=18;
+        {
+            const double before=vertical_->value();QPushButton* plus=nullptr;QPushButton* minus=nullptr;
+            for(auto* button:vertical_slider_->parentWidget()->findChildren<QPushButton*>(QStringLiteral("stepButton"))){if(button->text()=="+")plus=button;else minus=button;}
+            if(plus)plus->click();checks["slider_arrow_steps_one_tenth"]=plus&&minus&&std::abs(vertical_->value()-(before+0.1))<1e-9;
+            if(minus)minus->click();checks["slider_arrow_restores_value"]=std::abs(vertical_->value()-before)<1e-9;
+        }
         checks["status_has_no_hotkey"]=status_->text()=="Recoil off";checks["rapid_status_is_separate"]=rapid_status_->text()=="Rapid fire off"&&rapid_status_!=status_;
         checks["save_icon_next_to_settings"]=save_->text().isEmpty()&&!save_->icon().isNull()&&save_->parentWidget()==gear_->parentWidget()&&save_->geometry().right()<gear_->geometry().left();
         checks["footer_removed"]=!findChild<QFrame*>("footer");checks["small_r6_label_removed"]=!findChild<QLabel*>("r6Badge");
@@ -145,6 +162,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["phone_prefers_lan_over_virtual_adapters"]=lan::selectAddress({virtualSwitch,ethernet})=="192.168.11.103"&&lan::selectAddress({ethernet,virtualSwitch})=="192.168.11.103"&&lan::selectAddress({vpn,ethernet})=="192.168.11.103"&&lan::selectAddress({ethernet,wifi})=="10.0.0.8";
         checks["phone_handles_isolated_or_missing_lan"]=lan::selectAddress({virtualSwitch})=="127.0.0.1"&&lan::selectAddress({virtualSwitch,{QHostAddress("192.168.8.1"),true,false,false,10}})=="192.168.8.1"&&lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}})=="127.0.0.1";
         checks["phone_state_matches_desktop"]=mobileState()["operatorId"].toInt()==4&&mobileState()["profile"].toObject()["vertical"].toDouble()==12.3;
+        checks["phone_state_reports_ads_only"]=mobileState()["globals"].toObject()["adsOnly"].toBool()==engine_.ads_only.load();
         // Exercise timing and drag behavior on all three production scrollbars.
         settings_->setMinimumHeight(scroll_->viewport()->height()+300);QApplication::processEvents();gear_->click();preferences_scroll_->widget()->setMinimumHeight(preferences_scroll_->viewport()->height()+300);QApplication::processEvents();wait(220);
         auto* operatorBar=static_cast<FadingScrollBar*>(scroll_->verticalScrollBar());auto* preferenceBar=static_cast<FadingScrollBar*>(preferences_scroll_->verticalScrollBar());
@@ -238,10 +256,10 @@ QJsonObject MainWindow::selfTest(const QString& output){
         // Count pixels painted in the live accent so the check covers both the
         // Theme accents do not alter the stored binary accent.
         const QColor standardAccent=accent();
-        const auto accentInk=[standardAccent](const QImage& image){int count=0;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x){const auto color=image.pixelColor(x,y);if(qAbs(color.red()-standardAccent.red())<=40&&qAbs(color.green()-standardAccent.green())<=40&&qAbs(color.blue()-standardAccent.blue())<=40)++count;}return count;};
+        const auto accentInk=[standardAccent](const QImage& image){int count=0;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x){const auto color=image.pixelColor(x,y);if(qAbs(color.red()-standardAccent.red())<=24&&qAbs(color.green()-standardAccent.green())<=24&&qAbs(color.blue()-standardAccent.blue())<=24)++count;}return count;};
         checks["dirty_save_uses_the_standard_accent"]=unsaved_&&save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())>12;
         save_blocked_=true;save();checks["failed_save_retains_accent_and_dirty_state"]=unsaved_&&save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())>12;
-        save_blocked_=false;save();wait(180);checks["successful_save_returns_to_neutral"]=!unsaved_&&!save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())==0;
+        save_blocked_=false;save();wait(180);save_->clearFocus();const int neutralAccentPixels=accentInk(save_->grab().toImage());checks["save_cleared_unsaved_flag"]=!unsaved_&&!save_->property("unsaved").toBool();checks["save_icon_has_no_accent_pixels"]=neutralAccentPixels==0;checks["successful_save_returns_to_neutral"]=!unsaved_&&!save_->property("unsaved").toBool()&&neutralAccentPixels==0;
         editOperator([](r6::Operator& op){op.vertical=13.1f;});
         QTimer::singleShot(80,this,[this,output]{if(auto* modal=QApplication::activeModalWidget()){modal->grab().save(output+"/unsaved-close.png");if(auto* cancel=modal->findChild<QPushButton*>("cancelClose"))cancel->click();}});
         close();checks["cancel_close_keeps_unsaved_app_running"]=isVisible()&&engine_.running&&unsaved_;

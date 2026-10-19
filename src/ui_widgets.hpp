@@ -299,6 +299,24 @@ protected:
     }
 };
 
+// Compact GoofyUI chip that nudges a value by one increment; holding repeats.
+class StepButton final : public QPushButton {
+    QTimer repeat_,delay_;
+    int direction_;
+    std::function<void(int)> callback_;
+    void fire(){if(callback_)callback_(direction_);}
+public:
+    StepButton(const QString& glyph,int direction,std::function<void(int)> callback,QWidget* parent=nullptr)
+        :QPushButton(glyph,parent),direction_(direction),callback_(std::move(callback)){
+        setObjectName("stepButton");setFixedSize(26,22);setAutoDefault(false);setDefault(false);setCursor(Qt::PointingHandCursor);
+        repeat_.setInterval(70);delay_.setSingleShot(true);delay_.setInterval(350);
+        connect(&delay_,&QTimer::timeout,this,[this]{repeat_.start();});
+        connect(&repeat_,&QTimer::timeout,this,[this]{fire();});
+        connect(this,&QPushButton::pressed,this,[this]{fire();delay_.start();});
+        connect(this,&QPushButton::released,this,[this]{delay_.stop();repeat_.stop();});
+    }
+};
+
 // Keep the content at its natural size while its viewport opens/closes. Reversals
 // start at the displayed progress, and an empty viewport reserves no layout gap.
 class ExpandingContent final : public QWidget {

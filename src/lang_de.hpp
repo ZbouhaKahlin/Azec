@@ -134,4 +134,6 @@ inline const char* const lang_de[]={
     "Tasten und Kürzel",
     "Kopplung und Zugriff",
     "Export und Import",
+    "Nur beim Zielen",
+    "Rückstoß und Schnellfeuer wirken nur, solange die rechte Maustaste (ADS) gehalten wird.",
 };

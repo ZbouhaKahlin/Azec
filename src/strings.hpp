@@ -138,8 +138,10 @@ enum class UiText {
     SettingsShortcutsHint,
     SettingsPhoneHint,
     SettingsBackupHint,
+    OnlyWhileAiming,
+    OnlyWhileAimingHint,
 };
-inline constexpr int UiTextCount=134;
+inline constexpr int UiTextCount=136;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

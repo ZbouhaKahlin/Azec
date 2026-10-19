@@ -24,7 +24,7 @@ class Engine {
     void rapid_worker();
 public:
     std::atomic_bool running{false}, recoil_active{false};
-    std::atomic_bool game_focus_only{true}, input_allowed{false};
+    std::atomic_bool game_focus_only{true}, ads_only{false}, input_allowed{false};
     std::atomic_bool menu_visible{true};
     std::atomic_uint injected_events{0};
     explicit Engine(bool dry_run);

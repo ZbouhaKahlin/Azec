@@ -134,4 +134,6 @@ inline const char* const lang_fr[]={
     "Touches et raccourcis",
     "Appairage et accès",
     "Exporter et importer",
+    "Seulement en visée",
+    "Le recul et le tir rapide ne fonctionnent qu'en maintenant le bouton droit de la souris (ADS).",
 };

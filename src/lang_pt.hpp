@@ -134,4 +134,6 @@ inline const char* const lang_pt[]={
     "Teclas e atalhos",
     "Pareamento e acesso",
     "Exportar e importar",
+    "Somente ao mirar",
+    "Recuo e disparo rápido só funcionam enquanto você segura o botão direito do mouse (ADS).",
 };

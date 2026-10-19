@@ -134,4 +134,6 @@ inline const char* const lang_es[]={
     "Teclas y atajos",
     "Emparejamiento y acceso",
     "Exportar e importar",
+    "Solo al apuntar",
+    "El retroceso y el fuego rápido solo funcionan mientras mantienes el botón derecho del ratón (ADS).",
 };

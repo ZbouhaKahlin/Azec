@@ -63,6 +63,12 @@ inline QString applicationStyle(const QColor& accent){
         QDoubleSpinBox:focus,QSpinBox:focus { border-color:%1; }
         QDoubleSpinBox:disabled,QSpinBox:disabled { background:$soft; color:$muted; }
 
+        /* Slider precision chips sit above each track and stay flat until pressed. */
+        QPushButton#stepButton { background:$surface; border:2px solid $outline; border-radius:8px; color:$ink; font-size:15px; font-weight:800; padding:0; }
+        QPushButton#stepButton:pressed { background:$soft; }
+        QPushButton#stepButton:disabled { background:$surface; color:$muted; border-color:$soft; }
+        QPushButton#stepButton[keyboardFocus="true"] { border-color:%1; }
+
         /* The 20 px minimum keeps the round handle inside the widget bounds. */
         QSlider { min-height:20px; }
         QSlider::groove:horizontal { height:10px; border-radius:5px; background:$soft; }

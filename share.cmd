@@ -106,9 +106,7 @@ if errorlevel 1 (
     gh repo create Azec-Zuckerberg/Azec-releases --public --description "Azec portable release builds" --add-readme
     if errorlevel 1 exit /b 1
 )
-powershell -NoProfile -Command "(Get-FileHash 'dist\Azec.exe' -Algorithm SHA256).Hash.ToLower() + '  Azec.exe' | Set-Content 'dist\SHA256SUMS.txt' -Encoding ASCII"
-if errorlevel 1 exit /b 1
-gh release create "v%VERSION%" "dist\Azec.exe" "dist\SHA256SUMS.txt" --repo Azec-Zuckerberg/Azec-releases --title "Azec %VERSION%" --notes "Open Azec.exe to install and launch for your Windows user. Find Azec in Start afterward. Profiles are kept separately in LocalAppData\Azec and preserved by Settings - Updates."
+gh release create "v%VERSION%" "dist\Azec.exe" --repo Azec-Zuckerberg/Azec-releases --title "Azec %VERSION%" --notes "Open Azec.exe to install and launch for your Windows user. Find Azec in Start afterward. Profiles are kept separately in LocalAppData\Azec and preserved by Settings - Updates."
 if errorlevel 1 exit /b 1
 
 :report

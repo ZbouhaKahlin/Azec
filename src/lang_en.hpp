@@ -134,4 +134,6 @@ inline const char* const lang_en[]={
     "Keys and hotkeys",
     "Pairing and access",
     "Export and import",
+    "Only while aiming",
+    "Recoil and rapid fire only work while holding right mouse (ADS).",
 };

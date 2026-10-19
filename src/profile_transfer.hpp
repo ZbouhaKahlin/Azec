@@ -7,6 +7,7 @@
 
 struct BackupOptions {
     std::optional<bool> gameFocusOnly;
+    std::optional<bool> adsOnly;
     std::optional<bool> sidebarCollapsed;
     QString colorTheme;
 };
@@ -19,7 +20,7 @@ inline QJsonObject backupProfile(const r6::Operator& op){
 // preserved as raw bytes (rapid key/master).
 inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favorites,
                               bool gameFocusOnly,
-                              const QString& colorTheme,bool sidebarCollapsed){
+                              const QString& colorTheme,bool sidebarCollapsed,bool adsOnly=false){
     QJsonArray operators;
     for(int i=0;i<r6::operator_count;++i)operators.append(QJsonObject{{"name",QString::fromUtf8(config.operators[i].name)},
         {"primary",backupProfile(config.operators[i])},{"secondary",backupProfile(config.secondary[i])},
@@ -29,7 +30,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
     QStringList names(favorites.begin(),favorites.end());names.sort();
     return {{"application","Azec"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
         {"settings",QJsonObject{{"keys",keyArray},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
-            {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},
+            {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},
             {"colorTheme",colorTheme},{"sidebarCollapsed",sidebarCollapsed},
             {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",130.0},
             {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
@@ -60,6 +61,7 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     if(settings.contains("recoilMaster")&&!settings["recoilMaster"].isBool())return false;
     if(settings.contains("rapidActive")&&!settings["rapidActive"].isBool())return false;
     if(settings.contains("gameFocusOnly")&&!settings["gameFocusOnly"].isBool())return false;
+    if(settings.contains("adsOnly")&&!settings["adsOnly"].isBool())return false;
     if(settings.contains("sidebarCollapsed")&&!settings["sidebarCollapsed"].isBool())return false;
     if(settings.contains("colorTheme")&&!settings["colorTheme"].isString())return false;
     const auto keys=settings["keys"].toArray();const auto accent=settings["accent"].toArray();
@@ -87,6 +89,7 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
         for(int i=0;i<r6::operator_count;++i){next.operators[i].rapid=legacyRapid?1:0;next.secondary[i].rapid=legacyRapid?1:0;}
     }
     if(settings.contains("gameFocusOnly"))options.gameFocusOnly=settings["gameFocusOnly"].toBool();
+    if(settings.contains("adsOnly"))options.adsOnly=settings["adsOnly"].toBool();
     if(settings.contains("sidebarCollapsed"))options.sidebarCollapsed=settings["sidebarCollapsed"].toBool();
     if(settings.contains("colorTheme"))options.colorTheme=settings["colorTheme"].toString();
     QSet<QString> nextFavorites;
