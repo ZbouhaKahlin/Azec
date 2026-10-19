@@ -112,7 +112,7 @@ class MainWindow final : public QWidget {
         if(!tray_)return;
         tray_window_->setText(text(UiText::OpenHideWindow));
         tray_recoil_->setText(text(UiText::RecoilActive));tray_recoil_->setChecked(engine_.recoil_active);
-        tray_rapid_->setText(text(UiText::RapidFire));tray_rapid_->setChecked(engine_.rapid_active);
+        tray_rapid_->setText(text(UiText::RapidFire));tray_rapid_->setChecked(engine_.rapid_active());
         tray_exit_->setText(text(UiText::Exit));tray_->setToolTip("Azec");
     }
     void buildTray(){
@@ -309,9 +309,9 @@ class MainWindow final : public QWidget {
         amount(recoil,text(UiText::VerticalForce),true);amount(recoil,text(UiText::HorizontalAdjust),false);
         humanize_=toggle(settingRow(recoil,text(UiText::HumanizeMovement),hint(UiText::VaryMovementSlightlyOnBothAxes)),"Humanize movement",false,[this](bool on){editOperator([=](r6::Operator& op){op.humanize=on;});});
         auto* rapid=new Section(text(UiText::RapidFire),false,true,kbtheme::pink);cards_->addWidget(rapid);
-        rapid_active_=toggle(settingRow(rapid,text(UiText::RapidFire),hint(UiText::RapidFireGlobalHint)),"Rapid fire",engine_.rapid_active,[this](bool on){engine_.rapid_active=on;dirty();feedback(on);updateStatus();});
+        rapid_active_=toggle(settingRow(rapid,text(UiText::RapidFire),hint(UiText::RapidFireGlobalHint)),"Rapid fire",c.active_operator().rapid!=0,[this](bool on){editOperator([=](r6::Operator& op){op.rapid=on;});feedback(on);updateStatus();});
         auto* delayRow=settingRow(rapid,text(UiText::ShotDelay),hint(UiText::DelayBetweenRepeatedShots));
-        delay_=new QSpinBox;delay_->setRange(30,150);delay_->setSuffix(text(UiText::Ms));delay_->setButtonSymbols(QAbstractSpinBox::NoButtons);delay_->setAlignment(Qt::AlignCenter);delay_->setFixedWidth(85);delay_->setAccessibleName(text(UiText::ShotDelay));delayRow->addWidget(delay_);delay_->setEnabled(engine_.rapid_active);
+        delay_=new QSpinBox;delay_->setRange(30,150);delay_->setSuffix(text(UiText::Ms));delay_->setButtonSymbols(QAbstractSpinBox::NoButtons);delay_->setAlignment(Qt::AlignCenter);delay_->setFixedWidth(85);delay_->setAccessibleName(text(UiText::ShotDelay));delayRow->addWidget(delay_);delay_->setEnabled(c.active_operator().rapid!=0);
         connect(delay_,qOverload<int>(&QSpinBox::valueChanged),this,[this](int n){if(!refreshing_)editOperator([=](r6::Operator& op){op.delay=n;});});
 
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
@@ -485,18 +485,18 @@ class MainWindow final : public QWidget {
         primary_->setText(text(UiText::Primary));secondary_->setText(text(UiText::Secondary));
         primary_->setChosen(c.active_slot()==0);secondary_->setChosen(c.active_slot()==1);
         subtitle_->setText(c.secondary_enabled[c.selected]?(c.active_slot()?text(UiText::SecondaryWeapon):text(UiText::PrimaryWeapon)):text(UiText::OperatorSettings));
-        vertical_->setValue(op.vertical);horizontal_->setValue(op.horizontal);vertical_slider_->setValue(qRound(op.vertical*10));horizontal_slider_->setValue(qRound(op.horizontal*10));humanize_->syncChecked(op.humanize);delay_->setValue(std::clamp(op.delay,30,150));delay_->setEnabled(engine_.rapid_active);for(auto* control:{humanize_,dual_}){auto* surface=control->parentWidget();surface->setProperty("enabledSetting",control->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}refreshing_=false;
+        vertical_->setValue(op.vertical);horizontal_->setValue(op.horizontal);vertical_slider_->setValue(qRound(op.vertical*10));horizontal_slider_->setValue(qRound(op.horizontal*10));humanize_->syncChecked(op.humanize);delay_->setValue(std::clamp(op.delay,30,150));delay_->setEnabled(op.rapid!=0);for(auto* control:{humanize_,dual_}){auto* surface=control->parentWidget();surface->setProperty("enabledSetting",control->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}refreshing_=false;updateStatus();
     }
     void chooseWeapon(int slot){if(engine_.select_weapon(slot)){stopTransition();syncSelection();}}
     void handleWeaponKeys(bool primary,bool secondary,bool editing,bool modified){
         if(!editing&&!modified){if(primary&&!was_primary_)chooseWeapon(0);if(secondary&&!was_secondary_)chooseWeapon(1);}was_primary_=primary;was_secondary_=secondary;
     }
     void updateStatus(){const bool active=engine_.recoil_active;status_->setText(active?text(UiText::RecoilOn):text(UiText::RecoilOff));status_->setProperty("active",active);status_->style()->unpolish(status_);status_->style()->polish(status_);
-        const bool rapid=engine_.rapid_active;rapid_status_->setText(rapid?text(UiText::RapidFireOn):text(UiText::RapidFireOff));rapid_status_->setProperty("active",rapid);rapid_status_->style()->unpolish(rapid_status_);rapid_status_->style()->polish(rapid_status_);
-        if(rapid_active_){rapid_active_->syncChecked(engine_.rapid_active);auto* surface=rapid_active_->parentWidget();surface->setProperty("enabledSetting",rapid_active_->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}if(game_focus_only_)game_focus_only_->syncChecked(engine_.game_focus_only);if(delay_)delay_->setEnabled(engine_.rapid_active);if(tray_rapid_)tray_rapid_->setChecked(engine_.rapid_active);}
+        const bool rapid=engine_.rapid_active();rapid_status_->setText(rapid?text(UiText::RapidFireOn):text(UiText::RapidFireOff));rapid_status_->setProperty("active",rapid);rapid_status_->style()->unpolish(rapid_status_);rapid_status_->style()->polish(rapid_status_);
+        if(rapid_active_){rapid_active_->syncChecked(rapid);auto* surface=rapid_active_->parentWidget();surface->setProperty("enabledSetting",rapid_active_->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}if(game_focus_only_)game_focus_only_->syncChecked(engine_.game_focus_only);if(delay_)delay_->setEnabled(rapid);if(tray_rapid_)tray_rapid_->setChecked(rapid);}
     void feedback(bool on){if(!engine_.dry_run()&&engine_.snapshot().sound)sound::playToggle(on);}
     void toggleRecoil(){engine_.recoil_active=!engine_.recoil_active;feedback(engine_.recoil_active);updateStatus();}
-    void toggleRapid(){engine_.rapid_active=!engine_.rapid_active;feedback(engine_.rapid_active);dirty();updateStatus();}
+    void toggleRapid(){const bool on=!engine_.rapid_active();engine_.set_rapid_active(on);feedback(on);dirty();updateStatus();}
     bool textEditingActive() const {auto* focused=QApplication::focusWidget();return focused&&(qobject_cast<QLineEdit*>(focused)||qobject_cast<QAbstractSpinBox*>(focused)||qobject_cast<QComboBox*>(focused));}
     void pollKeys(){
         const bool editing=isActiveWindow()&&textEditingActive();
@@ -590,7 +590,7 @@ protected:
     void closeEvent(QCloseEvent* event) override {
         if(close_prompt_){if(!isVisible())showNormal();raise();activateWindow();QApplication::alert(this,0);if(close_alert_&&close_alert_->isVisible()){close_alert_->raise();close_alert_->activateWindow();}event->ignore();return;}
         if(unsaved_&&!force_close_){
-            close_prompt_=true;const bool recoil=engine_.recoil_active.exchange(false);const bool rapid=engine_.rapid_active.exchange(false);
+            close_prompt_=true;const bool recoil=engine_.recoil_active.exchange(false);
             if(!engine_.dry_run()&&engine_.snapshot().sound)sound::playUnsaved();
             if(!isVisible())showNormal();
             raise();activateWindow();QApplication::alert(this,0);
@@ -600,7 +600,7 @@ protected:
             auto* row=new QHBoxLayout;int choice=0;
             for(int i=0;i<3;++i){const QString titles[]={text(UiText::Cancel),text(UiText::Discard),text(UiText::Save)};auto* button=new QPushButton(titles[i]);button->setObjectName(i==2?"save":i==1?"discardChanges":"cancelClose");row->addWidget(button);connect(button,&QPushButton::clicked,&dialog,[&,i]{choice=i;dialog.accept();});}
             layout->addLayout(row);dialog.adjustSize();roundWindow(&dialog);close_alert_=&dialog;dialog.exec();close_alert_=nullptr;
-            engine_.recoil_active=recoil;engine_.rapid_active=rapid;close_prompt_=false;
+            engine_.recoil_active=recoil;close_prompt_=false;
             if(choice==0||(choice==2&&!save())){event->ignore();return;}
         }
         if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);

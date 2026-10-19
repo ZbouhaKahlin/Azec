@@ -9,7 +9,7 @@ QJsonObject MainWindow::mobileState() const {
         const QJsonObject colors{{"paper",kbtheme::paper.name()},{"surface",kbtheme::surface.name()},{"card",kbtheme::card.name()},{"ink",kbtheme::ink.name()},{"muted",kbtheme::muted.name()},{"accent",accent().name()},{"accent-ink",kbtheme::readableOn(accent()).name()},{"lavender",kbtheme::lavender.name()},{"outline",kbtheme::outline.name()},{"chip-ink",kbtheme::chipInk.name()}};
         const QJsonObject appearance{{"id",kbtheme::activeColorTheme},{"scheme",kbtheme::paper.lightness()<128?"dark":"light"},{"colors",colors},{"themes",themes}};
         return {{"operators",operators},{"operatorId",c.selected},{"weaponSlot",c.active_slot()},{"dual",c.secondary_enabled[c.selected]},{"profile",profileJson(c.active_operator())},{"dirty",unsaved_},{"keys",keys},{"appearance",appearance},
-            {"globals",QJsonObject{{"recoilActive",engine_.recoil_active.load()},{"rapidActive",engine_.rapid_active.load()},
+            {"globals",QJsonObject{{"recoilActive",engine_.recoil_active.load()},{"rapidActive",c.active_operator().rapid!=0},
                 {"gameFocusOnly",engine_.game_focus_only.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()}}}};
     }
 QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
@@ -50,12 +50,12 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
         if(action=="setGlobal"){
             const auto before=next;
             const auto values=request["values"].toObject();if(values.isEmpty())return fail("No settings values");
-            bool rapid=engine_.rapid_active,active=engine_.recoil_active,focus=engine_.game_focus_only;
+            bool rapid=false,rapidSet=false,rapidChanged=false,active=engine_.recoil_active,focus=engine_.game_focus_only;
             bool rebuild=false,keysChanged=false;
             for(auto it=values.begin();it!=values.end();++it){const auto key=it.key();const auto value=it.value();
                 if((key=="recoilActive"||key=="rapidActive"||key=="gameFocusOnly"||key=="sound")&&value.isBool()){
                     if(key=="recoilActive")active=value.toBool();
-                    else if(key=="rapidActive")rapid=value.toBool();
+                    else if(key=="rapidActive"){rapid=value.toBool();rapidSet=true;}
                     else if(key=="gameFocusOnly")focus=value.toBool();
                     else {next.sound=value.toBool();rebuild=true;}
                 }else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
@@ -68,9 +68,10 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
                 else return fail("Invalid setting: "+key);
             }
             if(!uniqueHotkeys(next))return fail("Each action must use a different hotkey");
+            if(rapidSet){auto& op=next.active_operator();if((op.rapid!=0)!=rapid){op.rapid=rapid?1:0;rapidChanged=true;}}
             const bool persistenceChanged=next.bytes()!=before.bytes()||next.primary_key!=before.primary_key||next.secondary_key!=before.secondary_key||
-                rapid!=engine_.rapid_active||focus!=engine_.game_focus_only;
-            engine_.edit([&](r6::Config& c){c=next;});engine_.rapid_active=rapid;engine_.recoil_active=active;engine_.game_focus_only=focus;
+                rapidChanged||focus!=engine_.game_focus_only;
+            engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_active=active;engine_.game_focus_only=focus;
             if(persistenceChanged)dirty();applyStyle();syncSelection();updateStatus();
             if(rebuild)QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});
             if(keysChanged&&!save())return fail("Could not save configuration");

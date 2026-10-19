@@ -20,15 +20,17 @@ Hotkeys Engine::hotkeys() const {
 }
 void Engine::edit(const std::function<void(Config&)>& change){std::lock_guard lock(config_mutex_);change(config_);}
 bool Engine::select_weapon(int slot){std::lock_guard lock(config_mutex_);if(slot<0||slot>1||(slot==1&&!config_.secondary_enabled[config_.selected]))return false;config_.weapon_slot=slot;return true;}
+bool Engine::rapid_active() const {std::lock_guard lock(config_mutex_);return config_.active_operator().rapid!=0;}
+void Engine::set_rapid_active(bool on){std::lock_guard lock(config_mutex_);config_.active_operator().rapid=on?1:0;}
 bool Engine::load(const std::filesystem::path& file){
     std::lock_guard lock(config_mutex_);
     if(!config_.load(file))return false;
     // The accent and the background response radius are fixed materials now;
     // old custom values are normalized on load and on the next save.
     config_.neon[0]=114.0f/255;config_.neon[1]=72.0f/255;config_.neon[2]=215.0f/255;config_.radius=130;
-    bool rapid=false, focusOnly=true;
-    readWeaponProfiles(config_,rapid,focusOnly,file);
-    rapid_active=rapid;game_focus_only=focusOnly;
+    bool focusOnly=true;
+    readWeaponProfiles(config_,focusOnly,file);
+    game_focus_only=focusOnly;
     return true;
 }
 bool Engine::save(const std::filesystem::path& file) const {
@@ -44,7 +46,7 @@ bool Engine::save(const std::filesystem::path& file) const {
     // Prepare the JSON sidecar first; if the binary write fails, the sidecar is
     // discarded so the two files never disagree about the saved state.
     QSaveFile sidecar;
-    if(!stageWeaponProfiles(config,rapid_active.load(),game_focus_only.load(),file,sidecar)){
+    if(!stageWeaponProfiles(config,game_focus_only.load(),file,sidecar)){
         diagnostic("save weapon profiles",sidecar.errorString());return false;
     }
     if(!config.save(file)){
@@ -87,14 +89,14 @@ void Engine::recoil_worker(){
         if(!recoil_active||!input_allowed||menu_visible){accumulator.reset();sleep(8);continue;}
         if(!(GetAsyncKeyState(VK_LBUTTON)&0x8000)){accumulator.reset();sleep(4);continue;}
         const auto movement=accumulator.step(op,op.humanize?jitter(random):0);
-        input(MOUSEEVENTF_MOVE,movement.x,movement.y);sleep(recoil_interval(rapid_active.load()));
+        input(MOUSEEVENTF_MOVE,movement.x,movement.y);sleep(recoil_interval(op.rapid!=0));
     }
 }
 void Engine::rapid_worker(){
     bool enabled=false;
     while(running){
         const auto op=current_profile().first;
-        if(!rapid_active||!input_allowed){
+        if(!op.rapid||!input_allowed){
             // Rapid fire stopped mid-burst: hand the trigger back to the player
             // instead of leaving our injected release as the last button event.
             // Never inject the hand-back into another application.

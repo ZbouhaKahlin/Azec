@@ -62,9 +62,9 @@ public:
 struct ConfigurationRecovery {QString notice;bool blockSaving=false;};
 inline ConfigurationRecovery loadConfiguration(r6::Engine& engine,const std::filesystem::path& path){
     if(engine.load(path))return {};
-    bool rapid=false,focusOnly=true;
-    engine.edit([&](r6::Config& config){config.language=1;readWeaponProfiles(config,rapid,focusOnly,path);});
-    engine.rapid_active=rapid;engine.game_focus_only=focusOnly;
+    bool focusOnly=true;
+    engine.edit([&](r6::Config& config){config.language=1;readWeaponProfiles(config,focusOnly,path);});
+    engine.game_focus_only=focusOnly;
     const QString filename=QString::fromStdWString(path.wstring());QFile file(filename);
     if(!file.exists())return {};
     if(!file.open(QIODevice::ReadOnly)){

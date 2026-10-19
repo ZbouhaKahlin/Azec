@@ -23,7 +23,7 @@ class Engine {
     void recoil_worker();
     void rapid_worker();
 public:
-    std::atomic_bool running{false}, recoil_active{false}, rapid_active{false};
+    std::atomic_bool running{false}, recoil_active{false};
     std::atomic_bool game_focus_only{true}, input_allowed{false};
     std::atomic_bool menu_visible{true};
     std::atomic_uint injected_events{0};
@@ -33,6 +33,8 @@ public:
     Hotkeys hotkeys() const;
     void edit(const std::function<void(Config&)>& change);
     bool select_weapon(int slot);
+    bool rapid_active() const;
+    void set_rapid_active(bool on);
     bool load(const std::filesystem::path& file);
     bool save(const std::filesystem::path& file) const;
     void start();

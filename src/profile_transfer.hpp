@@ -6,7 +6,6 @@
 #include <optional>
 
 struct BackupOptions {
-    bool rapidActive=false;
     std::optional<bool> gameFocusOnly;
     std::optional<bool> sidebarCollapsed;
     QString colorTheme;
@@ -19,7 +18,7 @@ inline QJsonObject backupProfile(const r6::Operator& op){
 // new backups; the removed settings are written normalized (accent/radius) or
 // preserved as raw bytes (rapid key/master).
 inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favorites,
-                              bool rapidActive,bool gameFocusOnly,
+                              bool gameFocusOnly,
                               const QString& colorTheme,bool sidebarCollapsed){
     QJsonArray operators;
     for(int i=0;i<r6::operator_count;++i)operators.append(QJsonObject{{"name",QString::fromUtf8(config.operators[i].name)},
@@ -30,7 +29,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
     QStringList names(favorites.begin(),favorites.end());names.sort();
     return {{"application","Azec"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
         {"settings",QJsonObject{{"keys",keyArray},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
-            {"recoilMaster",true},{"rapidActive",rapidActive},{"gameFocusOnly",gameFocusOnly},
+            {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},
             {"colorTheme",colorTheme},{"sidebarCollapsed",sidebarCollapsed},
             {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",130.0},
             {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
@@ -81,7 +80,12 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     next.language=settings["language"].toInt();next.selected=settings["selected"].toInt();next.radius=130;next.sound=settings["sound"].toBool();next.rapid_master=settings["rapidMaster"].toBool();next.phone_enabled=settings["phoneEnabled"].toBool();
     next.neon[0]=114.0f/255;next.neon[1]=72.0f/255;next.neon[2]=215.0f/255;
     options=BackupOptions{};
-    options.rapidActive=settings.value("rapidActive").toBool(false);
+    // Backups without the per-profile marker predate independent weapon rapid
+    // fire; their single global switch applies to both slots for compatibility.
+    if(!settings.value("perProfileRapid").toBool(false)){
+        const bool legacyRapid=settings.value("rapidActive").toBool(false);
+        for(int i=0;i<r6::operator_count;++i){next.operators[i].rapid=legacyRapid?1:0;next.secondary[i].rapid=legacyRapid?1:0;}
+    }
     if(settings.contains("gameFocusOnly"))options.gameFocusOnly=settings["gameFocusOnly"].toBool();
     if(settings.contains("sidebarCollapsed"))options.sidebarCollapsed=settings["sidebarCollapsed"].toBool();
     if(settings.contains("colorTheme"))options.colorTheme=settings["colorTheme"].toString();

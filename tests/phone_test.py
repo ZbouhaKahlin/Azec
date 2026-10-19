@@ -42,7 +42,7 @@ checks['rejects_invalid_slot']=call('/api/update',{'action':'setProfile','operat
 checks['selects_operator']=json.loads(call('/api/update',{'action':'selectOperator','operator':4})[1])['operatorId']==4
 checks['enables_secondary']=json.loads(call('/api/update',{'action':'setDual','operator':4,'enabled':True})[1])['weaponSlot']==1
 checks['edits_secondary']=abs(json.loads(call('/api/update',{'action':'setProfile','operator':4,'slot':1,'values':{'vertical':23.7,'horizontal':-3.4,'humanize':False,'rapid':True,'delay':85}})[1])['profile']['vertical']-23.7)<.001
-checks['primary_unchanged']=json.loads(call('/api/update',{'action':'selectWeapon','slot':0})[1])['profile']['vertical']==10
+checks['primary_unchanged']=(lambda p:p['vertical']==10 and p['rapid']==False)(json.loads(call('/api/update',{'action':'selectWeapon','slot':0})[1])['profile'])
 checks['secondary_preserved']=abs(json.loads(call('/api/update',{'action':'selectWeapon','slot':1})[1])['profile']['vertical']-23.7)<.001
 checks['favorite_saves']=next(o for o in json.loads(call('/api/update',{'action':'setFavorite','operator':4,'enabled':True})[1])['operators'] if o['id']==4)['favorite']
 state=json.loads(call('/api/state')[1])
@@ -56,7 +56,7 @@ checks['legacy_layout_unchanged']=(folder/'r6_config.bin').stat().st_size==3734
 saved=json.loads((folder/'azec_weapons.json').read_text())
 checks['secondary_persists']=saved['operators']['Ash']['enabled'] and abs(saved['operators']['Ash']['vertical']-23.7)<.001
 checks['extension_primary_persists']=saved['selected']==71 and abs(saved['primaryProfiles']['Noor']['vertical']-31.5)<.001 and saved['primaryProfiles']['Noor']['delay']==90
-checks['rapid_active_persists']=saved['rapidActive']==True
+checks['rapid_active_persists']=saved['perProfileRapid']==True and saved['primaryProfiles']['Noor']['rapid']==True and saved['operators']['Ash']['rapid']==True
 checks['operator_icon_available']=call('/icons/ash.svg',auth=False)[0]==200
 checks['extension_icon_available']=call('/icons/noor.svg',auth=False)[0]==200
 checks['rejects_icon_traversal']=call('/icons/../phone_server.hpp',auth=False)[0]==404
