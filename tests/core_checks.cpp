@@ -33,14 +33,17 @@ bool self_test(const std::filesystem::path& output) {
     auto m = accumulator.step(op, -1);
     ok &= check(m.x == -1 && m.y == 0, "shared signed humanization jitter");
     op.rapid=1; op.delay=10;
-    ok &= check(recoil_interval(op)==30 && rapid_interval(op)==30, "worker timing and delay floor");
+    ok &= check(recoil_interval(true)==30 && rapid_interval(op)==30, "worker timing and delay floor");
     op.rapid=0;
-    ok &= check(recoil_interval(op)==12, "recoil timing uses the base speed without rapid fire");
+    ok &= check(recoil_interval(false)==12, "recoil timing uses the base speed without rapid fire");
     op.rapid=1; op.delay=500;
     ok &= check(rapid_interval(op)==150, "stored delays above the UI range use the 150 ms ceiling");
     ok &= check(validHotkey(0)&&validHotkey(0x75)&&validHotkey('1')&&!validHotkey(1)&&!validHotkey(2)&&!validHotkey(4)&&!validHotkey(5)&&!validHotkey(6)&&
                 !validHotkey(16)&&!validHotkey(17)&&!validHotkey(18)&&!validHotkey(91)&&!validHotkey(92)&&!validHotkey(160)&&!validHotkey(165),
                 "hotkey whitelist rejects mouse buttons, modifiers and Windows keys");
+    ok &= check(validGlobalHotkey(0x2d)&&validGlobalHotkey(0x75)&&validGlobalHotkey(0x23)&&!validGlobalHotkey('A')&&!validGlobalHotkey('1')&&
+                !validGlobalHotkey(9)&&!validGlobalHotkey(13)&&!validGlobalHotkey(27)&&!validGlobalHotkey(32),
+                "global hotkeys reject typing and list-navigation keys");
     config.operators[4].horizontal=-4.5f;
     config.selected=4; config.language=1; config.neon[0]=0.25f;
     Config loaded;

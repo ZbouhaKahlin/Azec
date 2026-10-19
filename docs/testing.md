@@ -18,6 +18,7 @@ Run from the repository root in PowerShell:
 | Extended phone browser matrix | `python tests/phone_browser_test.py --full` |
 | Behavior + extended desktop matrix | `python tests/run_checks.py --ui --full` |
 | Decode rendered desktop QR images | `python tests/run_checks.py --ui-only --full --qr-scan` |
+| Build a runnable package | `.\package-release.ps1` |
 
 `--full` expands requested checks; it does not implicitly enable desktop checks. `build.cmd test --slow` includes expiry during a build. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`.
 
@@ -33,10 +34,31 @@ Default desktop checks use 100% scaling and omit exhaustive translated-layout sw
 
 The Windows CI workflow explicitly retains the slow expiry check and extended desktop/QR matrix. The optional Chrome suite is separate. Local fast checks are not a claim that the extended matrix passed.
 
+## What the checks cover today
+
+Input and output behaviour is only partially automatic. The fixtures run with `--dry-run`, so no mouse movement, synthetic clicks, or sounds are ever produced. That keeps the suites safe, but it also means the real SendInput path, the game-focus gate, and the generated sound cues are verified by reading the code and by unit-level checks, not by the suite.
+
+Covered automatically today:
+
+- The two global output switches persist, reload, and are refused by the phone when removed.
+- The game-focus gate recognises `RainbowSix*.exe` and rejects unrelated processes, including the BattlEye helper.
+- Global hotkey bindings reject typing and list-navigation keys.
+- Browsing the roster does not mark the profile dirty, and the wheel over a number field does not change a value.
+- The pairing code chip, copy actions, new-code rotation, and the server-failure retry path are exercised in the desktop and browser suites.
+- The phone Output card, the removal of the old master and per-weapon rapid controls, and the shared palette are checked in the browser suite.
+
+Still manual or not covered: a physical iPhone, real in-game input, the audible sound cues, and the behaviour of the game-focus gate while a real game is running. Treat these as unverified and say so in delivery notes.
+
 ## Fixtures and artifacts
 
 Python runners create fresh directories under `.build/verification`, run isolated dry-run instances, and stop their test processes. Inspect JSON reports and relevant screenshots. Never run fixture checks against the user's configuration or from the project root: the native checks write settings into their working directory.
 
 For manual inspection, launch the absolute path to `runtime/Azec.exe` from a fresh fixture directory with `--dry-run`. For motion captures, run the verifier there with `--ui-self-test --motion-only`; add `--motion-timing-only` to omit frame capture. Fixture settings, pairing info, revealed QR images, and motion captures must remain local. CI excludes pairing-info files and revealed QR captures from uploads.
 
+`share.cmd` builds the friend-facing single-file installer and runs `python tests/installation_test.py --smoke`. Run `python tests/installation_test.py` for profile persistence, migration, repair, update handoff, and operation after deleting the download. Optional `--previous path/to/Azec.exe` checks migration from an old portable release; `--installed-previous path/to/Azec.exe` checks a version change from an older per-user build and prevents downgrades. All installer fixtures redirect Programs, data, and the Start menu with `AZEC_INSTALL_TEST_ROOT` plus `--dry-run`; their PATH excludes the development Qt kit. Never run an installation fixture without this redirection. `package-release.ps1` remains the optional portable zip packager and excludes verification executables, stale builds, and personal data.
+
 Automated browser checks are emulation, not physical iPhone or in-game testing. State actual checks and limitations in delivery notes.
+
+## Update integrity checks
+
+Build `tests/update_checks.pro` with the pinned Qt qmake and nmake in `.build/update-checks`. Run the resulting `release/Azec-update-checks.exe` from `.build/verification`; it creates its own fresh temporary directory. It checks valid, corrupt, truncated, short, HTTP-error, missing-hash, and unwritable-file downloads against a local HTTP server. Add `--live-github` to query the real public release and download/verify its EXE without executing it. For deployment verification, copy this check executable into a fresh fixture containing the actual packaged runtime and run with only the system PATH. This is a separate verification executable and must never be included in the shared payload.

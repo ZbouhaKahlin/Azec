@@ -1,4 +1,5 @@
 /.build/
+/dist/
 /*.exe
 /r6_config.bin
 /azec_ui.json

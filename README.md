@@ -8,25 +8,28 @@ A Windows desktop app with 72 operator profiles, independent primary and seconda
 
 ## Get started
 
-1. Download and extract the Windows x64 package from [Releases](https://github.com/Azec-Zuckerberg/Azec/releases/latest).
-2. Open **Azec.exe**. Keep the included `runtime/` folder beside it; Qt is bundled. Windows needs the Visual C++ runtime.
-3. Select an operator, adjust its settings, and click **Save**. Recoil activity starts off.
+1. Download **Azec.exe** from the [public releases](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest).
+2. Open **Azec.exe**. It installs for your Windows user, opens the app, and adds **Azec** to the Start menu. Qt and the Visual C++ runtime are bundled; no source code, command prompt, or administrator rights are needed. No runtime folder appears beside the download.
+3. Select an operator, adjust its settings, and click **Save**. Recoil and rapid fire start off.
 
 ### Connect your phone
 
-Keep the PC and phone on the same local network. Open **Settings → Phone control** on the PC, then open the displayed address in your phone browser and enter the pairing code. You can also explicitly reveal and scan the QR code. Keep Azec running on the PC.
+Keep the PC and phone on the same local network. Open **Settings → Phone control** on the PC, then open the displayed address in your phone browser and enter the pairing code. The code is shown as a large selectable chip; **Copy code** copies just the six digits, **Copy link** copies a link that skips code entry, and **New code** rotates the code and disconnects phones that were already paired. You can also explicitly reveal and scan the QR code. Keep Azec running on the PC.
 
-Phone edits update the same profiles as the desktop. Tap **Save changes** to keep them after restarting. No external fonts, scripts, or cloud service are required. If Windows prompts, allow network access on your private network. Use the PC address shown in Settings, not `localhost` on your phone.
+Phone edits update the same profiles as the desktop. Tap **Save changes** to keep them after restarting. The top **Output** card has the two live switches: **Recoil active** and **Rapid fire active**. No external fonts, scripts, or cloud service are required. If Windows prompts, allow network access on your private network. Use the PC address shown in Settings, not `localhost` on your phone.
 
 ## Make it yours
 
-- **Goofy color themes:** choose the original palette or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush in **Settings → Appearance**. Choose the same ten themes on the phone in **Settings → Color theme**. Changes from either screen sync to both and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
-- **Collapsible sidebar:** the **Collapse** button at the top of the Goofy sidebar switches between operator names and a compact icon rail. Search stays at the bottom; click its compact icon to expand smoothly and start searching. The sidebar remembers your choice.
+- **Two output switches:** the header shows **Recoil** and **Rapid fire**. Each pill is a single global switch; the old “Master enable” gate is gone. The rapid-fire card holds the per-operator shot delay, while the switch applies to every operator.
+- **Only in Rainbow Six:** this is on by default. Azec ignores global keys and mouse output when another application is active; Alt-tab to the game and it resumes. Turn it off in **Settings → General** only if you deliberately want the old system-wide behavior. No software change can make a game macro immune to the game’s rules or anti-cheat; this reduces accidents, not account risk.
+- **Goofy color themes:** **Charcoal & blush** is the default for fresh configurations. Choose it or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Goofy (original) in **Settings → Appearance**. Choose the same ten themes on the phone in **Settings → Color theme**. Changes from either screen sync to both and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
+- **Collapsible sidebar:** the **Collapse** button at the top of the Goofy sidebar switches between operator names and a compact icon rail. A star shortcut appears above the operator icons when you have favorites. Search stays at the bottom; click its compact icon to expand smoothly and start searching. The sidebar remembers your choice.
 - **Settings categories:** General, Appearance, Shortcuts, Phone control, and Profile backup keep related options together.
 - **Independent profiles:** enabling a secondary profile copies the primary once, then keeps edits separate. Disabling it preserves those edits.
 - **Favorites and search:** right-click an operator to favorite it. Favorites appear once and save automatically.
-- **Portable backups:** export or import profiles in **Settings → Profile backup**. Imported profile changes remain unsaved until you click Save.
-- **Phone pairing:** sessions rotate on restart. Phone access can be disabled in Settings.
+- **Portable backups:** export or import profiles, favorites, the active color theme, the collapsed-sidebar choice, and the output and safety switches in **Settings → Profile backup**. Imported profile changes remain unsaved until you click Save.
+- **Phone pairing:** sessions rotate on restart. **New code** rotates the code and disconnect paired phones; **Copy code** copies just the six-digit code. Phone access can be disabled in Settings.
+- **Safe saving:** failed saves show a persistent banner with the problem instead of only changing the icon. The old and new settings files are rolled back together if the second write fails.
 
 ## Default shortcuts
 
@@ -35,10 +38,13 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 | Insert | Show / hide the window |
 | F6 | Toggle recoil activity |
 | 1 / 2 | Select primary / secondary when enabled |
-| Arrow keys | Adjust recoil by 0.1 while the window is active, outside text/number editing |
-| End | Immediate exit; unsaved edits are discarded (ignored while you are editing a text or number field) |
+| Arrow keys | Adjust recoil by 0.1 while the window is active, outside text/number fields and lists |
+| End | Immediate exit; unsaved edits are discarded. Only while Rainbow Six is active and Azec is not the active window. |
+| Ctrl+S | Save the configuration |
+| Ctrl+F | Focus the operator search |
+| Esc | Leave Settings, or clear the search field |
 
-Weapon and action bindings are configurable in Settings. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits.
+Weapon and action bindings are configurable in Settings. Global actions reject ordinary typing and list-navigation keys. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits and plays a soft two-note “no” cue; it does not use the Windows error beep.
 
 ## Build from source
 
@@ -59,6 +65,25 @@ Testing is proportional to the change. Documentation and other trivial edits do 
 
 This runs core, HTTP, recovery, and restart checks without the 61-second expiry wait. Desktop and browser checks are opt-in; 150% scaling and the complete language matrix are extended checks. See [Testing](docs/testing.md) for commands and when to use them.
 
+## Share one file
+
+```powershell
+.\share.cmd
+```
+
+`share.cmd` stamps an automatic version, rebuilds the app, embeds the runtime and licenses, and writes **`dist\Azec.exe`**. It smoke-tests the real EXE in an isolated installation before reporting success. Send that single file: your friend opens it once, then uses **Azec** in Start. Program files live in Windows' per-user application folder (normally `%LOCALAPPDATA%\Programs\Azec`). Character profiles, primary/secondary weapon settings, favorites, theme, and other preferences live separately in **`%LOCALAPPDATA%\Azec`**. The downloaded EXE can be deleted after installation.
+
+```powershell
+.\share.cmd quick      # repackage the current build without recompiling
+.\share.cmd publish    # also upload the build to a public releases-only repository
+```
+
+`publish` uses the GitHub CLI and uploads to `github.com/Azec-Zuckerberg/Azec-releases`: the binaries are public while this source repository stays private. The stable link is `https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe`.
+
+**Settings → General → Updates** checks the public release and asks before installing a newer build. The download must match its SHA-256 before it can run. Updates wait for Azec to close, prepare a separate versioned runtime, and preserve the data folder. Existing portable profiles beside the EXE are copied on first installation if the installed settings store is empty; originals are preserved and existing installed profiles are never overwritten. For a first installation with existing portable profiles, place this new EXE in the portable folder and run it after closing the old app. Later transfers use Profile backup. The app remains usable offline.
+
+`package-release.ps1` still produces the folder-style `dist/Azec-portable.zip` for anyone who prefers an unzipped portable copy. It refuses to package a runtime that is missing Qt or the C++ runtime DLLs, and excludes `Azec-checks.exe`, stale `Azec.exe` backups, personal configuration and logs, and pairing captures.
+
 ## Documentation
 
 - [Testing and verification](docs/testing.md) — fast defaults, targeted checks, extended coverage, and safe fixtures.
@@ -66,7 +91,7 @@ This runs core, HTTP, recovery, and restart checks without the 61-second expiry 
 - [Agent instructions](AGENTS.md) — architecture, compatibility contracts, and change-based testing rules. [CLAUDE.md](CLAUDE.md) shares these instructions.
 - README screenshot presentations: [C6, pastel themes](docs/showcase-pastel.html), and [A6, original and dark themes](docs/showcase.html). Both use the lilac grid background, with cascading iPhone screens to the left of the desktop windows.
 
-Personal settings (`r6_config.bin`, `azec_weapons.json`, `azec_ui.json`), logs, pairing credentials, and generated binaries stay out of Git. Runnable releases contain the launcher, `runtime/`, and licenses; they exclude `Azec-checks.exe` and personal data.
+Personal settings (`r6_config.bin`, `azec_weapons.json`, `azec_ui.json`), logs, pairing credentials, and generated binaries stay out of Git. `share.cmd` produces the single-file per-user installer; `package-release.ps1` produces the optional portable zip with its launcher, runtime, and licenses. Both exclude verification executables and personal data.
 
 ## Attribution and limitations
 

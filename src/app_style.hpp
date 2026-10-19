@@ -18,6 +18,8 @@ inline QString applicationStyle(const QColor& accent){
         QLabel#pageTitle,QLabel#preferencesTitle { font-family:'Fredoka'; font-size:24px; font-weight:600; color:$ink; }
         QLabel#sidebarTitle { font-family:'Fredoka'; font-size:16px; font-weight:600; color:$ink; }
         QLabel#subtitle,QLabel#hint { color:$muted; font-size:12px; }
+        QLabel#phoneAddress { background:$surface; color:$ink; border:2px solid $outline; border-radius:8px; padding:6px 8px; font-family:'Consolas'; font-size:12px; }
+        QLabel#pairingCode { background:$yellow; color:$chipInk; border:2px solid $outline; border-radius:8px; padding:4px 9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
         QLabel#rowTitle { color:$ink; font-size:14px; font-weight:600; }
         QLabel#rowHint { color:$muted; font-size:12px; }
         QLabel#panelTitle { font-family:'Fredoka'; color:$ink; font-size:17px; font-weight:600; }
@@ -43,11 +45,11 @@ inline QString applicationStyle(const QColor& accent){
 
         QListWidget { background:transparent; border:0; outline:0; }
 
-        QPushButton#sectionHeading { text-align:left; padding:6px 0; border:0; background:transparent; color:$ink; font-size:16px; font-weight:600; }
+        QPushButton#sectionHeading { text-align:$sectionAlign; padding:6px 0; border:0; background:transparent; color:$ink; font-size:16px; font-weight:600; }
         QPushButton#windowControl,QPushButton#saveControl,QPushButton#closeControl { background:transparent; border:0; padding:0; }
 
-        QPushButton#status { background:$soft; border:2px solid $outline; border-radius:10px; padding:6px 12px; color:$ink; font-size:12px; font-weight:700; }
-        QPushButton#status[active="true"] { background:$lime; border-color:$outline; color:$chipInk; }
+        QPushButton#status, QPushButton#statusRapid { background:$soft; border:2px solid $outline; border-radius:10px; padding:6px 12px; color:$ink; font-size:12px; font-weight:700; }
+        QPushButton#status[active="true"], QPushButton#statusRapid[active="true"] { background:$lime; border-color:$outline; color:$chipInk; }
 
         QPushButton#preferencesSave,QPushButton#save { background:%1; color:%2; border:2px solid $outline; border-radius:12px; padding:8px 16px; font-weight:700; }
         QPushButton#preferencesSave:disabled,QPushButton#save:disabled { background:$soft; color:$muted; }
@@ -55,7 +57,7 @@ inline QString applicationStyle(const QColor& accent){
         QPushButton#keyButton,QPushButton#secondary,QPushButton#cancelClose,QPushButton#discardChanges { background:$surface; border:2px solid $outline; border-radius:12px; padding:6px 12px; color:$ink; font-size:13px; font-weight:600; }
         QPushButton#keyButton:pressed,QPushButton#secondary:pressed,QPushButton#cancelClose:pressed,QPushButton#discardChanges:pressed { background:$soft; }
         QPushButton#cancelClose[keyboardFocus="true"],QPushButton#discardChanges[keyboardFocus="true"] { border-color:%1; }
-        QPushButton#keyButton[keyboardFocus="true"],QPushButton#secondary[keyboardFocus="true"],QPushButton#weaponChoice[keyboardFocus="true"],QPushButton#status[keyboardFocus="true"],QPushButton#save[keyboardFocus="true"],QPushButton#preferencesSave[keyboardFocus="true"] { border-color:%1; }
+        QPushButton#keyButton[keyboardFocus="true"],QPushButton#secondary[keyboardFocus="true"],QPushButton#weaponChoice[keyboardFocus="true"],QPushButton#status[keyboardFocus="true"],QPushButton#statusRapid[keyboardFocus="true"],QPushButton#save[keyboardFocus="true"],QPushButton#preferencesSave[keyboardFocus="true"] { border-color:%1; }
 
         QDoubleSpinBox,QSpinBox { background:$yellow; border:2px solid $outline; border-radius:9px; padding:5px 7px; color:$chipInk; font-family:'Consolas'; font-weight:700; font-size:13px; }
         QDoubleSpinBox:focus,QSpinBox:focus { border-color:%1; }
@@ -82,13 +84,18 @@ inline QString applicationStyle(const QColor& accent){
 
         QDialog { background:$paper; }
         QDialog#hotkeyDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
+        QDialog#helpDialog, QDialog#unsavedDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
         QDialog#palestinePopup { background:$paper; border:3px solid $outline; border-radius:24px; }
         QLabel#palestineArabic { color:$ink; font-size:24px; font-weight:900; }
         QToolTip { background:$surface; color:$ink; border:2px solid $outline; border-radius:10px; padding:6px 8px; font-size:12px; }
         QPushButton#secondary:disabled { color:$muted; border-color:$soft; }
+        QPushButton#noticeClose { background:transparent; border:0; padding:0; }
         QPushButton:focus { outline:0; }
     )CSS").arg(accentHex,onAccent);
     const std::pair<const char*,QColor> tokens[]={{"$ink",kbtheme::ink},{"$paper",kbtheme::paper},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$lime",kbtheme::lime},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$header",kbtheme::header},{"$chipInk",kbtheme::chipInk}};
     for(const auto& token:tokens)style.replace(QLatin1String(token.first),token.second.name());
+    // Qt mirrors layouts but not explicit alignments, so headings follow the
+    // reading direction of the selected language.
+    style.replace(QLatin1String("$sectionAlign"),QApplication::layoutDirection()==Qt::RightToLeft?"right":"left");
     return style;
 }

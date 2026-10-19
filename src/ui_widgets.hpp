@@ -8,6 +8,10 @@
 
 inline int operatorRowHeight=52;
 inline constexpr int operatorIconSize=44;
+// Shared raised-panel geometry: the page stack fills this surface exactly, so
+// transitions must use the same radius and ink border when clipping snapshots.
+inline constexpr qreal raisedPanelRadius=24;
+inline constexpr qreal raisedPanelBorder=3;
 
 class InkPopup final : public QFrame {
 public:
@@ -27,17 +31,18 @@ class LanguageComboBox final : public QComboBox {
     InkPopup* popup_;
     QListWidget* choices_;
     void choose(){const int index=choices_->currentRow();hidePopup();if(index>=0){setCurrentIndex(index);emit activated(index);}}
+    void styleChoices(){choices_->setStyleSheet(QString("QListWidget{background:transparent;border:0;outline:0;color:%1;} QListWidget::item{height:36px;padding:0 8px;border-radius:8px;background:transparent;} QListWidget::item:selected{background:%2;color:%1;} QListWidget::item:hover:!selected{background:transparent;}").arg(kbtheme::ink.name(),kbtheme::lavender.name()));}
 public:
     explicit LanguageComboBox(QWidget* parent=nullptr,const QString& popupName=QStringLiteral("languagePopup")):QComboBox(parent),popup_(new InkPopup(this)),choices_(new QListWidget(popup_)){
         popup_->setObjectName(popupName);auto* layout=new QVBoxLayout(popup_);layout->setContentsMargins(8,8,12,13);layout->addWidget(choices_);
         choices_->setIconSize(QSize(22,15));choices_->setMouseTracking(false);choices_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        choices_->setStyleSheet("QListWidget{background:transparent;border:0;outline:0;} QListWidget::item{height:36px;padding:0 8px;border-radius:8px;background:transparent;} QListWidget::item:selected{background:#EBDEFF;color:#31204C;} QListWidget::item:hover:!selected{background:transparent;}");
+        styleChoices();
 
         choices_->installEventFilter(this);connect(choices_,&QListWidget::clicked,this,[this]{choose();});
     }
     void showPopup() override{
         choices_->setIconSize(iconSize());
-        choices_->setStyleSheet(QString("QListWidget{background:transparent;border:0;outline:0;color:%1;} QListWidget::item{height:36px;padding:0 8px;border-radius:8px;background:transparent;} QListWidget::item:selected{background:%2;color:%1;} QListWidget::item:hover:!selected{background:transparent;}").arg(kbtheme::ink.name(),kbtheme::lavender.name()));
+        styleChoices();
         choices_->clear();for(int i=0;i<count();++i)new QListWidgetItem(itemIcon(i),itemText(i),choices_);
         choices_->setCurrentRow(currentIndex());const auto screen=QGuiApplication::screenAt(mapToGlobal(rect().center()));const QRect bounds=(screen?screen:QGuiApplication::primaryScreen())->availableGeometry();
         popup_->resize(qMin(bounds.width(),qMax(width(),choices_->sizeHintForColumn(0)+36)),qMin(bounds.height()-16,count()*36+21));
@@ -96,6 +101,159 @@ protected:
             painter.drawText(QRect(64,0,124,height()),Qt::AlignVCenter|Qt::AlignLeft,text());painter.setOpacity(1);
         }
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),2));painter.drawRoundedRect(QRectF(rect()).adjusted(2,2,-2,-2),10,10);}
+    }
+};
+
+// Sticker-sidebar icons: simple cardboard-cutout shapes with a flat colour
+// face, a slightly darker extruded side and a hard ink outline. No gradients,
+// blur or glow; the depth comes from layered flat shapes like the rest of
+// GoofyUI.
+enum class SettingsGlyph{General,Appearance,Shortcuts,Phone,Profile};
+
+inline QColor settingsGlyphColor(SettingsGlyph glyph){
+    switch(glyph){
+    case SettingsGlyph::General:return kbtheme::yellow;
+    case SettingsGlyph::Appearance:return kbtheme::pink;
+    case SettingsGlyph::Shortcuts:return kbtheme::blue;
+    case SettingsGlyph::Phone:return kbtheme::lime;
+    case SettingsGlyph::Profile:return kbtheme::defaultAccent;
+    }
+    return kbtheme::yellow;
+}
+
+inline QPainterPath settingsGlyphShape(SettingsGlyph glyph){
+    QPainterPath shape;
+    switch(glyph){
+    case SettingsGlyph::General:{
+        constexpr qreal pi=3.14159265358979323846;
+        for(int tooth=0;tooth<6;++tooth){
+            const qreal radii[]={10.4,10.4,7.3,7.3},offsets[]={-16,16,22,38};
+            for(int point=0;point<4;++point){
+                const qreal angle=(tooth*60.0+offsets[point]-90.0)*pi/180.0;
+                const QPointF position(std::cos(angle)*radii[point],std::sin(angle)*radii[point]);
+                if(tooth==0&&point==0)shape.moveTo(position);else shape.lineTo(position);
+            }
+        }
+        shape.closeSubpath();
+        break;
+    }
+    case SettingsGlyph::Appearance:{
+        QPainterPath body;
+        body.addRoundedRect(QRectF(-5.0,-10.4,10.0,6.9),3.3,3.3);
+        body.addRoundedRect(QRectF(-2.0,-4.2,4.0,3.2),1.4,1.4);
+        QPainterPath tip;tip.moveTo(-1.5,-1.4);tip.lineTo(1.5,-1.4);tip.lineTo(0,8.6);tip.closeSubpath();
+        body=body.united(tip);QTransform rotation;rotation.rotate(-42);shape=rotation.map(body);
+        break;
+    }
+    case SettingsGlyph::Shortcuts:shape.addRoundedRect(QRectF(-9.5,-6.3,19,12.6),2.6,2.6);break;
+    case SettingsGlyph::Phone:shape.addRoundedRect(QRectF(-6.4,-10.2,12.8,20.4),3.6,3.6);break;
+    case SettingsGlyph::Profile:{
+        shape.addEllipse(QPointF(0,-4.4),4.3,4.3);
+        QPainterPath shoulders;shoulders.moveTo(-8.0,9.6);shoulders.cubicTo(-7.4,1.0,7.4,1.0,8.0,9.6);shoulders.lineTo(-8.0,9.6);shoulders.closeSubpath();
+        shape=shape.united(shoulders);
+        break;
+    }
+    }
+    return shape;
+}
+
+inline void paintSettingsGlyphDetails(QPainter& painter,SettingsGlyph glyph,const QColor& fill){
+    const QColor detail=kbtheme::readableOn(fill),ink=kbtheme::outline;
+    painter.setPen(QPen(ink,1.6,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+    switch(glyph){
+    case SettingsGlyph::General:
+        painter.setBrush(mixColor(fill,ink,.45));painter.drawEllipse(QPointF(0,0),2.7,2.7);
+        break;
+    case SettingsGlyph::Appearance:
+        painter.save();painter.rotate(-42);painter.setBrush(QColor(255,255,255,82));painter.setPen(Qt::NoPen);painter.drawRoundedRect(QRectF(-3.0,-8.6,2.2,4.4),1.1,1.1);painter.restore();
+        painter.setBrush(fill);painter.drawEllipse(QPointF(6.4,7.1),1.5,1.5);
+        break;
+    case SettingsGlyph::Shortcuts:
+        painter.setPen(Qt::NoPen);painter.setBrush(detail);
+        for(int row=0;row<2;++row)for(int column=0;column<3;++column)painter.drawRoundedRect(QRectF(-6.2+column*4.3,-3.9+row*3.5,2.9,2.1),.7,.7);
+        painter.drawRoundedRect(QRectF(-6.2,3.9,12.4,1.5),.7,.7);
+        break;
+    case SettingsGlyph::Phone:
+        painter.setBrush(mixColor(fill,ink,.55));painter.drawRoundedRect(QRectF(-4.2,-7.0,8.4,11.6),1.5,1.5);
+        painter.setBrush(fill);painter.setPen(QPen(ink,1.4));painter.drawEllipse(QPointF(0,7.2),1.4,1.4);
+        break;
+    case SettingsGlyph::Profile:
+        painter.setPen(QPen(ink,1.6));painter.setBrush(detail);painter.drawEllipse(QPointF(0,-4.2),2.1,2.1);
+        painter.drawRoundedRect(QRectF(-4.6,2.2,9.2,3.0),1.5,1.5);
+        break;
+    }
+}
+
+inline void paintStickerGlyph(QPainter& painter,const QRectF& box,SettingsGlyph glyph,bool pressed){
+    Q_UNUSED(pressed)
+    const QColor fill=settingsGlyphColor(glyph),ink=kbtheme::outline;
+    const QPainterPath shape=settingsGlyphShape(glyph);
+    const qreal scale=box.width()/24.0;
+    painter.save();painter.translate(box.topLeft());painter.scale(scale,scale);painter.translate(12,12);
+    painter.setPen(QPen(ink,2.0,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));painter.setBrush(fill);painter.drawPath(shape);
+    paintSettingsGlyphDetails(painter,glyph,fill);
+    painter.restore();
+}
+
+inline QPainterPath stickerStarShape(){
+    constexpr qreal pi=3.14159265358979323846;QPainterPath path;
+    for(int point=0;point<10;++point){
+        const qreal radius=point%2?4.8:10.4,angle=-pi/2+point*pi/5;
+        const QPointF position(std::cos(angle)*radius,std::sin(angle)*radius);
+        if(point==0)path.moveTo(position);else path.lineTo(position);
+    }
+    path.closeSubpath();return path;
+}
+
+class StickerStarButton final : public QAbstractButton {
+public:
+    explicit StickerStarButton(QWidget* parent=nullptr):QAbstractButton(parent){
+        setFixedSize(34,34);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);
+    }
+protected:
+    void paintEvent(QPaintEvent*) override{
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
+        const QPainterPath shape=stickerStarShape();
+        painter.save();painter.translate((width()-26)/2.0,(height()-26)/2.0);painter.scale(26.0/24.0,26.0/24.0);painter.translate(12,12);
+        painter.setPen(QPen(kbtheme::outline,2.0,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));painter.setBrush(kbtheme::yellow);painter.drawPath(shape);
+        painter.restore();
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::defaultAccent,2));painter.drawRoundedRect(QRectF(rect()).adjusted(2,2,-2,-2),10,10);}
+    }
+};
+
+class SettingsNavButton final : public QAbstractButton {
+    SettingsGlyph glyph_;QString description_;
+public:
+    explicit SettingsNavButton(SettingsGlyph glyph,QWidget* parent=nullptr):QAbstractButton(parent),glyph_(glyph){
+        setCheckable(true);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);setFixedHeight(62);
+        setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);setMinimumWidth(0);
+    }
+    SettingsGlyph glyph() const{return glyph_;}
+    void setDescription(const QString& description){description_=description;update();}
+protected:
+    void paintEvent(QPaintEvent*) override{
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
+        const QRectF pill=QRectF(rect()).adjusted(1,2,-1,-2);
+        if(isChecked()){painter.setPen(QPen(kbtheme::outline,2));painter.setBrush(kbtheme::lavender);painter.drawRoundedRect(pill,14,14);}
+        const qreal progress=std::clamp((width()-64.0)/124.0,0.0,1.0);
+        const int art=32;const qreal compactX=(width()-art)/2.0,iconX=compactX+(11-compactX)*progress;
+        const bool rtl=QApplication::layoutDirection()==Qt::RightToLeft;
+        const QRectF iconRect(rtl?width()-11-art:iconX,(height()-art)/2.0,art,art);
+        paintStickerGlyph(painter,iconRect,glyph_,isDown());
+        if(progress>0.01){
+            QFont nameFont("Geist");nameFont.setPixelSize(14);nameFont.setWeight(QFont::DemiBold);
+            QFont hintFont("Geist");hintFont.setPixelSize(11);hintFont.setWeight(QFont::Normal);
+            const qreal left=rtl?8:iconRect.right()+8,available=rtl?iconRect.left()-16:width()-iconRect.right()-16;
+            const QRectF nameRect(left,8,available,20),hintRect(left,28,available,18);
+            const Qt::Alignment alignment=Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft);
+            painter.setOpacity(progress);
+            painter.setFont(nameFont);painter.setPen(kbtheme::ink);
+            painter.drawText(nameRect,alignment,QFontMetrics(nameFont).elidedText(text(),Qt::ElideRight,qMax(0,qRound(available))));
+            painter.setFont(hintFont);painter.setPen(kbtheme::muted);
+            painter.drawText(hintRect,alignment,QFontMetrics(hintFont).elidedText(description_,Qt::ElideRight,qMax(0,qRound(available))));
+            painter.setOpacity(1);
+        }
+        if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::defaultAccent,2));painter.drawRoundedRect(QRectF(rect()).adjusted(2,2,-2,-2),13,13);}
     }
 };
 
@@ -246,13 +404,30 @@ public:
         const bool selected=option.state&QStyle::State_Selected;
         const QRectF pill=QRectF(r.adjusted(4,2,-4,-2));
         if(selected){p->setPen(QPen(kbtheme::outline,2));p->setBrush(kbtheme::lavender);p->drawRoundedRect(pill.adjusted(1,1,-1,-1),12,12);}
-        // Anchor artwork and names while the sidebar clips/fades their right edge.
-        // Recentring icons or re-eliding text on every frame produces sideways jumps.
-        qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(r.left()+6,r.top()+4,operatorIconSize,operatorIconSize));
+        // Anchor artwork and names while the sidebar clips/fades their trailing
+        // edge. Recentring icons or re-eliding text on every frame produces
+        // sideways jumps. Right-to-left languages anchor from the other edge.
+        const bool rtl=option.widget&&option.widget->layoutDirection()==Qt::RightToLeft;
+        // The item is 200 px wide while the viewport is narrower, so the far
+        // edge of option.rect is already outside the visible row.
+        const int visibleRight=option.widget?option.widget->width()-1:r.right();
+        const int iconX=rtl?visibleRight-operatorIconSize-5:r.left()+6;
+        qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(iconX,r.top()+4,operatorIconSize,operatorIconSize));
         QFont f=option.font;f.setFamily("Geist");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(14);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(kbtheme::ink);
-        const QRect textRect(r.left()+65,r.top(),127,r.height());
         p->setClipRect(r);p->setOpacity(std::clamp((r.width()-58.0)/116.0,0.0,1.0));
-        p->drawText(textRect,Qt::AlignVCenter|Qt::AlignLeft,index.data().toString());p->restore();
+        if(rtl){
+            // Qt mirrors rect alignments with the layout direction, so the
+            // mirrored column places its text explicitly instead.
+            const QString label=index.data().toString();const QFontMetrics metrics(f);
+            p->drawText(QPoint(qMax(r.left(),visibleRight-65-metrics.horizontalAdvance(label)),r.top()+(r.height()+metrics.ascent()-metrics.descent())/2),label);
+        }else{
+            const QRect textRect(r.left()+65,r.top(),127,r.height());
+            p->drawText(textRect,Qt::AlignVCenter|Qt::AlignLeft,index.data().toString());
+        }
+        if(selected&&(option.state&QStyle::State_HasFocus)){
+            p->setOpacity(1);p->setBrush(Qt::NoBrush);p->setPen(QPen(accent_(),2));p->drawRoundedRect(pill.adjusted(3,3,-3,-3),11,11);
+        }
+        p->restore();
     }
 };
 
@@ -276,7 +451,11 @@ public:
 protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);QFont pixel("Press Start 2P");pixel.setPixelSize(21);painter.setFont(pixel);
-        painter.setPen(kbtheme::outline);painter.drawText(rect().translated(2,2),Qt::AlignCenter,text());
+        // A hard ink outline keeps the white pixel letters readable on the
+        // cream themes, where white alone would disappear into the header.
+        painter.setPen(kbtheme::outline);
+        for(int dx=-1;dx<=1;++dx)for(int dy=-1;dy<=1;++dy)if(dx||dy)painter.drawText(rect().translated(dx,dy),Qt::AlignCenter,text());
+        painter.drawText(rect().translated(2,2),Qt::AlignCenter,text());
         painter.setPen(Qt::white);painter.drawText(rect(),Qt::AlignCenter,text());
     }
 };
@@ -315,9 +494,9 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);
         const auto surface=surfaceRect();
         // GoofyUI hard shadow: one flat ink plate offset down-right, no blur.
-        painter.setBrush(kbtheme::outline);painter.drawRoundedRect(surface.translated(6,8),24,24);
-        painter.setBrush(kbtheme::surface);painter.drawRoundedRect(surface,24,24);
-        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,3));painter.drawRoundedRect(surface.adjusted(1.5,1.5,-1.5,-1.5),24,24);
+        painter.setBrush(kbtheme::outline);painter.drawRoundedRect(surface.translated(6,8),raisedPanelRadius,raisedPanelRadius);
+        painter.setBrush(kbtheme::surface);painter.drawRoundedRect(surface,raisedPanelRadius,raisedPanelRadius);
+        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,raisedPanelBorder));painter.drawRoundedRect(surface.adjusted(raisedPanelBorder/2.0,raisedPanelBorder/2.0,-raisedPanelBorder/2.0,-raisedPanelBorder/2.0),raisedPanelRadius,raisedPanelRadius);
     }
 };
 
@@ -327,7 +506,15 @@ public:
     PageSnapshot(QPixmap image,QWidget* parent):QWidget(parent),image_(std::move(image)){setAttribute(Qt::WA_TransparentForMouseEvents);setObjectName("pageTransition");}
     void setOpacity(qreal opacity){opacity_=opacity;update();}
 protected:
-    void paintEvent(QPaintEvent*) override {QPainter painter(this);painter.setOpacity(opacity_);painter.drawPixmap(0,0,image_);}
+    void paintEvent(QPaintEvent*) override {
+        // The snapshot is a rectangular pixmap; clip it to the panel interior so
+        // the ink border and rounded corners stay visible while it fades out.
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setOpacity(opacity_);
+        const qreal inset=raisedPanelBorder;
+        QPainterPath clip;
+        clip.addRoundedRect(QRectF(rect()).adjusted(inset,inset,-inset,-inset),raisedPanelRadius-raisedPanelBorder/2.0,raisedPanelRadius-raisedPanelBorder/2.0);
+        painter.setClipPath(clip);painter.drawPixmap(0,0,image_);
+    }
 };
 
 class PageStack final : public QStackedWidget {

@@ -7,6 +7,9 @@
 #include <thread>
 
 namespace r6 {
+struct Hotkeys {
+    int menu=0, recoil=0, panic=0, primary=0, secondary=0;
+};
 class Engine {
     mutable std::mutex config_mutex_;
     Config config_;
@@ -20,12 +23,14 @@ class Engine {
     void recoil_worker();
     void rapid_worker();
 public:
-    std::atomic_bool running{false}, recoil_active{false}, recoil_master{true};
+    std::atomic_bool running{false}, recoil_active{false}, rapid_active{false};
+    std::atomic_bool game_focus_only{true}, input_allowed{false};
     std::atomic_bool menu_visible{true};
     std::atomic_uint injected_events{0};
     explicit Engine(bool dry_run);
     ~Engine();
     Config snapshot() const;
+    Hotkeys hotkeys() const;
     void edit(const std::function<void(Config&)>& change);
     bool select_weapon(int slot);
     bool load(const std::filesystem::path& file);

@@ -55,7 +55,13 @@ class PairingQr final : public QPushButton {
         // Keep a four-module quiet zone and snap data modules to physical pixels.
         const int modules=image_.width()-8;const qreal unit=qreal(side)/image_.width();
         const auto finder=[modules](int x,int y){x-=4;y-=4;return (x>=0&&x<7&&y>=0&&y<7)||(x>=modules-7&&x<modules&&y>=0&&y<7)||(x>=0&&x<7&&y>=modules-7&&y<modules);};
-        const QColor ink("#242128");QPainter painter(&raster);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);painter.setBrush(ink);
+        const QColor ink=kbtheme::outline;QColor accent=kbtheme::defaultAccent;
+        const int luminance=(accent.red()*299+accent.green()*587+accent.blue()*114)/1000;
+        if(luminance>140){
+            const auto blend=[](const QColor& a,const QColor& b,double t){return QColor::fromRgbF(a.redF()*(1-t)+b.redF()*t,a.greenF()*(1-t)+b.greenF()*t,a.blueF()*(1-t)+b.blueF()*t);};
+            accent=blend(accent,ink,.65);
+        }
+        QPainter painter(&raster);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);painter.setBrush(ink);
         for(int y=0;y<image_.height();++y)for(int x=0;x<image_.width();++x)if(qRed(image_.pixel(x,y))==0){
             if(finder(x,y))continue;
             const int left=qRound(qreal(x)*side/image_.width()),top=qRound(qreal(y)*side/image_.height());
@@ -65,8 +71,9 @@ class PairingQr final : public QPushButton {
             const QRectF outer(origin.x()*unit,origin.y()*unit,7*unit,7*unit);
             painter.setBrush(ink);painter.drawRoundedRect(outer,unit*.35,unit*.35);
             painter.setBrush(Qt::white);painter.drawRoundedRect(outer.adjusted(unit,unit,-unit,-unit),unit*.4,unit*.4);
-            // Finder centers must stay dark on white, even with a light UI accent.
-            painter.setBrush(QColor("#7248D7"));painter.drawRoundedRect(outer.adjusted(2*unit,2*unit,-2*unit,-2*unit),unit*.3,unit*.3);
+            // The finder center follows the palette but is darkened when the
+            // accent is light, so every theme keeps a scannable dark-on-light QR.
+            painter.setBrush(accent);painter.drawRoundedRect(outer.adjusted(2*unit,2*unit,-2*unit,-2*unit),unit*.3,unit*.3);
         }
         // A small logo window consumes less than 6% of the symbol's modules.
         // The highest ECC level protects the obscured data. The finder and
@@ -112,6 +119,12 @@ public:
         }
         prepareFrames();updateLabel();
     }
+    // Rebuild the cached textures when the active palette changes. The encoded
+    // link is unchanged, so every theme still pairs with the same working code.
+    void refreshTheme(){
+        if(image_.isNull())return;
+        frames_.clear();obscured_=QPixmap();raster_ratio_=0;++generation_;prepareFrames();update();
+    }
 protected:
     void hideEvent(QHideEvent* event) override{conceal();QPushButton::hideEvent(event);}
     void showEvent(QShowEvent* event) override{prepareFrames();QPushButton::showEvent(event);}
@@ -137,7 +150,7 @@ protected:
                 // blur chain gently so neither startup nor section settling pops.
                 if(progress_<.15){painter.setOpacity(1-progress_/.15);painter.drawPixmap(target,obscured_,QRectF(obscured_.rect()));}
             }
-            painter.setOpacity(std::max(0.0,1-progress_*2));painter.setPen(QColor("#31204C"));painter.drawText(QRect(12,62,160,60),Qt::AlignCenter|Qt::TextWordWrap,reveal_text_);
+            painter.setOpacity(1);
             painter.restore();
         }
         painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,2));painter.drawRoundedRect(QRectF(1,1,182,182),12,12);

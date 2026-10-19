@@ -2,7 +2,13 @@
 
 Header 01, implemented in the Windows app: a seamless 60 px top bar matching the sidebar, with extra breathing room around the controls. All ten themes share the same layout. Switch in **Settings → Appearance → Color theme**.
 
+Each palette also drives the pairing QR: the finder centre takes the theme accent (darkened when the accent is too light to stay scannable), while the code itself stays dark-on-light so every theme pairs the same working link. The header carries the two global status pills, **Recoil** and **Rapid fire**, in every theme.
+
 These are native Qt screenshots at 100% display scale (864 × 664), captured from isolated dry-run fixtures.
+
+## Charcoal & blush (default)
+
+![Charcoal & blush](themes/charcoal.png)
 
 ## Goofy (original)
 
@@ -39,7 +45,3 @@ These are native Qt screenshots at 100% display scale (864 × 664), captured fro
 ## Deep sea & citron
 
 ![Deep sea & citron](themes/deep-sea.png)
-
-## Charcoal & blush
-
-![Charcoal & blush](themes/charcoal.png)

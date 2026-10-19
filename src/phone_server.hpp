@@ -6,6 +6,7 @@
 #include <QPainter>
 #include "diagnostics.hpp"
 #include "lan_address.hpp"
+#include "theme.hpp"
 
 class PhoneServer final : public QObject {
     QTcpServer server_;
@@ -13,6 +14,7 @@ class PhoneServer final : public QObject {
     std::function<QJsonObject()> state_;
     std::function<QJsonObject(const QJsonObject&)> update_;
     QHash<QString,QPair<int,qint64>> failures_;
+    QHash<QString,QByteArray> icon_cache_;
     QStringList hosts_;
     QTimer network_timer_;
     QElapsedTimer elapsed_;
@@ -50,7 +52,6 @@ class PhoneServer final : public QObject {
     }
     static QByteArray json(const QJsonObject& value){return QJsonDocument(value).toJson(QJsonDocument::Compact);}
     void handle(QTcpSocket* socket,const QByteArray& request,int headerEnd,int length){
-        refreshNetwork();
         const auto lines=request.left(headerEnd).split('\n');const auto first=lines.value(0).trimmed().split(' ');if(first.size()!=3){reply(socket,400,"{}");return;}
         const auto method=first[0];const auto target=QUrl::fromEncoded(first[1]);const auto path=target.path();QHash<QByteArray,QByteArray> headers;
         for(int i=1;i<lines.size();++i){const auto line=lines[i].trimmed();const int colon=line.indexOf(':');if(colon>0)headers[line.left(colon).toLower()]=line.mid(colon+1).trimmed();}
@@ -61,13 +62,23 @@ class PhoneServer final : public QObject {
         if(method=="GET"&&(path=="/manifest.webmanifest"||path=="/app-icon.svg")){
             QFile file(path=="/manifest.webmanifest"?":/ui/manifest.webmanifest":":/ui/app-icon.svg");
             if(!file.open(QIODevice::ReadOnly)){reply(socket,404,"{}");return;}
-            reply(socket,200,file.readAll(),path=="/manifest.webmanifest"?"application/manifest+json":"image/svg+xml");return;
+            if(path=="/manifest.webmanifest"){
+                // The installed app paints its splash and status bar from these
+                // two colours, so they follow the active desktop palette.
+                auto manifest=QJsonDocument::fromJson(file.readAll()).object();
+                manifest["background_color"]=kbtheme::paper.name();manifest["theme_color"]=kbtheme::defaultAccent.name();
+                reply(socket,200,json(manifest),"application/manifest+json");return;
+            }
+            reply(socket,200,file.readAll(),"image/svg+xml");return;
         }
         if(method=="GET"&&(path=="/app-icon-192.png"||path=="/app-icon-512.png"||path=="/apple-touch-icon.png")){
-            const int size=path=="/app-icon-512.png"?512:path=="/app-icon-192.png"?192:180;
-            QImage image(size,size,QImage::Format_ARGB32_Premultiplied);image.fill(Qt::transparent);
-            QPainter painter(&image);QSvgRenderer renderer(QStringLiteral(":/ui/app-icon.svg"));renderer.render(&painter);painter.end();
-            QByteArray bytes;QBuffer buffer(&bytes);buffer.open(QIODevice::WriteOnly);image.save(&buffer,"PNG");reply(socket,200,bytes,"image/png");return;
+            if(!icon_cache_.contains(path)){
+                const int size=path=="/app-icon-512.png"?512:path=="/app-icon-192.png"?192:180;
+                QImage image(size,size,QImage::Format_ARGB32_Premultiplied);image.fill(Qt::transparent);
+                QPainter painter(&image);QSvgRenderer renderer(QStringLiteral(":/ui/app-icon.svg"));renderer.render(&painter);painter.end();
+                QByteArray bytes;QBuffer buffer(&bytes);buffer.open(QIODevice::WriteOnly);image.save(&buffer,"PNG");icon_cache_.insert(path,bytes);
+            }
+            reply(socket,200,icon_cache_.value(path),"image/png");return;
         }
         if(method=="GET"&&path.startsWith("/icons/")){
             const auto name=path.mid(7);if(!QRegularExpression("^[a-z0-9]+\\.svg$").match(name).hasMatch()){reply(socket,404,"{}");return;}
@@ -120,6 +131,15 @@ public:
     quint16 port() const{return server_.serverPort();}
     QString code() const{return code_;}
     QString token() const{return token_;}
+    // Rotate the token and code, and drop current connections. The server keeps
+    // listening; already-paired phones receive 401 on their next request.
+    void rotate(){
+        token_=QUuid::createUuid().toString(QUuid::Id128);
+        code_=QString::number(QRandomGenerator::global()->bounded(100000,1000000));
+        const auto sockets=findChildren<QTcpSocket*>();
+        for(auto* socket:sockets)socket->abort();
+        if(network_changed_)network_changed_();
+    }
     QString currentAddress() const{
         return "http://"+lan::currentAddress()+":"+QString::number(port());
     }

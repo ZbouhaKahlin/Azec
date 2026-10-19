@@ -26,12 +26,21 @@ popd
 if not exist runtime mkdir runtime
 copy /y ".build\qt\release\Azec.exe" "runtime\Azec.exe" > nul
 if errorlevel 1 exit /b 1
-"%NEON_QT_ROOT%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-compiler-runtime --skip-plugin-types generic,networkinformation,tls,styles --dir "%~dp0runtime" "%~dp0runtime\Azec.exe"
+"%NEON_QT_ROOT%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-compiler-runtime --skip-plugin-types generic,networkinformation,styles --dir "%~dp0runtime" "%~dp0runtime\Azec.exe"
+if errorlevel 1 exit /b 1
+rem Bundle the Visual C++ runtime beside the app so a clean Windows install needs no redistributable.
+set "R6_CRT="
+for /d %%D in ("%VCToolsRedistDir%x64\Microsoft.VC*.CRT") do set "R6_CRT=%%~fD"
+if not defined R6_CRT (
+    echo Visual C++ redistributable files were not found under "%VCToolsRedistDir%".
+    exit /b 1
+)
+copy /y "%R6_CRT%\*.dll" "%~dp0runtime\" > nul
 if errorlevel 1 exit /b 1
 pushd .build
 rc /nologo /I "..\assets" /fo azec-icon.res "..\assets\app.rc"
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp azec-icon.res /Fe:"..\Azec.exe" /link /SUBSYSTEM:WINDOWS user32.lib
+cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp azec-icon.res /Fe:"..\Azec.exe" /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib ole32.lib uuid.lib
 if errorlevel 1 exit /b 1
 if /I "%~1"=="test" (
     cl /nologo /std:c++17 /O2 /EHsc /MT /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS ..\tests\core_test.cpp ..\tests\core_checks.cpp ..\src\core.cpp /Fe:core-tests.exe

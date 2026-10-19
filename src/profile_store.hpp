@@ -6,7 +6,7 @@
 #include "diagnostics.hpp"
 
 inline QString weaponFile(const std::filesystem::path& base){return QString::fromStdWString((base.parent_path()/L"azec_weapons.json").wstring());}
-inline void readWeaponProfiles(r6::Config& config,bool& recoilMaster,const std::filesystem::path& base){
+inline void readWeaponProfiles(r6::Config& config,bool& rapidActive,bool& gameFocusOnly,const std::filesystem::path& base){
     QFile file(weaponFile(base));if(!file.exists())return;
     if(!file.open(QIODevice::ReadOnly)){diagnostic("load weapon profiles",file.errorString());return;}
     if(file.size()>1024*1024){diagnostic("load weapon profiles","File exceeds 1 MiB; ignored");return;}
@@ -15,7 +15,8 @@ inline void readWeaponProfiles(r6::Config& config,bool& recoilMaster,const std::
     const auto root=document.object();if(root["version"].toInt()!=1){diagnostic("load weapon profiles","Unsupported version; ignored");return;}
     const auto validKey=[](const QJsonValue& value,int fallback){const int key=value.toInt(fallback);return r6::validHotkey(key)?key:fallback;};
     config.primary_key=validKey(root["primaryKey"],'1');config.secondary_key=validKey(root["secondaryKey"],'2');config.phone_enabled=root["phoneEnabled"].toBool(true);
-    if(root.contains("recoilMaster")&&root["recoilMaster"].isBool())recoilMaster=root["recoilMaster"].toBool();
+    if(root.contains("rapidActive")&&root["rapidActive"].isBool())rapidActive=root["rapidActive"].toBool();
+    if(root.contains("gameFocusOnly")&&root["gameFocusOnly"].isBool())gameFocusOnly=root["gameFocusOnly"].toBool();
     const auto profiles=root["operators"].toObject();
     for(int id=0;id<r6::operator_count;++id){
         const auto item=profiles[QString::fromUtf8(config.operators[id].name)].toObject();if(item.isEmpty())continue;
@@ -33,17 +34,34 @@ inline void readWeaponProfiles(r6::Config& config,bool& recoilMaster,const std::
         auto& op=config.operators[id];op.vertical=float(vertical);op.horizontal=float(horizontal);op.delay=delay;op.rapid=item["rapid"].toBool();op.humanize=item["humanize"].toBool(true);
     }
 }
-inline QByteArray weaponProfilesBytes(const r6::Config& config,bool recoilMaster){
+inline QByteArray weaponProfilesBytes(const r6::Config& config,bool rapidActive,bool gameFocusOnly){
     QJsonObject profiles,primaries;
     for(int id=0;id<r6::operator_count;++id){const auto& op=config.secondary[id];profiles[QString::fromUtf8(config.operators[id].name)]=QJsonObject{{"enabled",config.secondary_enabled[id]},{"initialized",config.secondary_initialized[id]},{"vertical",op.vertical},{"horizontal",op.horizontal},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)},{"delay",op.delay}};}
     // Extension operators keep their primary profile and the live selection here.
     for(int id=r6::legacy_operator_count;id<r6::operator_count;++id){const auto& op=config.operators[id];primaries[QString::fromUtf8(config.operators[id].name)]=QJsonObject{{"vertical",op.vertical},{"horizontal",op.horizontal},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)},{"delay",op.delay}};}
-    return QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},{"recoilMaster",recoilMaster},{"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries}}).toJson();
+    return QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},
+        {"rapidActive",rapidActive},{"gameFocusOnly",gameFocusOnly},{"recoilMaster",true},{"rapidMaster",bool(config.rapid_master)},
+        {"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries}}).toJson();
 }
 // Two-phase write: the sidecar is prepared without touching the disk copy and
 // only committed after the primary binary write succeeded.
-inline bool stageWeaponProfiles(const r6::Config& config,bool recoilMaster,const std::filesystem::path& base,QSaveFile& file){
-    const auto bytes=weaponProfilesBytes(config,recoilMaster);
+inline bool stageWeaponProfiles(const r6::Config& config,bool rapidActive,bool gameFocusOnly,const std::filesystem::path& base,QSaveFile& file){
+    const auto bytes=weaponProfilesBytes(config,rapidActive,gameFocusOnly);
     file.setFileName(weaponFile(base));
     return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size();
+}
+// Selection changes are UI navigation, not profile edits. Persist only that
+// field so browsing the roster never marks the profile dirty.
+inline bool persistSelection(const std::filesystem::path& base,int selected){
+    if(selected<0||selected>=r6::operator_count)return false;
+    QFile existing(weaponFile(base));QJsonObject root;
+    if(existing.exists()){
+        if(!existing.open(QIODevice::ReadOnly)||existing.size()>1024*1024)return false;
+        QJsonParseError error;const auto document=QJsonDocument::fromJson(existing.readAll(),&error);
+        if(error.error!=QJsonParseError::NoError||!document.isObject()||document.object()["version"].toInt()!=1)return false;
+        root=document.object();
+    }
+    root["version"]=1;root["selected"]=selected;
+    const auto bytes=QJsonDocument(root).toJson();QSaveFile file(weaponFile(base));
+    return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();
 }

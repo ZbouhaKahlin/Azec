@@ -37,6 +37,19 @@ inline bool validHotkey(int key){
     if(key>=160&&key<=165)return false;
     return true;
 }
+// Global actions (show/hide, recoil, panic) must not eat ordinary typing or
+// list-navigation keys. Weapon slots still accept 1/2 because they are meant
+// for the game and the foreground gate protects other applications.
+inline bool validGlobalHotkey(int key){
+    if(key==0)return true;
+    if(!validHotkey(key))return false;
+    if(key==8||key==9||key==13||key==27||key==32)return false;       // Backspace, Tab, Enter, Esc, Space
+    if(key>=48&&key<=57)return false;                                  // 0-9
+    if(key>=65&&key<=90)return false;                                  // A-Z
+    if(key>=186&&key<=192)return false;                                // OEM punctuation
+    if(key>=219&&key<=222)return false;                                // brackets, quote, tilde
+    return true;
+}
 struct Config {
     std::array<Operator, operator_count> operators;
     std::int32_t menu_key = 0x2d, recoil_key = 0x75, panic_key = 0x23;
@@ -71,6 +84,6 @@ public:
     Movement step(const Operator& op, int jitter);
     void reset() { x_ = y_ = 0; }
 };
-int recoil_interval(const Operator& op);
+int recoil_interval(bool rapidActive);
 int rapid_interval(const Operator& op);
 }
