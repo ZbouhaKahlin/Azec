@@ -32,7 +32,7 @@ enum class UiText {
     Ms,
     SystemSettings,
     FeedbackSound,
-    BeepWhenHotkeyStatesChange,
+    SoundWhenClosingUnsaved,
     Language,
     RecoilToggle,
     PanicExitKey,

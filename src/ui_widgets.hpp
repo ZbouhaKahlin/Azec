@@ -464,12 +464,18 @@ protected:
     }
 };
 
+inline QString operatorAssetName(const QString& name) {
+    QString asset; asset.reserve(name.size());
+    for (const QChar ch : name) if (ch.isLetterOrNumber()) asset.append(ch.toLower());
+    return asset;
+}
 inline QPixmap operatorPixmap(const QString& name,int size=32,qreal ratio=1) {
-    const QString key="azec/operator/"+name.toLower()+"/"+QString::number(size)+"/"+QString::number(ratio,'g',12);
+    const QString asset=operatorAssetName(name);
+    const QString key="azec/operator/"+asset+"/"+QString::number(size)+"/"+QString::number(ratio,'g',12);
     QPixmap cached;if(QPixmapCache::find(key,&cached))return cached;
     QPixmap pixmap(QSize(size,size)*ratio);pixmap.setDevicePixelRatio(ratio);pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);painter.setRenderHint(QPainter::Antialiasing);
-    QSvgRenderer renderer(":/operators/"+name.toLower()+".svg");
+    QSvgRenderer renderer(":/operators/"+asset+".svg");
     if(renderer.isValid())renderer.render(&painter,QRectF(0,0,size,size));
     painter.end();QPixmapCache::insert(key,pixmap);
     return pixmap;
@@ -548,10 +554,7 @@ class OperatorList final : public QListWidget {
     QScrollArea* area_;
 public:explicit OperatorList(QScrollArea* area):area_(area){}
 protected:
-    void wheelEvent(QWheelEvent* event) override {
-        QWheelEvent forwarded(QPointF(area_->viewport()->mapFromGlobal(event->globalPosition().toPoint())),event->globalPosition(),event->pixelDelta(),event->angleDelta(),event->buttons(),event->modifiers(),event->phase(),event->inverted());
-        QApplication::sendEvent(area_->viewport(),&forwarded);event->setAccepted(forwarded.isAccepted());
-    }
+    void wheelEvent(QWheelEvent* event) override;
 };
 
 // Paint the identity directly: nested graphics effects would disturb the panel shadow.
@@ -626,11 +629,78 @@ protected:
     void hideEvent(QHideEvent* event) override {settle();QStackedWidget::hideEvent(event);}
 };
 
+// Wheel notches glide to a nearby target instead of jumping a whole chunk.
+// Precision-touchpad pixel deltas stay one-to-one so native scrolling is kept.
+class SmoothScrollArea final : public QScrollArea {
+    QVariantAnimation glide_;
+    int target_=0;
+    bool wired_=false;
+public:
+    explicit SmoothScrollArea(QWidget* parent=nullptr):QScrollArea(parent){
+        glide_.setDuration(130);
+        glide_.setEasingCurve(QEasingCurve::OutCubic);
+        connect(&glide_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){
+            if(auto* bar=verticalScrollBar())bar->setValue(qRound(value.toReal()));
+        });
+    }
+    // The fading bar is installed after construction; bind to the bar that is
+    // actually used and stop a glide as soon as the user grabs it.
+    void wireScrollBar(){
+        auto* bar=verticalScrollBar();if(!bar||wired_)return;wired_=true;
+        connect(bar,&QScrollBar::sliderPressed,&glide_,&QVariantAnimation::stop);
+        connect(bar,&QScrollBar::actionTriggered,&glide_,&QVariantAnimation::stop);
+    }
+    static double notchDistance(int angleDelta){return angleDelta/120.0*96.0;}
+    void glideBy(double distance){
+        auto* bar=verticalScrollBar();if(!bar||bar->maximum()<=bar->minimum())return;
+        // Repeated notches add to the pending target so quick wheel bursts keep
+        // their momentum instead of restarting from the visible position.
+        const int origin=glide_.state()==QAbstractAnimation::Running?target_:bar->value();
+        target_=qBound(bar->minimum(),qRound(origin-distance),bar->maximum());
+        if(target_==bar->value()&&glide_.state()!=QAbstractAnimation::Running)return;
+        glide_.stop();glide_.setStartValue(qreal(bar->value()));glide_.setEndValue(qreal(target_));glide_.start();
+    }
+    void scrollByWheel(int angleDelta,int pixelDelta){
+        auto* bar=verticalScrollBar();if(!bar)return;
+        if(pixelDelta){glide_.stop();bar->setValue(bar->value()-pixelDelta);}
+        else if(angleDelta)glideBy(notchDistance(angleDelta));
+    }
+    bool gliding() const{return glide_.state()==QAbstractAnimation::Running;}
+protected:
+    void wheelEvent(QWheelEvent* event) override {
+        auto* bar=verticalScrollBar();
+        if(bar&&bar->maximum()>bar->minimum()){
+            if(int pixels=event->pixelDelta().y();pixels){scrollByWheel(0,pixels);event->accept();return;}
+            if(int angle=event->angleDelta().y();angle){scrollByWheel(angle,0);event->accept();return;}
+        }
+        QScrollArea::wheelEvent(event);
+    }
+};
+
+// The sidebar lists live inside one SmoothScrollArea, but they receive the
+// wheel themselves. Route those events straight into the shared glide instead
+// of relying on viewport event forwarding, which would jump a whole step.
+inline void OperatorList::wheelEvent(QWheelEvent* event) {
+    if(auto* smooth=dynamic_cast<SmoothScrollArea*>(area_)){
+        smooth->scrollByWheel(event->angleDelta().y(),event->pixelDelta().y());
+        event->accept();
+        return;
+    }
+    QWheelEvent forwarded(QPointF(area_->viewport()->mapFromGlobal(event->globalPosition().toPoint())),event->globalPosition(),event->pixelDelta(),event->angleDelta(),event->buttons(),event->modifiers(),event->phase(),event->inverted());
+    QApplication::sendEvent(area_->viewport(),&forwarded);event->setAccepted(forwarded.isAccepted());
+}
+
 class FadingScrollBar final : public QScrollBar {
     QTimer idle_;
     QVariantAnimation fade_;
     qreal opacity_=0;
+    qreal fadeTarget_=0;
     void fadeTo(qreal target){
+        // A glide emits valueChanged on every frame; without this guard the
+        // fade would restart repeatedly and never reach full opacity.
+        if(fadeTarget_==target&&fade_.state()==QAbstractAnimation::Running)return;
+        if(qFuzzyCompare(opacity_,target)&&fade_.state()!=QAbstractAnimation::Running)return;
+        fadeTarget_=target;
         fade_.stop();fade_.setDuration(target>opacity_?100:240);
         fade_.setStartValue(opacity_);fade_.setEndValue(target);fade_.start();
     }
@@ -650,7 +720,9 @@ public:
         auto* bar=new FadingScrollBar(area);area->setVerticalScrollBar(bar);
         // The lane is always reserved, including when there is no overflow.
         area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-        area->viewport()->installEventFilter(bar);return bar;
+        area->viewport()->installEventFilter(bar);
+        if(auto* smooth=dynamic_cast<SmoothScrollArea*>(area))smooth->wireScrollBar();
+        return bar;
     }
 protected:
     bool eventFilter(QObject* object,QEvent* event) override {
@@ -674,6 +746,7 @@ class ScrollFade final : public QWidget {
     int strip_=46;
 public:
     ScrollFade(QAbstractScrollArea* area,const QColor& color,bool top=false,QWidget* parent=nullptr):QWidget(parent?parent:area),area_(area),on_surface_(color==kbtheme::surface),top_(top){
+        setObjectName("scrollFade");
         setAttribute(Qt::WA_TransparentForMouseEvents);setAttribute(Qt::WA_NoSystemBackground);
         area_->viewport()->installEventFilter(this);
         if(auto* bar=area_->verticalScrollBar()){connect(bar,&QScrollBar::valueChanged,this,[this]{refresh();});connect(bar,&QScrollBar::rangeChanged,this,[this]{refresh();});}

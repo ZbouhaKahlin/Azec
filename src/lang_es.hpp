@@ -28,7 +28,7 @@ inline const char* const lang_es[]={
     " ms",
     "Ajustes del sistema",
     "Sonido de aviso",
-    "Pitido cuando cambian los atajos.",
+    "Reproducir un sonido suave al cerrar con cambios sin guardar.",
     "Idioma",
     "Alternar retroceso",
     "Tecla de pánico / salida",

@@ -70,13 +70,6 @@ inline void play(const std::vector<BYTE>& wav) {
                SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
 }
 
-// A rising pair for "on", a falling pair for "off".
-inline void playToggle(bool on) {
-    static const auto enabled = makeWav({{523.25, 70}, {659.25, 105}});
-    static const auto disabled = makeWav({{523.25, 70}, {392.00, 105}});
-    play(on ? enabled : disabled);
-}
-
 // A soft descending "mm-mm" used when leaving with unsaved changes.
 inline void playUnsaved() {
     static const auto no = makeWav({{392.00, 90}, {329.63, 150}});

@@ -15,9 +15,11 @@ struct BackupOptions {
 inline QJsonObject backupProfile(const r6::Operator& op){
     return {{"vertical",op.vertical},{"horizontal",op.horizontal},{"delay",op.delay},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)}};
 }
-// Version 1 keeps the six-key settings shape so older builds can still import
-// new backups; the removed settings are written normalized (accent/radius) or
-// preserved as raw bytes (rapid key/master).
+// Version 1 keeps the six-key settings shape so backups stay readable; the
+// operator array grows with the roster, so a build older than that roster may
+// reject a newer backup while still accepting its own older sizes. Removed
+// settings are written normalized (accent/radius) or preserved as raw bytes
+// (rapid key/master).
 inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favorites,
                               bool gameFocusOnly,
                               const QString& colorTheme,bool sidebarCollapsed,bool adsOnly=false){
@@ -40,8 +42,9 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     const auto integer=[&](const QJsonValue& value,int lo,int hi){return number(value,lo,hi)&&std::floor(value.toDouble())==value.toDouble();};
     if(root["application"]!="Azec"||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
     const auto records=root["operators"].toArray();const auto settings=root["settings"].toObject();r6::Config next;
-    // Backups made before the extension carry 71 records; both sizes import by name.
-    if(records.size()!=r6::operator_count&&records.size()!=r6::legacy_operator_count)return false;
+    // Backups carry any roster size from the original 71 records up to the
+    // current list; each record is matched by operator name.
+    if(records.size()<r6::legacy_operator_count||records.size()>r6::operator_count)return false;
     const auto profile=[&](const QJsonValue& record,r6::Operator& op){
         if(!record.isObject())return false;const auto values=record.toObject();
         if(!number(values["vertical"],0,100)||!number(values["horizontal"],-50,50)||!integer(values["delay"],0,60000)||!values["rapid"].isBool()||!values["humanize"].isBool())return false;

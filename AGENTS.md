@@ -9,7 +9,7 @@ Azec is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded loca
 - `src/app_style.hpp` / `src/strings.hpp`: styles and localized strings.
 - `src/phone_bridge.cpp`: mobile API callbacks and state building.
 - `src/profile_transfer.hpp` / `src/profile_transfer.cpp`: complete profile backup validation and import/export.
-- `src/ui_widgets.hpp`: custom controls, operator rows, title animation, popup, raised panel, page transitions, and fading scrollbars.
+- `src/ui_widgets.hpp`: custom controls, operator rows, title animation, popup, raised panel, page transitions, smooth wheel scrolling, and fading scrollbars.
 - `src/core.hpp` / `src/core.cpp`: primary binary configuration layout, weapon profiles, and movement arithmetic.
 - `src/engine.hpp` / `src/engine.cpp`: synchronized configuration, active weapon selection, and input worker threads.
 - `src/profile_store.hpp`: secondary weapon profiles and additional preferences in JSON.
@@ -40,8 +40,8 @@ All fixture checks must use fresh isolated directories under `.build/verificatio
 ## Data and behavior contracts
 
 - Preserve the original 3,734-byte primary configuration layout in `r6_config.bin`. Keep backward compatibility when adding features.
-- The operator roster covers all 72 operators in id order: Ace, Alibi, Amaru, Aruni, Ash, Azami, Bandit, Blackbeard, Blitz, Brava, Buck, Capitao, Castle, Caveira, Clash, Deimos, Doc, Dokkaebi, Echo, Ela, Fenrir, Finka, Flores, Frost, Fuze, Glaz, Goyo, Gridlock, Grim, Hibana, Iana, IQ, Jackal, Jager, Kaid, Kali, Kapkan, Lesion, Lion, Maestro, Maverick, Melusi, Mira, Montagne, Mozzie, Mute, Nokk, Osa, Oryx, Pulse, Ram, Rook, Sens, Sentry, Skopos, Smoke, Solis, Striker, Sledge, Tachanka, Thatcher, Thermite, Thorn, Thunderbird, Tubarao, Twitch, Valkyrie, Vigil, Wamai, Warden, Ying, Noor. Keep this order: extend at the end only so existing records never shift.
-- `r6_config.bin` serializes only the original 71 records. Primary profiles for operators past the original list (Noor, id 71) and the selected operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`); the binary `selected` field still rejects indexes past the original list. Backups with 71 or 72 records import by name.
+- The operator roster covers all 78 operators in id order: Ace, Alibi, Amaru, Aruni, Ash, Azami, Bandit, Blackbeard, Blitz, Brava, Buck, Capitao, Castle, Caveira, Clash, Deimos, Doc, Dokkaebi, Echo, Ela, Fenrir, Finka, Flores, Frost, Fuze, Glaz, Goyo, Gridlock, Grim, Hibana, Iana, IQ, Jackal, Jager, Kaid, Kali, Kapkan, Lesion, Lion, Maestro, Maverick, Melusi, Mira, Montagne, Mozzie, Mute, Nokk, Osa, Oryx, Pulse, Ram, Rook, Sens, Sentry, Skopos, Smoke, Solis, Striker, Sledge, Tachanka, Thatcher, Thermite, Thorn, Thunderbird, Tubarao, Twitch, Valkyrie, Vigil, Wamai, Warden, Ying, Noor, Nomad, Zofia, Zero, Rauora, Solid Snake, Denari. Keep this order: extend at the end only so existing records never shift.
+- `r6_config.bin` serializes only the original 71 records. Primary profiles for operators past the original list (Noor through Denari, ids 71-77) and the selected operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`); the binary `selected` field still rejects indexes past the original list. Backups with 71 to 78 records import by name.
 - Store secondary profiles, per-weapon rapid-fire flags, weapon hotkeys, the phone-access preference, and the game-focus preference in `azec_weapons.json`. Favorites use `azec_ui.json`.
 - Fresh configurations and the unpaired phone page default to English. Preserve saved language IDs: Portuguese is 0 and English is 1; pairing follows the desktop's saved language.
 - Each operator has a primary profile and an optional independent secondary profile. First enable copies primary settings; disabling preserves secondary edits. Character selection starts on primary.
@@ -69,7 +69,7 @@ All fixture checks must use fresh isolated directories under `.build/verificatio
 - Favorites appear only when nonempty and matching search. Favorited operators are hidden from All operators, so each operator appears once. Removing a favorite returns it to All operators.
 - Right-click favorites use a compact context-menu action, without a nested push button; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
 - Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
-- Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds.
+- Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds. Wheel notches glide smoothly instead of jumping; precision-touchpad pixel deltas stay native. The operator page, sidebar, and Settings share the same top/bottom edge fades.
 - The mouse wheel over a slider, number field, or dropdown scrolls the surrounding page instead of changing a value, unless that control already has focus. Arrow keys must reach a focused operator list; the 0.1 recoil fine-tuning only applies when no list, text field, or slider owns the keyboard.
 - Feedback sounds are generated inside the app. Do not use the Windows error beep or the system console bell. Closing with unsaved changes plays a soft descending two-note cue, and the cue follows the Feedback sound preference.
 - Selecting an operator persists only the selection and must never mark the profile dirty. Browsing the roster is navigation, not an edit.

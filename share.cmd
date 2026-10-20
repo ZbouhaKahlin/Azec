@@ -95,10 +95,15 @@ if errorlevel 1 ( popd & exit /b 1 )
 popd
 
 rem --------------------------------------------------------- smoke test
+if /I "%AZEC_SKIP_TESTS%"=="1" (
+    echo Installer smoke test skipped: AZEC_SKIP_TESTS=1.
+    goto publishing
+)
 python tests\installation_test.py --smoke
 if errorlevel 1 exit /b 1
 
 rem ------------------------------------------------------------- publishing
+:publishing
 if not defined DO_PUBLISH goto report
 gh repo view Azec-Zuckerberg/Azec-releases > nul 2>&1
 if errorlevel 1 (

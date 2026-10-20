@@ -49,16 +49,22 @@ state=json.loads(call('/api/state')[1])
 checks['extension_operator_listed']=any(o['id']==71 and o['name']=='Noor' for o in state['operators'])
 checks['selects_extension_operator']=json.loads(call('/api/update',{'action':'selectOperator','operator':71})[1])['operatorId']==71
 checks['extension_profile_edits']=abs(json.loads(call('/api/update',{'action':'setProfile','operator':71,'slot':0,'values':{'vertical':31.5,'horizontal':-4.25,'delay':90,'rapid':True,'humanize':False}})[1])['profile']['vertical']-31.5)<.001
-checks['rejects_extension_boundary']=call('/api/update',{'action':'selectOperator','operator':72})[0]==400
+checks['selects_new_extension_operator']=json.loads(call('/api/update',{'action':'selectOperator','operator':77})[1])['operatorId']==77
+checks['new_extension_profile_edits']=abs(json.loads(call('/api/update',{'action':'setProfile','operator':77,'slot':0,'values':{'vertical':22.5,'horizontal':1.5,'delay':70}})[1])['profile']['vertical']-22.5)<.001
+call('/api/update',{'action':'selectOperator','operator':71})
+checks['rejects_extension_boundary']=call('/api/update',{'action':'selectOperator','operator':78})[0]==400
 checks['rapid_active_roundtrip']=json.loads(call('/api/update',{'action':'setGlobal','values':{'rapidActive':True}})[1])['globals']['rapidActive']==True
 checks['save_succeeds']=call('/api/update',{'action':'save'})[0]==200
 checks['legacy_layout_unchanged']=(folder/'r6_config.bin').stat().st_size==3734
 saved=json.loads((folder/'azec_weapons.json').read_text())
 checks['secondary_persists']=saved['operators']['Ash']['enabled'] and abs(saved['operators']['Ash']['vertical']-23.7)<.001
 checks['extension_primary_persists']=saved['selected']==71 and abs(saved['primaryProfiles']['Noor']['vertical']-31.5)<.001 and saved['primaryProfiles']['Noor']['delay']==90
+checks['new_extension_primary_persists']=abs(saved['primaryProfiles']['Denari']['vertical']-22.5)<.001 and saved['primaryProfiles']['Denari']['delay']==70
 checks['rapid_active_persists']=saved['perProfileRapid']==True and saved['primaryProfiles']['Noor']['rapid']==True and saved['operators']['Ash']['rapid']==True
 checks['operator_icon_available']=call('/icons/ash.svg',auth=False)[0]==200
 checks['extension_icon_available']=call('/icons/noor.svg',auth=False)[0]==200
+checks['current_roster_complete']=all(any(o['name']==n for o in state['operators']) for n in ('Nomad','Zofia','Zero','Rauora','Solid Snake','Denari'))
+checks['solid_snake_icon_available']=call('/icons/solidsnake.svg',auth=False)[0]==200
 checks['rejects_icon_traversal']=call('/icons/../phone_server.hpp',auth=False)[0]==404
 checks['rejects_wrong_host']=call('/api/state',extra={'Host':'unrelated.example:'+str(info['port'])})[0]==403
 checks['unknown_authenticated_route']=call('/missing')[0]==404

@@ -16,14 +16,20 @@ bool self_test(const std::filesystem::path& output) {
     };
     bool ok = check(sizeof(Operator) == 52 && config.bytes().size() == 3734, "recovered binary layout");
     ok &= check(std::string(config.operators.front().name) == "Ace" &&
-                std::string(config.operators[operator_count-2].name) == "Ying" &&
-                std::string(config.operators.back().name) == "Noor", "original operator bounds with the extension appended");
+                std::string(config.operators[legacy_operator_count-1].name) == "Ying" &&
+                std::string(config.operators[legacy_operator_count].name) == "Noor", "original operator bounds stay fixed with extensions appended");
+    const char* extensions[]={"Noor","Nomad","Zofia","Zero","Rauora","Solid Snake","Denari"};
+    const int extensionCount=int(sizeof(extensions)/sizeof(extensions[0]));
+    bool extensionRoster=true;
+    for(int i=0;i<extensionCount;++i)extensionRoster&=std::string(config.operators[legacy_operator_count+i].name)==extensions[i];
+    ok &= check(extensionRoster&&operator_count==legacy_operator_count+extensionCount,"all current operators are appended without shifting saved records");
+    ok &= check(config.language==1&&Config{}.language==1,"fresh configuration defaults to English");
     Config extension;extension.operators[operator_count-1].vertical=55.f;extension.secondary_enabled[operator_count-1]=true;extension.selected=operator_count-1;
     ok &= check(extension.bytes()==Config{}.bytes(),"extension profile and selection stay out of the legacy layout");
     Config extensionLoaded;
     ok &= check(extension.save(output)&&extensionLoaded.load(output)&&extensionLoaded.selected==0&&
                 extensionLoaded.operators[operator_count-1].vertical==10&&
-                std::string(extensionLoaded.operators.back().name)=="Noor","extension data never reaches the binary file");
+                std::string(extensionLoaded.operators.back().name)=="Denari","extension data never reaches the binary file");
     RecoilAccumulator accumulator;
     Operator op; op.vertical = 1.25f; op.horizontal = -0.5f;
     int x = 0, y = 0;

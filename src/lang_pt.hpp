@@ -28,7 +28,7 @@ inline const char* const lang_pt[]={
     " ms",
     "Configurações",
     "Som de feedback",
-    "Sinal sonoro ao alternar atalhos.",
+    "Tocar um som suave ao fechar com alterações não salvas.",
     "Idioma",
     "Alternar recoil",
     "Tecla de saída",

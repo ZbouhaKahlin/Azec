@@ -9,7 +9,8 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / 'runtime' / 'Azec.exe'
+APP = Path(os.environ.get('AZEC_APP', ROOT / 'runtime' / 'Azec.exe'))
+CHECKS = Path(os.environ.get('AZEC_CHECKS', ROOT / 'runtime' / 'Azec-checks.exe'))
 
 def start(folder):
     process = subprocess.Popen([str(APP), '--dry-run', '--phone-info=phone-info.json'], cwd=folder,
@@ -90,7 +91,7 @@ def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False):
             fixture = Path(tempfile.mkdtemp(prefix='ui-goofy-' + scale + '-', dir=parent))
             env = os.environ.copy()
             env['QT_SCALE_FACTOR'] = scale
-            subprocess.run([str(ROOT / 'runtime' / 'Azec-checks.exe'), '--ui-self-test']
+            subprocess.run([str(CHECKS), '--ui-self-test']
                            + (['--all-languages'] if full else []), cwd=fixture, env=env, check=True, timeout=150)
             report = json.loads((fixture / 'ui-verification.json').read_text())
             if not report['passed']:

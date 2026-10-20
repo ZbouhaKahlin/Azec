@@ -28,7 +28,7 @@ inline const char* const lang_en[]={
     " ms",
     "System settings",
     "Feedback sound",
-    "Play a soft tone when recoil or rapid fire toggles.",
+    "Play a soft cue when closing with unsaved changes.",
     "Language",
     "Recoil toggle",
     "Panic / exit key",

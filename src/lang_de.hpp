@@ -28,7 +28,7 @@ inline const char* const lang_de[]={
     " ms",
     "Systemeinstellungen",
     "Feedback-Ton",
-    "Signalton bei Hotkey-Wechseln.",
+    "Leisen Ton beim Schließen mit ungespeicherten Änderungen abspielen.",
     "Sprache",
     "Rückstoß umschalten",
     "Panik- / Beenden-Taste",

@@ -23,9 +23,10 @@ static_assert(offsetof(Operator, vertical) == 32);
 static_assert(offsetof(Operator, rapid) == 40);
 static_assert(offsetof(Operator, delay) == 44);
 static_assert(offsetof(Operator, humanize) == 48);
-constexpr int operator_count = 72;
-// The original writes exactly 71 operator records; extension operators (Noor)
-// keep r6_config.bin at 3,734 bytes and live in azec_weapons.json instead.
+constexpr int operator_count = 78;
+// The original writes exactly 71 operator records; extension operators (Noor
+// and every later roster addition) keep r6_config.bin at 3,734 bytes and live
+// in azec_weapons.json instead.
 constexpr int legacy_operator_count = 71;
 // Bindable keys reject mouse buttons, lone modifiers, and Windows keys.
 inline bool validHotkey(int key){
@@ -53,7 +54,7 @@ inline bool validGlobalHotkey(int key){
 struct Config {
     std::array<Operator, operator_count> operators;
     std::int32_t menu_key = 0x2d, recoil_key = 0x75, panic_key = 0x23;
-    std::int32_t selected = 0, language = 1;
+    std::int32_t selected = 0, language = 1; // Fresh stores open in English; saved Portuguese (0) is preserved.
     std::uint8_t sound = 1;
     std::int32_t rapid_key = 0x77;
     std::uint8_t rapid_master = 1;

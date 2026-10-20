@@ -28,7 +28,7 @@ inline const char* const lang_fr[]={
     " ms",
     "Paramètres système",
     "Son de retour",
-    "Bip lorsque les raccourcis changent d'état.",
+    "Jouer un son discret à la fermeture avec des modifications non enregistrées.",
     "Langue",
     "Basculer le recul",
     "Touche panique / sortie",

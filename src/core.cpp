@@ -13,8 +13,9 @@
 
 namespace r6 {
 // FUN_140063d90 constructs 73 names but stops after index 70. Zero and Zofia
-// are embedded strings, but never enter the original's 71-element list. Noor
-// (Year 11) is appended as an extension and never enters the binary layout.
+// are embedded strings, but never enter the original's 71-element list. The
+// live roster additions from Noor onward are appended as extensions and never
+// enter the binary layout, so saved operator records keep their positions.
 static const char* names[] = {
     "Ace", "Alibi", "Amaru", "Aruni", "Ash", "Azami", "Bandit", "Blackbeard",
     "Blitz", "Brava", "Buck", "Capitao", "Castle", "Caveira", "Clash", "Deimos",
@@ -24,7 +25,8 @@ static const char* names[] = {
     "Melusi", "Mira", "Montagne", "Mozzie", "Mute", "Nokk", "Osa", "Oryx",
     "Pulse", "Ram", "Rook", "Sens", "Sentry", "Skopos", "Smoke", "Solis",
     "Striker", "Sledge", "Tachanka", "Thatcher", "Thermite", "Thorn",
-    "Thunderbird", "Tubarao", "Twitch", "Valkyrie", "Vigil", "Wamai", "Warden", "Ying", "Noor"
+    "Thunderbird", "Tubarao", "Twitch", "Valkyrie", "Vigil", "Wamai", "Warden", "Ying", "Noor",
+    "Nomad", "Zofia", "Zero", "Rauora", "Solid Snake", "Denari"
 };
 static_assert(std::size(names) == operator_count);
 Config::Config() {

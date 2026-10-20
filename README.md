@@ -1,6 +1,6 @@
 # Azec
 
-A Windows desktop app with 72 operator profiles, independent primary and secondary weapon settings, and phone controls over your local network.
+A Windows desktop app with 78 operator profiles, independent primary and secondary weapon settings, and phone controls over your local network.
 
 ![Azec C6: pastel desktop and phone themes on a lilac grid background](docs/showcase-pastel.png)
 
@@ -77,6 +77,8 @@ This runs core, HTTP, recovery, and restart checks without the 61-second expiry 
 .\share.cmd quick      # repackage the current build without recompiling
 .\share.cmd publish    # also upload the build to a public releases-only repository
 ```
+
+When explicitly skipping all packaging tests, set `$env:AZEC_SKIP_TESTS = "1"` before running `share.cmd`; this skips its installer smoke test.
 
 `publish` uses the GitHub CLI and uploads to `github.com/Azec-Zuckerberg/Azec-releases`: the binaries are public while this source repository stays private. The stable link is `https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe`.
 
