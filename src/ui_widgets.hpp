@@ -62,6 +62,71 @@ protected:
     }
 };
 
+// Unframed theme choices: only the app preview has a border, with its name below.
+class ThemeCard final : public QAbstractButton {
+    QString id_;
+    void paintPreview(QPainter& painter,const QRectF& area) const{
+        const auto& theme=kbtheme::colorTheme(id_);
+        const QColor paper(theme.paper),surface(theme.surface),accent(theme.accent),selection(theme.selection),text(theme.text),outline(theme.outline);
+        painter.save();
+        QPainterPath clip;clip.addRoundedRect(area,7,7);painter.setClipPath(clip);
+        // Show the palette at a useful size: real typography and control shapes,
+        // rather than illegible text in a miniature window.
+        painter.fillRect(area,paper);
+        painter.fillRect(QRectF(area.left(),area.top()+31,area.width(),area.height()-31),surface);
+        QFont brand("Press Start 2P");brand.setPixelSize(11);painter.setFont(brand);painter.setPen(text);
+        painter.drawText(QRectF(area.left()+12,area.top()+7,80,19),Qt::AlignVCenter,QStringLiteral("Azec"));
+        const QRectF toggle(area.right()-40,area.top()+8,29,17);
+        painter.setPen(QPen(outline,1.5));painter.setBrush(accent);painter.drawRoundedRect(toggle,8.5,8.5);
+        const QRectF knob(toggle.right()-15,toggle.top()+2,13,13);
+        painter.setBrush(Qt::white);painter.drawEllipse(knob);
+        painter.setPen(QPen(outline,1,Qt::SolidLine,Qt::RoundCap));
+        painter.drawPoint(QPointF(knob.center().x()-2,knob.center().y()-2));painter.drawPoint(QPointF(knob.center().x()+2,knob.center().y()-2));
+        painter.drawArc(knob.adjusted(3,3,-3,-3),200*16,140*16);
+        const QRectF track(area.left()+13,area.top()+47,area.width()-65,6);
+        painter.setPen(Qt::NoPen);painter.setBrush(selection);painter.drawRoundedRect(track,3,3);
+        painter.setBrush(accent);painter.drawRoundedRect(QRectF(track.topLeft(),QSizeF(track.width()*.43,track.height())),3,3);
+        painter.setPen(QPen(outline,1.5));painter.setBrush(Qt::white);painter.drawEllipse(QPointF(track.left()+track.width()*.43,track.center().y()),5,7);
+        const QRectF number(area.right()-42,area.top()+39,31,21);
+        painter.setBrush(QColor("#FFDD59"));painter.drawRoundedRect(number,5,5);
+        QFont mono("Consolas");mono.setPixelSize(10);mono.setBold(true);painter.setFont(mono);painter.setPen(kbtheme::chipInk);painter.drawText(number,Qt::AlignCenter,QStringLiteral("12.0"));
+        painter.restore();
+        painter.setPen(QPen(outline,1.5));painter.setBrush(Qt::NoBrush);painter.drawRoundedRect(area,7,7);
+    }
+public:
+    explicit ThemeCard(const QString& id,QWidget* parent=nullptr):QAbstractButton(parent),id_(id){
+        const auto& theme=kbtheme::colorTheme(id);
+        setObjectName("themeCard-"+id);setText(QString::fromUtf8(theme.name));setAccessibleName(QString::fromUtf8(theme.name));setToolTip(QString::fromUtf8(theme.name));
+        setCheckable(true);setAutoExclusive(true);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);
+        setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);setFixedHeight(96);
+    }
+    QString themeId() const{return id_;}
+    QSize sizeHint() const override{return QSize(168,96);}
+protected:
+    void paintEvent(QPaintEvent*) override{
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
+        const bool active=isChecked(),keyboard=hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange);
+        const QRectF preview(4,4,width()-8,66);paintPreview(painter,preview);
+        if(active){painter.setPen(QPen(kbtheme::defaultAccent,2));painter.setBrush(Qt::NoBrush);painter.drawRoundedRect(preview.adjusted(-3,-3,3,3),10,10);}
+        QFont font=this->font();font.setPixelSize(12);font.setWeight(active?QFont::Bold:QFont::Medium);painter.setFont(font);painter.setPen(kbtheme::ink);
+        const bool rtl=layoutDirection()==Qt::RightToLeft;
+        const QRectF nameRect(rtl&&active?23:4,76,width()-(active?27:8),18);
+        const QString name=QFontMetrics(font).elidedText(text(),Qt::ElideRight,qRound(nameRect.width()));
+        painter.drawText(nameRect,(rtl?Qt::AlignRight:Qt::AlignLeft)|Qt::AlignVCenter,name);
+        if(active){
+            const QRectF check(rtl?4:width()-18,78,14,14);
+            painter.setPen(Qt::NoPen);painter.setBrush(kbtheme::defaultAccent);painter.drawEllipse(check);
+            painter.setPen(QPen(kbtheme::readableOn(kbtheme::defaultAccent),1.6,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+            painter.drawPolyline(QPolygonF({{check.center().x()-4,check.center().y()},{check.center().x()-1,check.center().y()+3},{check.center().x()+4,check.center().y()-3}}));
+        }
+        if(keyboard){painter.setPen(QPen(kbtheme::defaultAccent,2,Qt::DashLine));painter.setBrush(Qt::NoBrush);painter.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),10,10);}
+    }
+    void keyPressEvent(QKeyEvent* event) override{
+        if(event->key()==Qt::Key_Return||event->key()==Qt::Key_Enter){click();return;}
+        QAbstractButton::keyPressEvent(event);
+    }
+};
+
 inline QColor mixColor(const QColor& from,const QColor& to,qreal amount){
     return QColor::fromRgbF(from.redF()+(to.redF()-from.redF())*amount,from.greenF()+(to.greenF()-from.greenF())*amount,from.blueF()+(to.blueF()-from.blueF())*amount);
 }

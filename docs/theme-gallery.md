@@ -1,6 +1,6 @@
 # Goofy color themes
 
-Header 01, implemented in the Windows app: a seamless 60 px top bar matching the sidebar, with extra breathing room around the controls. All ten themes share the same layout. Switch in **Settings → Appearance → Color theme**.
+Header 01, implemented in the Windows app: a seamless 60 px top bar matching the sidebar, with extra breathing room around the controls. All ten themes share the same layout. Pick a preview card in **Settings → Appearance**.
 
 Each palette also drives the pairing QR: the finder centre takes the theme accent (darkened when the accent is too light to stay scannable), while the code itself stays dark-on-light so every theme pairs the same working link. The header carries the two status pills, **Recoil** and **Rapid fire**, in every theme.
 

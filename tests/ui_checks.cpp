@@ -307,12 +307,20 @@ QJsonObject MainWindow::selfTest(const QString& output){
         wait(220);
 
             const auto originalTheme=kbtheme::activeColorTheme;const auto themeProfiles=engine_.snapshot().bytes();const bool themeDirty=unsaved_;const auto themePanel=panel_->geometry();
-            checks["all_requested_palettes_available"]=theme_choice_->count()==10;
+            checks["all_requested_palettes_available"]=theme_cards_.size()==10;
+            bool themeCardsVisible=theme_cards_.size()==10;
+            for(auto* card:theme_cards_)themeCardsVisible&=card->isVisible();
+            const QString clickTheme=kbtheme::activeColorTheme=="rose"?QStringLiteral("goofy"):QStringLiteral("rose");
+            ThemeCard* clickCard=nullptr;for(auto* card:theme_cards_)if(card->themeId()==clickTheme)clickCard=card;
+            if(clickCard)clickCard->click();QApplication::processEvents();
+            checks["appearance_theme_card_click_applies_and_saves"]=clickCard&&kbtheme::activeColorTheme==clickTheme&&selectedThemeId()==clickTheme&&kbtheme::readColorTheme(config_path_)==clickTheme;
+            checks["appearance_theme_grid_shows_all_palettes"]=themeCardsVisible&&selectedThemeId()==kbtheme::activeColorTheme&&!findChild<QComboBox*>("colorThemeChoice");
+            chooseColorTheme(originalTheme);QApplication::processEvents();
             bool palettesApply=true,palettesPersist=true,themeLayoutStable=true,seamlessHeaders=true,mobilePalettesMatch=true;
             for(const auto& palette:kbtheme::colorThemes){
-                theme_choice_->setCurrentIndex(theme_choice_->findData(QLatin1String(palette.id)));QApplication::processEvents();
+                chooseColorTheme(QLatin1String(palette.id));QApplication::processEvents();
                 const bool matchingText=this->palette().color(QPalette::WindowText)==QColor(palette.text);
-                palettesApply&=accent()==QColor(palette.accent)&&kbtheme::paper==QColor(palette.paper)&&kbtheme::surface==QColor(palette.surface)&&matchingText;
+                palettesApply&=accent()==QColor(palette.accent)&&kbtheme::paper==QColor(palette.paper)&&kbtheme::surface==QColor(palette.surface)&&matchingText&&selectedThemeId()==QLatin1String(palette.id);
                 palettesPersist&=kbtheme::readColorTheme(config_path_)==QLatin1String(palette.id);
                 const auto phoneAppearance=mobileState()["appearance"].toObject();const auto phoneColors=phoneAppearance["colors"].toObject();
                 mobilePalettesMatch&=phoneAppearance["id"].toString()==QLatin1String(palette.id)&&phoneColors["paper"].toString()==QColor(palette.paper).name()&&phoneColors["ink"].toString()==QColor(palette.text).name()&&phoneColors["outline"].toString()==QColor(palette.outline).name()&&phoneAppearance["themes"].toArray().size()==10;
@@ -323,10 +331,10 @@ QJsonObject MainWindow::selfTest(const QString& output){
             checks["all_palettes_have_seamless_sidebar_color_header"]=seamlessHeaders;checks["palettes_apply_immediately_with_readable_text"]=palettesApply;checks["palette_selection_persists"]=palettesPersist;checks["palettes_keep_layout_and_profile_edits"]=themeLayoutStable;
             checks["desktop_theme_changes_publish_matching_phone_palettes"]=mobilePalettesMatch;
             persistFavorites();checks["favorites_preserve_nondefault_palette"]=kbtheme::readColorTheme(config_path_)=="deep-sea";
-            {MainWindow reopened(engine_,config_path_);checks["palette_reloads_in_new_window"]=reopened.theme_choice_->currentData().toString()==kbtheme::activeColorTheme;}
-            theme_choice_->setCurrentIndex(theme_choice_->findData(originalTheme));QApplication::processEvents();
+            {MainWindow reopened(engine_,config_path_);checks["palette_reloads_in_new_window"]=reopened.selectedThemeId()==kbtheme::activeColorTheme;}
+            chooseColorTheme(originalTheme);QApplication::processEvents();
             const auto phoneThemeProfiles=engine_.snapshot().bytes();const bool phoneThemeDirty=unsaved_;const auto remoteTheme=mobileUpdate({{"action","setTheme"},{"theme","forest"}});
-            checks["phone_theme_change_updates_desktop_and_persistence"]=remoteTheme["appearance"].toObject()["id"].toString()=="forest"&&theme_choice_->currentData().toString()=="forest"&&kbtheme::paper==QColor("#14241E")&&kbtheme::readColorTheme(config_path_)=="forest"&&engine_.snapshot().bytes()==phoneThemeProfiles&&unsaved_==phoneThemeDirty;
+            checks["phone_theme_change_updates_desktop_and_persistence"]=remoteTheme["appearance"].toObject()["id"].toString()=="forest"&&selectedThemeId()=="forest"&&kbtheme::paper==QColor("#14241E")&&kbtheme::readColorTheme(config_path_)=="forest"&&engine_.snapshot().bytes()==phoneThemeProfiles&&unsaved_==phoneThemeDirty;
             checks["phone_rejects_unknown_and_nonstring_theme"]=mobileUpdate({{"action","setTheme"},{"theme","not-a-theme"}}).contains("error")&&mobileUpdate({{"action","setTheme"},{"theme",12}}).contains("error")&&kbtheme::activeColorTheme=="forest";
             mobileUpdate({{"action","setTheme"},{"theme",originalTheme}});
             const auto sidebarProfiles=engine_.snapshot().bytes();showOperators();wait(220);const int expandedWidth=panel_->width();sidebar_scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();
@@ -338,7 +346,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             checks["sidebar_collapsed_preference_persists"]=uiprefs::sidebarCollapsed(config_path_);capture(output+"/sidebar-collapsed.png");
             checks["collapsed_sidebar_keeps_top_toggle_and_bottom_search_icon"]=sidebar_toggle_->width()==64&&sidebar_search_->isVisible()&&search_->isHidden()&&sidebar_search_box_->geometry().top()>sidebar_scroll_->geometry().bottom()&&operators_->viewport()->grab(QRect(6,4,44,44)).toImage()==anchoredIcon;
             const bool alreadyFavorite=favorites_.contains("Ash");setFavorite(4,true);checks["collapsed_sidebar_favorites_stay_unique_and_preserve_preferences"]=sidebar_->width()==76&&operators_->item(4)->isHidden()&&favorites_group_->isVisible()&&uiprefs::sidebarCollapsed(config_path_);setFavorite(4,alreadyFavorite);
-            theme_choice_->setCurrentIndex(theme_choice_->findData("rose"));QApplication::processEvents();checks["changing_palette_preserves_collapsed_sidebar"]=sidebar_->width()==76&&uiprefs::sidebarCollapsed(config_path_)&&kbtheme::readColorTheme(config_path_)=="rose"&&engine_.snapshot().bytes()==sidebarProfiles;capture(output+"/sidebar-rose.png");theme_choice_->setCurrentIndex(theme_choice_->findData(originalTheme));
+            chooseColorTheme("rose");QApplication::processEvents();checks["changing_palette_preserves_collapsed_sidebar"]=sidebar_->width()==76&&uiprefs::sidebarCollapsed(config_path_)&&kbtheme::readColorTheme(config_path_)=="rose"&&selectedThemeId()=="rose"&&engine_.snapshot().bytes()==sidebarProfiles;capture(output+"/sidebar-rose.png");chooseColorTheme(originalTheme);
             {MainWindow reopened(engine_,config_path_);checks["collapsed_sidebar_reloads_in_new_window"]=reopened.sidebar_collapsed_&&reopened.sidebar_->width()==76;}
             QApplication::setActiveWindow(this);sidebar_search_->click();wait(80);checks["search_expands_sidebar_with_animation"]=!sidebar_collapsed_&&sidebar_animation_.state()==QAbstractAnimation::Running;wait(220);
             checks["sidebar_search_receives_focus"]=sidebar_->width()==200&&search_->hasFocus()&&sidebar_search_->isHidden();
@@ -347,14 +355,14 @@ QJsonObject MainWindow::selfTest(const QString& output){
             checks["rapid_sidebar_reversal_settles_expanded"]=!sidebar_collapsed_&&sidebar_->width()==200&&sidebar_animation_.state()==QAbstractAnimation::Stopped&&!uiprefs::sidebarCollapsed(config_path_);
             showPreferences();chooseSettingsCategory(1);wait(220);capture(output+"/appearance-settings.png");
             const auto uiPath=uiprefs::filePath(config_path_),uiTemporary=uiPath+".appearance-test-backup";QFile::rename(uiPath,uiTemporary);QDir().mkdir(uiPath);
-            const auto previousTheme=kbtheme::activeColorTheme;theme_choice_->setCurrentIndex(theme_choice_->findData("midnight"));setSidebarCollapsed(true);
-            checks["failed_ui_save_keeps_theme_and_sidebar"]=kbtheme::activeColorTheme==previousTheme&&theme_choice_->currentData().toString()==previousTheme&&!sidebar_collapsed_&&sidebar_->width()==200;
-            checks["failed_phone_theme_save_keeps_both_screens_on_previous_theme"]=mobileUpdate({{"action","setTheme"},{"theme","forest"}}).contains("error")&&kbtheme::activeColorTheme==previousTheme&&theme_choice_->currentData().toString()==previousTheme&&mobileState()["appearance"].toObject()["id"].toString()==previousTheme;
-            QDir().rmdir(uiPath);QFile::rename(uiTemporary,uiPath);notice_->hide();
+            const auto previousTheme=kbtheme::activeColorTheme;chooseColorTheme("midnight");setSidebarCollapsed(true);
+            checks["failed_ui_save_keeps_theme_and_sidebar"]=kbtheme::activeColorTheme==previousTheme&&selectedThemeId()==previousTheme&&!sidebar_collapsed_&&sidebar_->width()==200;
+            checks["failed_phone_theme_save_keeps_both_screens_on_previous_theme"]=mobileUpdate({{"action","setTheme"},{"theme","forest"}}).contains("error")&&kbtheme::activeColorTheme==previousTheme&&selectedThemeId()==previousTheme&&mobileState()["appearance"].toObject()["id"].toString()==previousTheme;
+            QDir().rmdir(uiPath);QFile::rename(uiTemporary,uiPath);notice_close_->click();
             persistFavorites();checks["favorite_save_preserves_theme_and_sidebar"]=kbtheme::readColorTheme(config_path_)==originalTheme&&!uiprefs::sidebarCollapsed(config_path_);
 
         if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(1);wait(220);
-        checks["appearance_has_no_interface_selector_or_restart_action"]=preferences_->isVisible()&&!findChild<QComboBox*>("interfaceChoice")&&!findChild<QWidget*>("interfacePopup");
+        checks["appearance_has_no_interface_selector_or_restart_action"]=preferences_->isVisible()&&!findChild<QComboBox*>("interfaceChoice")&&!findChild<QWidget*>("interfacePopup")&&!findChild<QComboBox*>("colorThemeChoice");
         capture(output+"/appearance-settings.png");
         const auto uiFixture=std::filesystem::path(output.toStdWString())/L"ui-preferences"/L"r6_config.bin";QDir().mkpath(QString::fromStdWString(uiFixture.parent_path().wstring()));
         checks["missing_appearance_preferences_use_defaults"]=kbtheme::readColorTheme(uiFixture)=="charcoal"&&!uiprefs::sidebarCollapsed(uiFixture);

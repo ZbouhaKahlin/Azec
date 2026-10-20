@@ -64,7 +64,7 @@ class MainWindow final : public QWidget {
     QVector<SettingsNavButton*> settings_nav_buttons_;bool settings_sidebar_=false;
     IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;StickerStarButton* sidebar_favorites_=nullptr;
     QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false,sidebar_animating_=false,favorites_shown_=false;
-    QComboBox *theme_choice_=nullptr;QVector<QWidget*> preference_categories_;int preference_category_=0;
+    QVector<ThemeCard*> theme_cards_;QVector<QWidget*> preference_categories_;int preference_category_=0;
     QVariantAnimation operator_transition_;
     FadeLabel *name_opacity_=nullptr,*icon_opacity_=nullptr;
     QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr,*subtitle_=nullptr;
@@ -240,11 +240,21 @@ class MainWindow final : public QWidget {
         styleNotice();
         for(auto* child:findChildren<QWidget*>())child->update();update();
     }
+    void syncThemeCards(){
+        for(auto* card:theme_cards_)if(card->themeId()==kbtheme::activeColorTheme)card->setChecked(true);
+        for(auto* card:theme_cards_){if(card->themeId()!=kbtheme::activeColorTheme&&card->isChecked())card->setChecked(false);card->update();}
+    }
+    QString selectedThemeId() const{
+        for(auto* card:theme_cards_)if(card&&card->isChecked())return card->themeId();
+        return {};
+    }
     bool chooseColorTheme(const QString& id){
         if(!kbtheme::writeColorTheme(config_path_,id)){
-            QSignalBlocker blocked(theme_choice_);theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));showNotice(text(UiText::ThemeSaveFailed),true,true);return false;
+            syncThemeCards();showNotice(text(UiText::ThemeSaveFailed),true,true);return false;
         }
-        kbtheme::initialize(id);{QSignalBlocker blocked(theme_choice_);theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));}if(pairing_qr_)pairing_qr_->refreshTheme();applyStyle();return true;
+        kbtheme::initialize(id);
+        if(pairing_qr_)pairing_qr_->refreshTheme();
+        applyStyle();syncThemeCards();return true;
     }
     void chooseSettingsCategory(int index){
         if(index<0||index>=preference_categories_.size())return;
@@ -326,16 +336,22 @@ class MainWindow final : public QWidget {
     void buildPreferences(){
         if(!preferences_)return;
         refreshing_=true;const auto c=engine_.snapshot();
-        delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;
+        theme_cards_.clear();delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;
         auto* outer=new QVBoxLayout(content);outer->setContentsMargins(2,0,10,0);outer->setSpacing(14);
         const auto categoryLayout=[&]{auto* page=new QWidget;page->setMinimumWidth(0);auto* layout=new QVBoxLayout(page);layout->setContentsMargins(0,0,0,0);layout->setSpacing(14);outer->addWidget(page);preference_categories_.append(page);return layout;};
         auto* generalLayout=categoryLayout();auto* preferencesLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();
-        auto* colors=new Section(text(UiText::ColorTheme),false,true,kbtheme::blue);preferencesLayout->addWidget(colors);
-        auto* colorHint=label(text(UiText::ColorThemeHint),"rowHint");colorHint->setWordWrap(true);colors->body->addWidget(colorHint);
-        theme_choice_=new LanguageComboBox(nullptr,"themePopup");theme_choice_->setObjectName("colorThemeChoice");theme_choice_->setAccessibleName(text(UiText::ColorTheme));theme_choice_->setIconSize(QSize(54,18));
-        for(const auto& theme:kbtheme::colorThemes){QPixmap swatch(54,18);swatch.fill(Qt::transparent);QPainter painter(&swatch);painter.fillRect(0,0,18,18,QColor(theme.paper));painter.fillRect(18,0,18,18,QColor(theme.selection));painter.fillRect(36,0,18,18,QColor(theme.accent));painter.end();theme_choice_->addItem(QIcon(swatch),QString::fromUtf8(theme.name),QLatin1String(theme.id));}
-        theme_choice_->setCurrentIndex(theme_choice_->findData(kbtheme::activeColorTheme));colors->body->addWidget(theme_choice_);
-        connect(theme_choice_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){chooseColorTheme(theme_choice_->itemData(index).toString());});
+        auto* colorTitle=new StickerLabel(text(UiText::ColorTheme),kbtheme::blue);preferencesLayout->addWidget(colorTitle,0,Qt::AlignLeft);
+        auto* themeGrid=new QWidget;themeGrid->setObjectName("themeGrid");auto* grid=new QGridLayout(themeGrid);
+        themeGrid->setToolTip(text(UiText::ColorThemeHint));
+        grid->setContentsMargins(0,0,0,0);grid->setHorizontalSpacing(14);grid->setVerticalSpacing(10);
+        for(int i=0;i<kbtheme::colorThemes.size();++i){
+            const auto& theme=kbtheme::colorThemes[i];auto* card=new ThemeCard(QLatin1String(theme.id));
+            theme_cards_.append(card);grid->addWidget(card,i/3,i%3);
+            const QString id=QLatin1String(theme.id);
+            connect(card,&QAbstractButton::clicked,this,[this,id]{if(id!=kbtheme::activeColorTheme)chooseColorTheme(id);else syncThemeCards();});
+        }
+        for(int column=0;column<3;++column)grid->setColumnStretch(column,1);
+        preferencesLayout->addWidget(themeGrid);syncThemeCards();
         auto* system=new Section(text(UiText::SystemSettings),false,true,kbtheme::lime);system_=system;generalLayout->addWidget(system);
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::BeepWhenHotkeyStatesChange)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         game_focus_only_=toggle(settingRow(system,text(UiText::OnlyWhileGameIsActive),text(UiText::OnlyWhileGameIsActiveHint)),"Only in Rainbow Six",engine_.game_focus_only,[this](bool on){engine_.game_focus_only=on;dirty();});
