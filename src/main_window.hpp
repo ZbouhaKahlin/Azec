@@ -565,25 +565,29 @@ class MainWindow final : public QWidget {
         return saved;
     }
     void bindKey(int index){
-        binding_=index+1;QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setObjectName("hotkeyDialog");dialog.setAttribute(Qt::WA_StyledBackground);dialog.setWindowTitle(text(UiText::KeyBinding));dialog.setMinimumWidth(380);auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(24,20,24,24);layout->setSpacing(14);
-        auto* header=new QHBoxLayout;header->addWidget(label(text(UiText::SetAHotkey),"cardTitle"),1);auto* cancel=new IconButton(":/ui/close.svg",[this]{return accent();});cancel->setObjectName("closeControl");cancel->setAccessibleName(text(UiText::CancelHotkeyBinding));header->addWidget(cancel);layout->addLayout(header);connect(cancel,&QPushButton::clicked,&dialog,&QDialog::reject);
+        binding_=index+1;QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setObjectName("hotkeyDialog");dialog.setAttribute(Qt::WA_StyledBackground);dialog.setWindowTitle(text(UiText::KeyBinding));dialog.setFixedWidth(336);auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(20,16,20,18);layout->setSpacing(12);
         const QString actions[]={text(UiText::OpenHideWindow),text(UiText::RecoilToggle),text(UiText::PanicExitKey),text(UiText::PrimaryWeapon),text(UiText::SecondaryWeapon)};
-        auto* action=label(actions[index],"rowTitle");action->setWordWrap(true);layout->addWidget(action);
-        auto* hint=label(text(UiText::ReleaseYourKeysWaiting));hint->setObjectName("bindingHint");hint->setWordWrap(true);hint->setMinimumHeight(52);layout->addWidget(hint);
-        auto* instructions=label(text(UiText::EscCancelsBackspaceClears),"hint");instructions->setWordWrap(true);layout->addWidget(instructions);
-        auto* dismiss=new QPushButton(text(UiText::Cancel));dismiss->setObjectName("secondary");layout->addWidget(dismiss,0,Qt::AlignRight);connect(dismiss,&QPushButton::clicked,&dialog,&QDialog::reject);
+        auto* header=new QHBoxLayout;header->setSpacing(8);auto* action=label(actions[index],"rowTitle");action->setWordWrap(true);header->addWidget(action,1);auto* cancel=new IconButton(":/ui/close.svg",[this]{return accent();});cancel->setObjectName("closeControl");cancel->setAccessibleName(text(UiText::CancelHotkeyBinding));cancel->setToolTip(text(UiText::CancelHotkeyBinding));header->addWidget(cancel,0,Qt::AlignTop);layout->addLayout(header);connect(cancel,&QPushButton::clicked,&dialog,&QDialog::reject);
+        auto* hint=label(text(UiText::ReleaseYourKeysWaiting),"bindingHint");hint->setWordWrap(true);hint->setAlignment(Qt::AlignCenter);hint->setAccessibleName(text(UiText::SetAHotkey));layout->addWidget(hint);
+        auto* instructions=label(text(UiText::EscCancelsBackspaceClears),"hint");instructions->setWordWrap(true);instructions->setAlignment(Qt::AlignCenter);layout->addWidget(instructions);
+        // Reserve only the space the localized messages need, so rejected keys
+        // never resize the prompt while the user is typing.
+        dialog.ensurePolished();hint->ensurePolished();const auto margins=layout->contentsMargins();const int hintWidth=dialog.contentsRect().width()-margins.left()-margins.right();int hintHeight=52;
+        for(const auto message:{UiText::ReleaseYourKeysWaiting,UiText::PressAKeyNow,UiText::UnsafeGlobalHotkey,UiText::ThisKeyIsAlreadyAssignedChooseAnother}){hint->setText(text(message));hintHeight=qMax(hintHeight,hint->heightForWidth(hintWidth));}
+        hint->setFixedHeight(hintHeight);hint->setText(text(UiText::ReleaseYourKeysWaiting));
+        const auto showBindingError=[&](UiText message){hint->setText(text(message));hint->setProperty("invalid",true);hint->style()->unpolish(hint);hint->style()->polish(hint);hint->update();};
         bool released=false;int rejectedKey=0;QTimer timer;timer.setInterval(16);connect(&timer,&QTimer::timeout,&dialog,[&]{
             if(!dialog.isActiveWindow())return;
             if(!released){for(int key=1;key<256;++key)if(keyDown(key))return;released=true;hint->setText(text(UiText::PressAKeyNow));}
             if(rejectedKey){if(keyDown(rejectedKey))return;rejectedKey=0;}
             for(int key=3;key<256;++key){if(!r6::validHotkey(key))continue;if(keyDown(key)){
                 if(key==VK_ESCAPE){release_key_=key;blocked_until_=clock_.elapsed()+250;dialog.reject();return;}
-                if(key!=VK_BACK&&index<3&&!r6::validGlobalHotkey(key)){hint->setText(text(UiText::UnsafeGlobalHotkey));rejectedKey=key;return;}
-                const auto existing=engine_.snapshot();if(key!=VK_BACK&&hotkeyConflict(existing,index,key)>=0){hint->setText(text(UiText::ThisKeyIsAlreadyAssignedChooseAnother));rejectedKey=key;return;}
+                if(key!=VK_BACK&&index<3&&!r6::validGlobalHotkey(key)){showBindingError(UiText::UnsafeGlobalHotkey);rejectedKey=key;return;}
+                const auto existing=engine_.snapshot();if(key!=VK_BACK&&hotkeyConflict(existing,index,key)>=0){showBindingError(UiText::ThisKeyIsAlreadyAssignedChooseAnother);rejectedKey=key;return;}
                 engine_.edit([=](r6::Config& c){int* keys[]={&c.menu_key,&c.recoil_key,&c.panic_key,&c.primary_key,&c.secondary_key};*keys[index]=key==VK_BACK?0:key;});dirty();save();release_key_=key;blocked_until_=clock_.elapsed()+250;dialog.accept();return;
             }}
         });
-        dialog.resize(400,dialog.sizeHint().height());roundWindow(&dialog);dialog.move(frameGeometry().center()-dialog.rect().center());timer.start();dialog.exec();binding_=0;const auto c=engine_.snapshot();const int keys[]={c.menu_key,c.recoil_key,c.panic_key,c.primary_key,c.secondary_key};if(key_buttons_[index])key_buttons_[index]->setText(bindingName(keys[index]));syncSelection();updateStatus();
+        dialog.adjustSize();dialog.setFixedHeight(dialog.height());roundWindow(&dialog);dialog.move(frameGeometry().center()-dialog.rect().center());timer.start();dialog.exec();binding_=0;const auto c=engine_.snapshot();const int keys[]={c.menu_key,c.recoil_key,c.panic_key,c.primary_key,c.secondary_key};if(key_buttons_[index])key_buttons_[index]->setText(bindingName(keys[index]));syncSelection();updateStatus();
     }
     void showPalestineSurprise(){
         // The Hebrew picker entry is bait: the reveal is a Free Palestine popup.

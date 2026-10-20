@@ -90,6 +90,8 @@ inline QString applicationStyle(const QColor& accent){
 
         QDialog { background:$paper; }
         QDialog#hotkeyDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
+        QLabel#bindingHint { color:$ink; font-size:16px; font-weight:600; }
+        QLabel#bindingHint[invalid="true"] { color:$danger; }
         QDialog#helpDialog, QDialog#unsavedDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
         QDialog#palestinePopup { background:$paper; border:3px solid $outline; border-radius:24px; }
         QLabel#palestineArabic { color:$ink; font-size:24px; font-weight:900; }
@@ -98,7 +100,7 @@ inline QString applicationStyle(const QColor& accent){
         QPushButton#noticeClose { background:transparent; border:0; padding:0; }
         QPushButton:focus { outline:0; }
     )CSS").arg(accentHex,onAccent);
-    const std::pair<const char*,QColor> tokens[]={{"$ink",kbtheme::ink},{"$paper",kbtheme::paper},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$lime",kbtheme::lime},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$header",kbtheme::header},{"$chipInk",kbtheme::chipInk}};
+    const std::pair<const char*,QColor> tokens[]={{"$ink",kbtheme::ink},{"$paper",kbtheme::paper},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$lime",kbtheme::lime},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$header",kbtheme::header},{"$chipInk",kbtheme::chipInk},{"$danger",kbtheme::danger}};
     for(const auto& token:tokens)style.replace(QLatin1String(token.first),token.second.name());
     // Qt mirrors layouts but not explicit alignments, so headings follow the
     // reading direction of the selected language.
