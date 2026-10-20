@@ -60,7 +60,7 @@ class MainWindow final : public QWidget {
     IconButton* back_=nullptr;QSet<QString> favorites_;
     PageStack* pages_=nullptr;QWidget* operator_page_=nullptr;
     RaisedPanel* panel_=nullptr;QScrollArea* sidebar_scroll_=nullptr;
-    QWidget *sidebar_=nullptr,*favorites_header_=nullptr,*operators_header_=nullptr,*sidebar_search_box_=nullptr,*settings_nav_=nullptr;
+    QWidget *sidebar_=nullptr,*favorites_header_=nullptr,*favorites_heading_=nullptr,*operators_header_=nullptr,*sidebar_search_box_=nullptr,*settings_nav_=nullptr;
     QVector<SettingsNavButton*> settings_nav_buttons_;bool settings_sidebar_=false;
     IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;StickerStarButton* sidebar_favorites_=nullptr;
     QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false,sidebar_animating_=false,favorites_shown_=false;
@@ -272,7 +272,7 @@ class MainWindow final : public QWidget {
     void updateSidebarFades(){
         if(!sidebar_||settings_sidebar_)return;
         const qreal expanded=std::clamp((sidebar_->width()-88.0)/72.0,0.0,1.0);
-        setWidgetOpacity(favorites_header_,expanded);
+        setWidgetOpacity(favorites_heading_,expanded);
         setWidgetOpacity(operators_header_,expanded);
         setWidgetOpacity(sidebar_favorites_,1.0-expanded);
     }
@@ -294,9 +294,9 @@ class MainWindow final : public QWidget {
             sidebar_scroll_->setVisible(true);sidebar_search_box_->setVisible(true);
             search_->setVisible(!compact);sidebar_search_->setVisible(compact);
             if(sidebar_favorites_){sidebar_favorites_->setVisible(favorites_shown_&&(compact||sidebar_animating_));sidebar_favorites_->setToolTip(text(UiText::Favorites));sidebar_favorites_->setAccessibleName(text(UiText::Favorites));}
-            favorites_header_->setVisible(labelsVisible);
-            // Keep the All operators row height in compact mode so the star shortcut
-            // (which replaces the Favorites header) and both lists stay anchored.
+            favorites_header_->setVisible(true);favorites_heading_->setVisible(labelsVisible);
+            // Both group headers retain their height, including while their
+            // labels fade, so collapsing never shifts either list vertically.
             operators_header_->setVisible(true);operators_title_->setVisible(labelsVisible);
         }
         const QString title=text(compact?UiText::ExpandSidebar:UiText::CollapseSidebar);

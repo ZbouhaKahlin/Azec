@@ -6,6 +6,43 @@ QJsonObject MainWindow::selfTest(const QString& output){
         // Pause global hotkey polling; fixture actions call production handlers directly.
         poll_.stop();
         QJsonArray themeSamples;
+        const auto checkSidebarMotion=[&]()->QJsonObject{
+            QJsonObject motionChecks;
+            showNormal();activateWindow();showOperators();search_->clear();setSidebarCollapsed(false,false);wait(220);
+            // Sample both lists throughout the transition, including its layout
+            // changes at the start/end. The old checks only collapsed an empty
+            // Favorites group and missed the extra star row displacing the lists.
+            const auto motionFavorites=favorites_;bool rowsStable=true,shortcutWorks=true;QJsonArray sidebarSamples;
+            for(int favoriteCount:{0,1,6}){
+                favorites_.clear();for(int i=0;i<favoriteCount;++i)favorites_.insert(operators_->item(i)->text());refreshFavorites();
+                sidebar_scroll_->verticalScrollBar()->setValue(0);wait(50);QApplication::processEvents();
+                const int operatorsY=operators_->mapTo(sidebar_,QPoint()).y(),favoritesY=favorites_list_->mapTo(sidebar_,QPoint()).y();
+                const auto sampleRows=[&]{
+                    QApplication::processEvents();const int currentOperatorsY=operators_->mapTo(sidebar_,QPoint()).y(),currentFavoritesY=favorites_list_->mapTo(sidebar_,QPoint()).y();
+                    rowsStable&=currentOperatorsY==operatorsY&&(favoriteCount==0||currentFavoritesY==favoritesY);
+                    sidebarSamples.append(QJsonObject{{"favorites",favoriteCount},{"width",sidebar_->width()},{"operatorsY",currentOperatorsY},{"favoritesY",currentFavoritesY},{"expectedOperatorsY",operatorsY},{"expectedFavoritesY",favoritesY}});
+                };
+                sidebar_toggle_->click();sampleRows();
+                for(int frame=0;frame<35;++frame){wait(10);sampleRows();}
+                if(favoriteCount==6)capture(output+"/sidebar-favorites-collapsed.png");
+                if(favoriteCount>0){shortcutWorks&=sidebar_favorites_->isVisible();sidebar_favorites_->click();}
+                else sidebar_toggle_->click();
+                sampleRows();for(int frame=0;frame<35;++frame){wait(10);sampleRows();}
+                // Check focus within this window; another desktop window can
+                // temporarily be active while the isolated verifier is running.
+                shortcutWorks&=sidebar_->width()==200&&!sidebar_collapsed_&&(favoriteCount==0||focusWidget()==favorites_list_);
+                // Reversing midway must keep the same vertical positions too.
+                for(bool collapsed:{true,false,true,false}){setSidebarCollapsed(collapsed);sampleRows();wait(40);sampleRows();}
+                wait(280);sampleRows();
+                if(favoriteCount==6){capture(output+"/sidebar-favorites-expanded.png");favorites_list_->viewport()->grab().save(output+"/sidebar-favorites-viewport.png");}
+            }
+            motionChecks["sidebar_rows_stay_anchored_with_favorites_throughout_animation"]=rowsStable;
+            motionChecks["sidebar_favorites_shortcut_expands_and_focuses_list"]=shortcutWorks;
+            QFile sidebarReport(output+"/sidebar-motion.json");sidebarReport.open(QIODevice::WriteOnly);sidebarReport.write(QJsonDocument(sidebarSamples).toJson());
+            favorites_=motionFavorites;persistFavorites();refreshFavorites();
+            return {{"passed",rowsStable&&shortcutWorks},{"checks",motionChecks}};
+        };
+        if(QCoreApplication::arguments().contains("--sidebar-only"))return checkSidebarMotion();
         if(QCoreApplication::arguments().contains("--motion-only")){
             const bool captureFrames=!QCoreApplication::arguments().contains("--motion-timing-only");
             QJsonObject sequences,motionChecks;bool continuous=true,stableControls=true,stableBackground=true;
@@ -368,6 +405,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             search_->setText("Blackbeard");int matches=0;for(int i=0;i<operators_->count();++i)if(!operators_->item(i)->isHidden())++matches;checks["expanded_sidebar_search_still_filters"]=matches==1;search_->clear();
             setSidebarCollapsed(true);wait(70);const int beforeSidebarReverse=sidebar_->width();setSidebarCollapsed(false);checks["sidebar_retarget_preserves_current_width"]=sidebar_->width()==beforeSidebarReverse;wait(30);setSidebarCollapsed(true);wait(30);setSidebarCollapsed(false);wait(280);
             checks["rapid_sidebar_reversal_settles_expanded"]=!sidebar_collapsed_&&sidebar_->width()==200&&sidebar_animation_.state()==QAbstractAnimation::Stopped&&!uiprefs::sidebarCollapsed(config_path_);
+            const auto sidebarMotion=checkSidebarMotion()["checks"].toObject();for(auto it=sidebarMotion.begin();it!=sidebarMotion.end();++it)checks[it.key()]=it.value();
             showPreferences();chooseSettingsCategory(1);wait(220);capture(output+"/appearance-settings.png");
             const auto uiPath=uiprefs::filePath(config_path_),uiTemporary=uiPath+".appearance-test-backup";QFile::rename(uiPath,uiTemporary);QDir().mkdir(uiPath);
             const auto previousTheme=kbtheme::activeColorTheme;chooseColorTheme("midnight");setSidebarCollapsed(true);
