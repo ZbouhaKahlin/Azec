@@ -28,22 +28,22 @@ constexpr int operator_count = 78;
 // and every later roster addition) keep r6_config.bin at 3,734 bytes and live
 // in azec_weapons.json instead.
 constexpr int legacy_operator_count = 71;
-// Bindable keys reject mouse buttons, lone modifiers, and Windows keys.
+// Non-panic bindings accept any key the user chooses, including arrows, the
+// numeric keypad, mouse side buttons, modifiers, and Windows keys. Duplicate
+// bindings are still rejected by the conflict check, not by this predicate.
 inline bool validHotkey(int key){
-    if(key==0)return true;
-    if(key<3||key>255)return false;
-    if(key>=4&&key<=6)return false;
-    if(key>=16&&key<=18)return false;
-    if(key==91||key==92)return false;
-    if(key>=160&&key<=165)return false;
-    return true;
+    return key==0||(key>=1&&key<=255);
 }
-// Global actions (show/hide, recoil, panic) must not eat ordinary typing or
-// list-navigation keys. Weapon slots still accept 1/2 because they are meant
-// for the game and the foreground gate protects other applications.
+// The panic key keeps the stricter safe-key filter: no mouse buttons, lone
+// modifiers, Windows keys, ordinary typing, or common punctuation. Existing
+// non-panic bindings are not restricted by this function.
 inline bool validGlobalHotkey(int key){
     if(key==0)return true;
     if(!validHotkey(key))return false;
+    if(key==1||key==2||(key>=4&&key<=6))return false;                  // mouse buttons
+    if(key>=16&&key<=18)return false;                                  // Shift, Ctrl, Alt
+    if(key==91||key==92)return false;                                  // Windows keys
+    if(key>=160&&key<=165)return false;                                // left/right modifiers
     if(key==8||key==9||key==13||key==27||key==32)return false;       // Backspace, Tab, Enter, Esc, Space
     if(key>=48&&key<=57)return false;                                  // 0-9
     if(key>=65&&key<=90)return false;                                  // A-Z

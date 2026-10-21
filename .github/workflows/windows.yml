@@ -1,10 +1,20 @@
 name: Windows verification
-# Manual only: this private repository's GitHub Actions jobs cannot start while
-# the account has a failed payment or a spending limit that blocks minutes
-# ("The job was not started because recent account payments have failed").
-# Automatic push/pull_request triggers therefore only produced failing checks.
-# Restore the previous trigger list once Actions billing is working again.
-on: workflow_dispatch
+# Tests run only on an explicit manual request. Extra coverage is opt-in too.
+on:
+  workflow_dispatch:
+    inputs:
+      desktop:
+        description: Run desktop UI and QR checks on the CI machine
+        type: boolean
+        default: false
+      extended:
+        description: Include 150% scaling and all desktop languages (requires desktop)
+        type: boolean
+        default: false
+      slow:
+        description: Include the real 61-second pairing expiry wait
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -26,12 +36,18 @@ jobs:
           if (!(Test-Path "$env:LOCALAPPDATA/NeonManagerR6/Qt/6.8.3/msvc2022_64/bin/qmake.exe")) { ./setup-qt.ps1 }
       - name: Build and check core, HTTP, restart, and single-instance behavior
         shell: pwsh
-        run: ./build.cmd test --slow
-      - name: Verify Goofy at 100% and 150%
+        run: |
+          if ('${{ inputs.slow }}' -eq 'true') { ./build.cmd test --slow }
+          else { ./build.cmd test }
+          exit $LASTEXITCODE
+      - name: Requested desktop and QR checks
+        if: ${{ inputs.desktop }}
         shell: pwsh
         run: |
           python -m pip install opencv-python-headless
-          python tests/run_checks.py --ui-only --qr-scan --full
+          if ('${{ inputs.extended }}' -eq 'true') { python tests/run_checks.py --ui-only --qr-scan --full }
+          else { python tests/run_checks.py --ui-only --qr-scan }
+          exit $LASTEXITCODE
       - name: Upload verification reports and screenshots
         if: always()
         uses: actions/upload-artifact@v4

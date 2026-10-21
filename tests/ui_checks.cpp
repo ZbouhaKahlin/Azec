@@ -256,6 +256,8 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 "http://192.168.1.23:18764/#token=ffeeddccbbaa99887766554433221100",
                 "http://10.0.0.8:65535/#token=6be3872124af49ccac9c76bdbccdae94",
                 "http://172.31.255.254:18764/#token=4bbdc4dca77d42e0a61f8da225ac028e",
+                "http://255.255.255.255:65535/#token=0123456789abcdef0123456789abcdef",
+                "http://192.168.1.23:18764/#token=0123456789abcdef0123456789abcdef&fixture=longer-link-with-alignment-markers",
                 "https://github.com/Azec-Zuckerberg/Azec"};
             int sampleIndex=0;bool samplesReady=true;
             for(const auto& link:sampleLinks){
@@ -265,6 +267,19 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 const auto name=QString("qr-sample-%1.png").arg(++sampleIndex);samplesReady&=sample.grab().save(output+"/"+name);qrCases.append(scanCase(name,link));
             }
             checks["branded_qr_samples_rendered"]=samplesReady;
+            const auto originalQrTheme=kbtheme::activeColorTheme;
+            PairingQr themedSample(QStringLiteral("Reveal QR"),QStringLiteral("Hide QR"));themedSample.setPairingLink(sampleLinks[4]);
+            bool themeSamplesReady=true;QImage previousQr;
+            for(const auto& theme:kbtheme::colorThemes){
+                kbtheme::initialize(QLatin1String(theme.id));themedSample.refreshTheme();
+                for(int attempt=0;attempt<200&&!themedSample.framesReady();++attempt)wait(10);
+                themeSamplesReady&=themedSample.framesReady();if(!themedSample.revealed())themedSample.click();wait(460);
+                const auto image=themedSample.grab().toImage();
+                themeSamplesReady&=previousQr.isNull()||image!=previousQr;previousQr=image;
+                const auto name=QString("qr-theme-%1.png").arg(QLatin1String(theme.id));themeSamplesReady&=image.save(output+"/"+name);qrCases.append(scanCase(name,sampleLinks[4]));
+            }
+            kbtheme::initialize(originalQrTheme);
+            checks["qr_theme_refresh_recolors_same_link_in_all_palettes"]=themeSamplesReady;
             QFile scanManifest(output+"/qr-scan-cases.json");scanManifest.open(QIODevice::WriteOnly);scanManifest.write(QJsonDocument(qrCases).toJson());
         }
         showPreferences();chooseSettingsCategory(3);wait(220);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);

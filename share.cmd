@@ -1,11 +1,31 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-set "MODE=%~1"
 set "DO_PUBLISH="
 set "QUICK="
-if /I "%MODE%"=="publish" set "DO_PUBLISH=1"
-if /I "%MODE%"=="quick" set "QUICK=1"
+set "RUN_TESTS="
+:arguments
+if "%~1"=="" goto argumentsready
+if /I "%~1"=="--help" goto help
+if /I "%~1"=="publish" (
+    set "DO_PUBLISH=1"
+    shift
+    goto arguments
+)
+if /I "%~1"=="quick" (
+    set "QUICK=1"
+    shift
+    goto arguments
+)
+if /I "%~1"=="test" (
+    set "RUN_TESTS=1"
+    shift
+    goto arguments
+)
+echo Unknown argument: %~1
+goto usage
+:argumentsready
+if defined QUICK if defined DO_PUBLISH goto usage
 
 set "AZEC_SHARE_ROOT=%~dp0"
 rem Quick repackaging must retain the compiled app's version.
@@ -99,6 +119,10 @@ if /I "%AZEC_SKIP_TESTS%"=="1" (
     echo Installer smoke test skipped: AZEC_SKIP_TESTS=1.
     goto publishing
 )
+if not defined RUN_TESTS (
+    echo Installer smoke test skipped. Add test to request it explicitly.
+    goto publishing
+)
 python tests\installation_test.py --smoke
 if errorlevel 1 exit /b 1
 
@@ -121,3 +145,12 @@ echo Send that single file. Your friend opens it, then finds Azec in Start.
 if defined DO_PUBLISH echo https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe
 endlocal
 exit /b 0
+
+:help
+echo Usage: share.cmd [quick ^| publish] [test]
+echo Packages without tests by default. Add test to run the installer smoke test.
+exit /b 0
+
+:usage
+echo Usage: share.cmd [quick ^| publish] [test]
+exit /b 2

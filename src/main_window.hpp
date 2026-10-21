@@ -571,7 +571,10 @@ class MainWindow final : public QWidget {
         if(recoil&&!was_recoil_)toggleRecoil();
         was_menu_=menu;was_recoil_=recoil;
         auto* focused=QApplication::focusWidget();
-        handleWeaponKeys(keyDown(k.primary),keyDown(k.secondary),editing,keyDown(VK_CONTROL)||keyDown(VK_MENU)||keyDown(VK_LWIN)||keyDown(VK_RWIN));
+        const auto modifierKey=[](int key){return key==VK_CONTROL||key==VK_MENU||key==VK_LWIN||key==VK_RWIN||key==VK_LCONTROL||key==VK_RCONTROL||key==VK_LMENU||key==VK_RMENU;};
+        const bool modifierHeld=keyDown(VK_CONTROL)||keyDown(VK_MENU)||keyDown(VK_LWIN)||keyDown(VK_RWIN);
+        const bool modified=modifierHeld&&!(modifierKey(k.primary)&&keyDown(k.primary))&&!(modifierKey(k.secondary)&&keyDown(k.secondary));
+        handleWeaponKeys(keyDown(k.primary),keyDown(k.secondary),editing,modified);
         if(isVisible()&&isActiveWindow()&&pages_->currentWidget()==operator_page_&&!editing&&!qobject_cast<QSlider*>(focused)&&!qobject_cast<QAbstractItemView*>(focused)&&clock_.elapsed()-last_tune_>80){const float y=(keyDown(VK_UP)? .1f:0)-(keyDown(VK_DOWN)? .1f:0),x=(keyDown(VK_RIGHT)? .1f:0)-(keyDown(VK_LEFT)? .1f:0);if(x||y){editOperator([=](r6::Operator& op){op.vertical=std::clamp(op.vertical+y,0.f,100.f);op.horizontal=std::clamp(op.horizontal+x,-50.f,50.f);});syncSelection();last_tune_=clock_.elapsed();}}
     }
     bool save(){
@@ -607,7 +610,7 @@ class MainWindow final : public QWidget {
             if(rejectedKey){if(keyDown(rejectedKey))return;rejectedKey=0;}
             for(int key=3;key<256;++key){if(!r6::validHotkey(key))continue;if(keyDown(key)){
                 if(key==VK_ESCAPE){release_key_=key;blocked_until_=clock_.elapsed()+250;dialog.reject();return;}
-                if(key!=VK_BACK&&index<3&&!r6::validGlobalHotkey(key)){showBindingError(UiText::UnsafeGlobalHotkey);rejectedKey=key;return;}
+                if(key!=VK_BACK&&index==2&&!r6::validGlobalHotkey(key)){showBindingError(UiText::UnsafeGlobalHotkey);rejectedKey=key;return;}
                 const auto existing=engine_.snapshot();if(key!=VK_BACK&&hotkeyConflict(existing,index,key)>=0){showBindingError(UiText::ThisKeyIsAlreadyAssignedChooseAnother);rejectedKey=key;return;}
                 engine_.edit([=](r6::Config& c){int* keys[]={&c.menu_key,&c.recoil_key,&c.panic_key,&c.primary_key,&c.secondary_key};*keys[index]=key==VK_BACK?0:key;});dirty();save();release_key_=key;blocked_until_=clock_.elapsed()+250;dialog.accept();return;
             }}

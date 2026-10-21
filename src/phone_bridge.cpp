@@ -4,7 +4,7 @@ QJsonObject MainWindow::mobileState() const {
         const auto c=engine_.snapshot();QJsonArray operators;
         for(int id=0;id<r6::operator_count;++id){const auto name=QString::fromUtf8(c.operators[id].name);operators.append(QJsonObject{{"id",id},{"name",name},{"favorite",favorites_.contains(name)},{"dual",c.secondary_enabled[id]}});}
         QJsonArray keys;const int values[]={c.menu_key,c.recoil_key,c.panic_key,c.primary_key,c.secondary_key};const char* labels[]={"Open / hide window","Recoil toggle","Exit key","Primary weapon","Secondary weapon"};
-        for(int i=0;i<5;++i)keys.append(QJsonObject{{"label",labels[i]},{"value",values[i]},{"name",bindingName(values[i])},{"global",i<3}});
+        for(int i=0;i<5;++i)keys.append(QJsonObject{{"label",labels[i]},{"value",values[i]},{"name",bindingName(values[i])},{"global",i<3},{"panic",i==2}});
         QJsonArray themes;for(const auto& theme:kbtheme::colorThemes)themes.append(QJsonObject{{"id",theme.id},{"name",theme.name}});
         const QJsonObject colors{{"paper",kbtheme::paper.name()},{"surface",kbtheme::surface.name()},{"card",kbtheme::card.name()},{"ink",kbtheme::ink.name()},{"muted",kbtheme::muted.name()},{"accent",accent().name()},{"accent-ink",kbtheme::readableOn(accent()).name()},{"lavender",kbtheme::lavender.name()},{"outline",kbtheme::outline.name()},{"chip-ink",kbtheme::chipInk.name()}};
         const QJsonObject appearance{{"id",kbtheme::activeColorTheme},{"scheme",kbtheme::paper.lightness()<128?"dark":"light"},{"colors",colors},{"themes",themes}};
@@ -62,7 +62,7 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
                 }else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
                 else if(key.startsWith("key")&&key.size()==4&&key[3]>='0'&&key[3]<='4'&&validInteger(value,0,255)){
                     const int index=key[3].digitValue();
-                    const bool safe=index<3?r6::validGlobalHotkey(value.toInt()):r6::validHotkey(value.toInt());
+                    const bool safe=index==2?r6::validGlobalHotkey(value.toInt()):r6::validHotkey(value.toInt());
                     if(!safe)return fail("This key is not safe for a global shortcut");
                     int* keys[]={&next.menu_key,&next.recoil_key,&next.panic_key,&next.primary_key,&next.secondary_key};*keys[index]=value.toInt();rebuild=keysChanged=true;
                 }

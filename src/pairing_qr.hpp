@@ -1,6 +1,5 @@
 #pragma once
 #include <QtWidgets>
-#include <QSvgRenderer>
 #include <algorithm>
 #include <cmath>
 #include "theme.hpp"
@@ -52,37 +51,21 @@ class PairingQr final : public QPushButton {
         const qreal ratio=devicePixelRatioF();if(image_.isNull()||raster_ratio_==ratio)return;
         raster_ratio_=ratio;const auto generation=++generation_;const int side=qRound(184*ratio);
         QImage raster(side,side,QImage::Format_RGB32);raster.fill(Qt::white);
-        // Keep a four-module quiet zone and snap data modules to physical pixels.
-        const int modules=image_.width()-8;const qreal unit=qreal(side)/image_.width();
-        const auto finder=[modules](int x,int y){x-=4;y-=4;return (x>=0&&x<7&&y>=0&&y<7)||(x>=modules-7&&x<modules&&y>=0&&y<7)||(x>=0&&x<7&&y>=modules-7&&y<modules);};
-        const QColor ink=kbtheme::outline;QColor accent=kbtheme::defaultAccent;
-        const int luminance=(accent.red()*299+accent.green()*587+accent.blue()*114)/1000;
-        if(luminance>140){
-            const auto blend=[](const QColor& a,const QColor& b,double t){return QColor::fromRgbF(a.redF()*(1-t)+b.redF()*t,a.greenF()*(1-t)+b.greenF()*t,a.blueF()*(1-t)+b.blueF()*t);};
-            accent=blend(accent,ink,.65);
+        // Keep the standard four-module quiet zone on every side. The image
+        // already carries a four-module border, so reserve eight modules total
+        // before choosing the largest whole-pixel cell size that still fits.
+        const int modules=image_.width()-8;
+        const int unit=std::max(1,side/(modules+8));
+        const int origin=(side-modules*unit)/2;
+        const auto edge=[&](int cell){return origin+(cell-4)*unit;};
+        QColor accent=kbtheme::defaultAccent;
+        const auto linear=[](qreal value){return value<=.04045?value/12.92:std::pow((value+.055)/1.055,2.4);};
+        // Keep the palette hue, darkening even pastel accents to >= 7:1 on white.
+        while(.2126*linear(accent.redF())+.7152*linear(accent.greenF())+.0722*linear(accent.blueF())>.10)accent=accent.darker(110);
+        QPainter painter(&raster);painter.setPen(Qt::NoPen);painter.setBrush(accent);
+        for(int y=0;y<image_.height();++y)for(int x=0;x<image_.width();++x){
+            if(qRed(image_.pixel(x,y))==0)painter.drawRect(QRect(edge(x),edge(y),edge(x+1)-edge(x),edge(y+1)-edge(y)));
         }
-        QPainter painter(&raster);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);painter.setBrush(ink);
-        for(int y=0;y<image_.height();++y)for(int x=0;x<image_.width();++x)if(qRed(image_.pixel(x,y))==0){
-            if(finder(x,y))continue;
-            const int left=qRound(qreal(x)*side/image_.width()),top=qRound(qreal(y)*side/image_.height());
-            painter.drawRoundedRect(QRectF(left,top,qRound(qreal(x+1)*side/image_.width())-left,qRound(qreal(y+1)*side/image_.height())-top),unit*.12,unit*.12);
-        }
-        for(const auto origin:{QPoint(4,4),QPoint(modules-3,4),QPoint(4,modules-3)}){
-            const QRectF outer(origin.x()*unit,origin.y()*unit,7*unit,7*unit);
-            painter.setBrush(ink);painter.drawRoundedRect(outer,unit*.35,unit*.35);
-            painter.setBrush(Qt::white);painter.drawRoundedRect(outer.adjusted(unit,unit,-unit,-unit),unit*.4,unit*.4);
-            // The finder center follows the palette but is darkened when the
-            // accent is light, so every theme keeps a scannable dark-on-light QR.
-            painter.setBrush(accent);painter.drawRoundedRect(outer.adjusted(2*unit,2*unit,-2*unit,-2*unit),unit*.3,unit*.3);
-        }
-        // A small logo window consumes less than 6% of the symbol's modules.
-        // The highest ECC level protects the obscured data. The finder and
-        // timing patterns stay clear of the logo window.
-        const qreal center=side/2.0,logoModules=std::min(8.0,modules*.2);
-        const qreal half=(logoModules+1)*unit/2;
-        painter.setBrush(Qt::white);painter.drawRoundedRect(QRectF(center-half,center-half,half*2,half*2),unit*.7,unit*.7);
-        QSvgRenderer logo(QStringLiteral(":/ui/logo.svg"));const qreal logoSide=logoModules*unit;
-        logo.render(&painter,QRectF(center-logoSide/2,center-logoSide/2,logoSide,logoSide));
         painter.end();
         auto placeholder=raster.scaled(9,9,Qt::IgnoreAspectRatio,Qt::SmoothTransformation).scaled(side,side,Qt::IgnoreAspectRatio,Qt::SmoothTransformation);
         obscured_=QPixmap::fromImage(placeholder);obscured_.setDevicePixelRatio(ratio);
@@ -113,7 +96,9 @@ public:
     void setPairingLink(const QString& link){
         if(link==link_)return;conceal();link_=link;image_=QImage();frames_.clear();obscured_=QPixmap();raster_ratio_=0;++generation_;
         if(!link.isEmpty()){
-            const auto qr=qrcodegen::QrCode::encodeText(link.toUtf8().constData(),qrcodegen::QrCode::Ecc::HIGH);
+            // Q correction keeps real pairing links less dense.
+            // The encoder still boosts to H when it fits the same version.
+            const auto qr=qrcodegen::QrCode::encodeText(link.toUtf8().constData(),qrcodegen::QrCode::Ecc::QUARTILE);
             const int extent=qr.getSize()+8;image_=QImage(extent,extent,QImage::Format_RGB32);image_.fill(Qt::white);
             for(int y=0;y<qr.getSize();++y)for(int x=0;x<qr.getSize();++x)if(qr.getModule(x,y))image_.setPixelColor(x+4,y+4,Qt::black);
         }
@@ -153,7 +138,6 @@ protected:
             painter.setOpacity(1);
             painter.restore();
         }
-        painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,2));painter.drawRoundedRect(QRectF(1,1,182,182),12,12);
         painter.setPen(kbtheme::muted);QFont font=painter.font();font.setPixelSize(12);painter.setFont(font);
         painter.drawText(QRect(0,187,184,21),Qt::AlignCenter,revealed_?hide_text_:reveal_text_);
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::purple,2));painter.drawRoundedRect(QRectF(2,2,180,180),12,12);}

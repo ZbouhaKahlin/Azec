@@ -1,6 +1,9 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+set "BUILD_CHECKS="
+if /I "%~1"=="checks" set "BUILD_CHECKS=1"
+if /I "%~1"=="test" set "BUILD_CHECKS=1"
 if not exist .build mkdir .build
 if not defined NEON_QT_ROOT set "NEON_QT_ROOT=%LOCALAPPDATA%\NeonManagerR6\Qt\6.8.3\msvc2022_64"
 if not exist "%NEON_QT_ROOT%\bin\qmake.exe" (
@@ -49,7 +52,7 @@ if /I "%~1"=="test" (
     if errorlevel 1 exit /b 1
 )
 popd
-if /I "%~1"=="test" (
+if defined BUILD_CHECKS (
     if not exist .build\verification-build mkdir .build\verification-build
     pushd .build\verification-build
     "%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0Azec.pro" CONFIG+=verification -o Makefile
@@ -59,6 +62,8 @@ if /I "%~1"=="test" (
     popd
     copy /y ".build\verification-build\release\Azec-checks.exe" "runtime\Azec-checks.exe" > nul
     if errorlevel 1 exit /b 1
+)
+if /I "%~1"=="test" (
     python tests\run_checks.py %2
     if errorlevel 1 exit /b 1
 )

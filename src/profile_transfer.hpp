@@ -83,7 +83,7 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     // any legacy value without blocking an import.
     const auto bindings=hotkeys(next);
     for(size_t i=0;i<bindings.size();++i)for(size_t j=i+1;j<bindings.size();++j)if(bindings[i]&&bindings[i]==bindings[j])return false;
-    next.menu_key=r6::validGlobalHotkey(next.menu_key)?next.menu_key:0;next.recoil_key=r6::validGlobalHotkey(next.recoil_key)?next.recoil_key:0;
+    next.menu_key=r6::validHotkey(next.menu_key)?next.menu_key:0;next.recoil_key=r6::validHotkey(next.recoil_key)?next.recoil_key:0;
     next.panic_key=r6::validGlobalHotkey(next.panic_key)?next.panic_key:0;
     next.primary_key=r6::validHotkey(next.primary_key)?next.primary_key:0;next.secondary_key=r6::validHotkey(next.secondary_key)?next.secondary_key:0;
     next.rapid_key=r6::validHotkey(next.rapid_key)?next.rapid_key:0;

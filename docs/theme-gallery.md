@@ -2,9 +2,9 @@
 
 Header 01, implemented in the Windows app: a seamless 60 px top bar matching the sidebar, with extra breathing room around the controls. All ten themes share the same layout. Pick a preview card in **Settings → Appearance**.
 
-Each palette also drives the pairing QR: the finder centre takes the theme accent (darkened when the accent is too light to stay scannable), while the code itself stays dark-on-light so every theme pairs the same working link. The header carries the two status pills, **Recoil** and **Rapid fire**, in every theme.
+Each palette also drives the pairing QR: its square modules use a dark version of the theme accent against white, the full pattern continues through the center without a logo, and the card keeps a four-module white quiet zone around the symbol. Changing palettes preserves the pairing link. The header carries the two status pills, **Recoil** and **Rapid fire**, in every theme.
 
-These are native Qt screenshots at 100% display scale (864 × 664), captured from isolated dry-run fixtures.
+These are native Qt screenshots at 100% display scale (864 × 664), captured from isolated dry-run fixtures. They show the palettes and layout; details such as the QR artwork may predate later updates.
 
 ## Charcoal & blush (default)
 

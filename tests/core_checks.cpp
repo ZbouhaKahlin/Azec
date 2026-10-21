@@ -44,12 +44,16 @@ bool self_test(const std::filesystem::path& output) {
     ok &= check(recoil_interval(false)==12, "recoil timing uses the base speed without rapid fire");
     op.rapid=1; op.delay=500;
     ok &= check(rapid_interval(op)==150, "stored delays above the UI range use the 150 ms ceiling");
-    ok &= check(validHotkey(0)&&validHotkey(0x75)&&validHotkey('1')&&!validHotkey(1)&&!validHotkey(2)&&!validHotkey(4)&&!validHotkey(5)&&!validHotkey(6)&&
-                !validHotkey(16)&&!validHotkey(17)&&!validHotkey(18)&&!validHotkey(91)&&!validHotkey(92)&&!validHotkey(160)&&!validHotkey(165),
-                "hotkey whitelist rejects mouse buttons, modifiers and Windows keys");
-    ok &= check(validGlobalHotkey(0x2d)&&validGlobalHotkey(0x75)&&validGlobalHotkey(0x23)&&!validGlobalHotkey('A')&&!validGlobalHotkey('1')&&
+    ok &= check(validHotkey(0)&&validHotkey(1)&&validHotkey(2)&&validHotkey(4)&&validHotkey(6)&&
+                validHotkey(16)&&validHotkey(17)&&validHotkey(18)&&validHotkey(91)&&validHotkey(92)&&validHotkey(160)&&validHotkey(165)&&
+                validHotkey(0x25)&&validHotkey(0x61)&&validHotkey(226)&&!validHotkey(-1)&&!validHotkey(256),
+                "non-panic bindings accept every in-range key");
+    ok &= check(validGlobalHotkey(0x2d)&&validGlobalHotkey(0x75)&&validGlobalHotkey(0x23)&&
+                !validGlobalHotkey(1)&&!validGlobalHotkey(2)&&!validGlobalHotkey(4)&&!validGlobalHotkey(6)&&
+                !validGlobalHotkey(16)&&!validGlobalHotkey(17)&&!validGlobalHotkey(18)&&!validGlobalHotkey(91)&&!validGlobalHotkey(92)&&
+                !validGlobalHotkey(160)&&!validGlobalHotkey(165)&&!validGlobalHotkey('A')&&!validGlobalHotkey('1')&&
                 !validGlobalHotkey(9)&&!validGlobalHotkey(13)&&!validGlobalHotkey(27)&&!validGlobalHotkey(32),
-                "global hotkeys reject typing and list-navigation keys");
+                "panic keeps the safe-key filter");
     config.operators[4].horizontal=-4.5f;
     config.selected=4; config.language=1; config.neon[0]=0.25f;
     Config loaded;
@@ -91,7 +95,9 @@ bool self_test(const std::filesystem::path& output) {
     replacement.rapid_key=0;
     ok &= check(replacement.save(garbage)&&after.load(garbage)&&after.rapid_key==0,"explicitly cleared rapid hotkey persists");
     replacement.menu_key=1;
-    ok &= check(replacement.save(garbage)&&after.load(garbage)&&after.menu_key==0,"mouse-button bindings sanitize to None on load");
+    ok &= check(replacement.save(garbage)&&after.load(garbage)&&after.menu_key==1,"non-panic mouse-button binding persists on load");
+    replacement.panic_key=1;
+    ok &= check(replacement.save(garbage)&&after.load(garbage)&&after.panic_key==0,"panic mouse-button binding sanitizes to None on load");
     std::error_code ignored;std::filesystem::remove(garbage,ignored);
     std::cout << "CONFIG " << output.string() << '\n';
     return ok;

@@ -107,13 +107,14 @@ bool Config::load(const std::filesystem::path& path) {
     for (auto c : next.neon) if (!std::isfinite(c) || c < 0 || c > 1) return false;
     for (auto key : {next.menu_key,next.recoil_key,next.panic_key,next.rapid_key})
         if (key < 0 || key > 255) return false;
-    // Legacy or hand-edited bindings that cannot be pressed safely fall back
-    // to "None" instead of rejecting the whole configuration. Global actions
-    // also refuse ordinary typing and list-navigation keys.
+    // Any in-range binding is accepted. Only the panic key keeps the stricter
+    // safe-key filter; other actions may use arrows, numpad, mouse, modifiers,
+    // or Windows keys by the user's choice. Duplicate bindings are reported by
+    // the binding UI and import validation instead of being silently cleared.
     const auto sanitize = [](std::int32_t& key) { if (!validHotkey(key)) key = 0; };
     sanitize(next.menu_key); sanitize(next.recoil_key); sanitize(next.panic_key); sanitize(next.rapid_key);
-    const auto sanitizeGlobal = [](std::int32_t& key) { if (!validGlobalHotkey(key)) key = 0; };
-    sanitizeGlobal(next.menu_key); sanitizeGlobal(next.recoil_key); sanitizeGlobal(next.panic_key);
+    const auto sanitizePanic = [](std::int32_t& key) { if (!validGlobalHotkey(key)) key = 0; };
+    sanitizePanic(next.panic_key);
     *this = next;
     return true;
 }

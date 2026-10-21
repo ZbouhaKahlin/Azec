@@ -46,7 +46,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 | Ctrl+F | Focus the operator search |
 | Esc | Leave Settings, or clear the search field |
 
-Weapon and action bindings are configurable in Settings. Show/hide, recoil-toggle and panic shortcuts reject ordinary typing and list-navigation keys. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits and plays a soft two-note “no” cue; it does not use the Windows error beep.
+Weapon and action bindings are configurable in Settings. Show/hide, recoil-toggle, and weapon bindings accept any key you choose, including arrows, the numeric keypad, mouse side buttons, modifiers, and Windows keys; if a key is already assigned, the binding is rejected with an “already used” message. The panic shortcut keeps a stricter safe-key filter. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits and plays a soft two-note “no” cue; it does not use the Windows error beep.
 
 ## Build from source
 
@@ -59,13 +59,7 @@ Requires Windows x64, Visual Studio 2022 C++ tools, a Windows SDK, Python, and Q
 
 `setup-qt.ps1` installs the pinned Qt kit. Set `NEON_QT_ROOT` to use another compatible installation. Build intermediates live in `.build/`; the launcher is `Azec.exe`, with deployed files in `runtime/`.
 
-Testing is proportional to the change. Documentation and other trivial edits do **not** require the full suite. For substantial behavior changes:
-
-```powershell
-.\build.cmd test
-```
-
-This runs core, HTTP, recovery, and restart checks without the 61-second expiry wait. Desktop and browser checks are opt-in; 150% scaling and the complete language matrix are extended checks. See [Testing](docs/testing.md) for commands and when to use them.
+**Tests are optional and run only when explicitly requested or when investigating a reported bug.** Normal edits, builds, and releases do not require them. `.\build.cmd checks` builds the separate verifier without running it; `.\build.cmd test` explicitly requests behavior tests. The desktop-backed test runners can open app windows, so agents must follow the visibility restrictions in [AGENTS.md](AGENTS.md). See [Testing](docs/testing.md) for the purpose of each test file and the available commands. Scale/language matrices are never automatic.
 
 ## Share one file
 
@@ -73,14 +67,14 @@ This runs core, HTTP, recovery, and restart checks without the 61-second expiry 
 .\share.cmd
 ```
 
-`share.cmd` stamps an automatic version, rebuilds the app, embeds the runtime and licenses, and writes **`dist\Azec.exe`**. It smoke-tests the real EXE in an isolated installation before reporting success. Send that single file: your friend opens it once, then uses **Azec** in Start. Program files live in Windows' per-user application folder (normally `%LOCALAPPDATA%\Programs\Azec`). Character profiles, primary/secondary weapon settings, favorites, theme, and other preferences live separately in **`%LOCALAPPDATA%\Azec`**. The downloaded EXE can be deleted after installation.
+`share.cmd` stamps an automatic version, rebuilds the app, embeds the runtime and licenses, and writes **`dist\Azec.exe`** without running tests. Send that single file: your friend opens it once, then uses **Azec** in Start. Program files live in Windows' per-user application folder (normally `%LOCALAPPDATA%\Programs\Azec`). Character profiles, primary/secondary weapon settings, favorites, theme, and other preferences live separately in **`%LOCALAPPDATA%\Azec`**. The downloaded EXE can be deleted after installation.
 
 ```powershell
 .\share.cmd quick      # repackage the current build without recompiling
 .\share.cmd publish    # also upload the build to a public releases-only repository
 ```
 
-When explicitly skipping all packaging tests, set `$env:AZEC_SKIP_TESTS = "1"` before running `share.cmd`; this skips its installer smoke test.
+To explicitly request the installer smoke test, add `test`: `.\share.cmd test`, `.\share.cmd quick test`, or `.\share.cmd publish test`. It launches an isolated copy of the app and can show a window; agents must not run it on your desktop unless it can run invisibly. The existing `AZEC_SKIP_TESTS=1` override still skips it even when `test` is supplied.
 
 `publish` uses the GitHub CLI and uploads to `github.com/Azec-Zuckerberg/Azec-releases`: the binaries are public while this source repository stays private. The stable link is `https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe`.
 
@@ -90,9 +84,9 @@ When explicitly skipping all packaging tests, set `$env:AZEC_SKIP_TESTS = "1"` b
 
 ## Documentation
 
-- [Testing and verification](docs/testing.md) — fast defaults, targeted checks, extended coverage, and safe fixtures.
+- [Optional testing and verification](docs/testing.md) — what each test file does, explicit commands, visibility, and safe fixtures.
 - [Application reference](docs/reference.md) — detailed UI, phone pairing, persistence, and input behavior.
-- [Agent instructions](AGENTS.md) — architecture, compatibility contracts, and change-based testing rules. [CLAUDE.md](CLAUDE.md) shares these instructions.
+- [Agent instructions](AGENTS.md) — architecture, compatibility contracts, and opt-in testing rules. [CLAUDE.md](CLAUDE.md) shares these instructions.
 - README screenshot presentations: [C6, pastel themes](docs/showcase-pastel.html), and [A6, original and dark themes](docs/showcase.html). Both use the lilac grid background, with cascading iPhone screens to the left of the desktop windows.
 
 Personal settings (`r6_config.bin`, `azec_weapons.json`, `azec_ui.json`), logs, pairing credentials, and generated binaries stay out of Git. `share.cmd` produces the single-file per-user installer; `package-release.ps1` produces the optional portable zip with its launcher, runtime, and licenses. Both exclude verification executables and personal data.
