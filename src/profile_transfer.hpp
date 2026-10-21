@@ -1,6 +1,7 @@
 #pragma once
 #include "core.hpp"
 #include "hotkeys.hpp"
+#include "sensitivity.hpp"
 #include <QtCore>
 #include <cmath>
 #include <optional>
@@ -30,11 +31,13 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
     const int keys[]={config.menu_key,config.recoil_key,config.rapid_key,config.panic_key,config.primary_key,config.secondary_key};
     QJsonArray keyArray;for(const auto key:keys)keyArray.append(key);
     QStringList names(favorites.begin(),favorites.end());names.sort();
+    auto setup=sensitivity::json(config.sensitivity);setup.remove("source");
     return {{"application","Azec"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
         {"settings",QJsonObject{{"keys",keyArray},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
             {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},
             {"colorTheme",colorTheme},{"sidebarCollapsed",sidebarCollapsed},
             {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",130.0},
+            {"sensitivity",config.sensitivity.valid()?QJsonValue(setup):QJsonValue(QJsonValue::Null)},
             {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
 }
 inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>& favorites,BackupOptions& options){
@@ -67,6 +70,11 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     if(settings.contains("adsOnly")&&!settings["adsOnly"].isBool())return false;
     if(settings.contains("sidebarCollapsed")&&!settings["sidebarCollapsed"].isBool())return false;
     if(settings.contains("colorTheme")&&!settings["colorTheme"].isString())return false;
+    if(settings.contains("sensitivity")&&!settings["sensitivity"].isNull()){
+        if(!settings["sensitivity"].isObject())return false;
+        auto setup=settings["sensitivity"].toObject();setup.remove("source");
+        const auto parsed=sensitivity::fromJson(setup);if(!parsed)return false;next.sensitivity=*parsed;
+    }
     const auto keys=settings["keys"].toArray();const auto accent=settings["accent"].toArray();
     if(keys.size()!=6||accent.size()!=3)return false;
     int* destinations[]={&next.menu_key,&next.recoil_key,&next.rapid_key,&next.panic_key,&next.primary_key,&next.secondary_key};

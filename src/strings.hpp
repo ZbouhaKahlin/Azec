@@ -140,8 +140,37 @@ enum class UiText {
     SettingsBackupHint,
     OnlyWhileAiming,
     OnlyWhileAimingHint,
+    TourChooseTitle,
+    TourChooseHint,
+    TourProfilesHint,
+    TourRecoilHint,
+    TourRapidHint,
+    TourShortcutsHint,
+    TourSetupHint,
+    SkipTour,
+    ReplayTour,
+    MouseSetup,
+    MouseDpi,
+    SensitivityHorizontal,
+    SensitivityVertical,
+    SensitivityMultiplier,
+    ReadGameSettings,
+    ChooseGameSettings,
+    SaveMouseSetup,
+    RescaleProfiles,
+    GameSettingsMissing,
+    GameSettingsMultiple,
+    GameSettingsRead,
+    MouseSetupHint,
+    MouseSetupSaved,
+    RescalePreview,
+    RescaleOutOfRange,
+    SensitivityChanged,
+    MouseSetupRequired,
+    ProfilesRescaled,
+    SaveWithoutRescaling,
 };
-inline constexpr int UiTextCount=136;
+inline constexpr int UiTextCount=165;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

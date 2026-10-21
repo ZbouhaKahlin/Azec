@@ -51,6 +51,14 @@ inline bool validGlobalHotkey(int key){
     if(key>=219&&key<=222)return false;                                // brackets, quote, tilde
     return true;
 }
+// Device setup lives only in the JSON sidecar; binary records stay unchanged.
+struct SensitivitySetup {
+    int dpi=0;
+    double horizontal=0,vertical=0,multiplier=0;
+    std::wstring source;
+    bool validGame() const;
+    bool valid() const;
+};
 struct Config {
     std::array<Operator, operator_count> operators;
     std::int32_t menu_key = 0x2d, recoil_key = 0x75, panic_key = 0x23;
@@ -65,6 +73,7 @@ struct Config {
     std::array<bool, operator_count> secondary_enabled{}, secondary_initialized{};
     int weapon_slot = 0, primary_key = '1', secondary_key = '2';
     bool phone_enabled = true;
+    SensitivitySetup sensitivity;
     Config();
     int active_slot() const { return weapon_slot == 1 && secondary_enabled[selected] ? 1 : 0; }
     Operator& active_operator() { return active_slot() ? secondary[selected] : operators[selected]; }

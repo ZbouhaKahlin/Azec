@@ -40,9 +40,9 @@ Input and output behaviour is only partially automatic. The fixtures run with `-
 
 Covered automatically today:
 
-- The two global output switches persist, reload, and are refused by the phone when removed.
+- The Recoil switch updates live and starts off on launch; per-profile Rapid fire persists and reloads. Removed Master enable settings are rejected by the phone API.
 - The game-focus gate recognises `RainbowSix*.exe` and rejects unrelated processes, including the BattlEye helper.
-- Global hotkey bindings reject typing and list-navigation keys.
+- Show/hide, recoil-toggle and panic bindings reject typing and list-navigation keys.
 - Browsing the roster does not mark the profile dirty, and the wheel over a number field does not change a value.
 - The pairing code chip, copy actions, new-code rotation, and the server-failure retry path are exercised in the desktop and browser suites.
 - The phone Output card, the removal of the old master and per-weapon rapid controls, and the shared palette are checked in the browser suite.
@@ -58,6 +58,12 @@ For manual inspection, launch the absolute path to `runtime/Azec.exe` from a fre
 `share.cmd` builds the friend-facing single-file installer and runs `python tests/installation_test.py --smoke`. Run `python tests/installation_test.py` for profile persistence, migration, repair, update handoff, and operation after deleting the download. Optional `--previous path/to/Azec.exe` checks migration from an old portable release; `--installed-previous path/to/Azec.exe` checks a version change from an older per-user build and prevents downgrades. All installer fixtures redirect Programs, data, and the Start menu with `AZEC_INSTALL_TEST_ROOT` plus `--dry-run`; their PATH excludes the development Qt kit. Never run an installation fixture without this redirection. `package-release.ps1` remains the optional portable zip packager and excludes verification executables, stale builds, and personal data.
 
 Automated browser checks are emulation, not physical iPhone or in-game testing. State actual checks and limitations in delivery notes.
+
+## Console checks for mouse setup
+
+`tests/sensitivity_checks.pro` builds `Azec-sensitivity-checks.exe` with Qt Core only, without opening the desktop app. Build it using the pinned Qt qmake and nmake in `.build/sensitivity-checks`. Run `release/Azec-sensitivity-checks.exe <fresh-empty-fixture>` with the Qt kit's `bin` on PATH and an absolute, newly created fixture directory under `.build/verification`.
+
+This suite runs the existing core checks plus targeted coverage for INI parsing, unchanged game files, DPI reference values, per-axis rescaling, preserved secondary profiles, rejection without partial changes, sidecar and Engine persistence, backward-compatible backups, omitted machine paths, and tour-completion preferences. It never starts input workers, opens a game, moves the cursor, or plays sounds. It does not verify the tour's rendered layout, animation, or native focus behavior. Do not include this verification executable in a release package.
 
 ## Update integrity checks
 

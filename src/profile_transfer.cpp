@@ -17,6 +17,7 @@ bool MainWindow::applyBackup(const QByteArray& bytes){
     const auto old=favorites_;favorites_=favorites;
     if(!persistFavorites()){favorites_=old;return false;}
     engine_.edit([&](r6::Config& current){current=config;});
+    mouse_draft_.reset();mouse_source_.clear();mouse_setup_dirty_=false;
     if(options.gameFocusOnly)engine_.game_focus_only=*options.gameFocusOnly;
     if(options.adsOnly)engine_.ads_only=*options.adsOnly;
     if(config.phone_enabled)phone_->start();else phone_->stop();

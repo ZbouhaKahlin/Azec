@@ -86,7 +86,7 @@
 <file alias="PressStart2P-Regular.ttf">fonts/PressStart2P-Regular.ttf</file>
 </qresource>
 <qresource prefix="/ui"><file alias="star.svg">star.svg</file><file alias="back.svg">back.svg</file><file alias="sidebar-toggle.svg">sidebar-toggle.svg</file><file alias="search.svg">search.svg</file><file alias="settings.svg">settings.svg</file><file alias="save.svg">save.svg</file><file alias="close.svg">close.svg</file><file alias="minimize.svg">minimize.svg</file><file alias="chevron.svg">chevron.svg</file></qresource>
-<qresource prefix="/ui"><file alias="phone.html">phone.html</file>
+<qresource prefix="/ui"><file alias="tour-arrow.svg">tour-arrow.svg</file><file alias="phone.html">phone.html</file>
     <file alias="manifest.webmanifest">manifest.webmanifest</file><file alias="app-icon.svg">app-icon.svg</file><file alias="logo.svg">logo.svg</file></qresource>
 <qresource prefix="/flags"><file alias="us.svg">flags/us.svg</file><file alias="br.svg">flags/br.svg</file><file alias="fr.svg">flags/fr.svg</file><file alias="es.svg">flags/es.svg</file><file alias="de.svg">flags/de.svg</file><file alias="sa.svg">flags/sa.svg</file><file alias="il.svg">flags/il.svg</file><file alias="cn.svg">flags/cn.svg</file><file alias="jp.svg">flags/jp.svg</file><file alias="ps.svg">flags/ps.svg</file></qresource>
 </RCC>

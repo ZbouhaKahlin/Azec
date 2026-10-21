@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include "diagnostics.hpp"
+#include "sensitivity.hpp"
 
 inline QString weaponFile(const std::filesystem::path& base){return QString::fromStdWString((base.parent_path()/L"azec_weapons.json").wstring());}
 // Rapid fire is stored per weapon profile. Older sidecars carried a single
@@ -17,6 +18,7 @@ inline void readWeaponProfiles(r6::Config& config,bool& gameFocusOnly,bool& adsO
     QJsonParseError error;const auto document=QJsonDocument::fromJson(file.readAll(),&error);
     if(error.error!=QJsonParseError::NoError||!document.isObject()){diagnostic("load weapon profiles","Invalid JSON; ignored");clearRapid();return;}
     const auto root=document.object();if(root["version"].toInt()!=1){diagnostic("load weapon profiles","Unsupported version; ignored");clearRapid();return;}
+    if(const auto setup=sensitivity::fromJson(root["sensitivity"].toObject()))config.sensitivity=*setup;
     const auto validKey=[](const QJsonValue& value,int fallback){const int key=value.toInt(fallback);return r6::validHotkey(key)?key:fallback;};
     config.primary_key=validKey(root["primaryKey"],'1');config.secondary_key=validKey(root["secondaryKey"],'2');config.phone_enabled=root["phoneEnabled"].toBool(true);
     bool legacyRapid=false;
@@ -48,7 +50,8 @@ inline QByteArray weaponProfilesBytes(const r6::Config& config,bool gameFocusOnl
     for(int id=r6::legacy_operator_count;id<r6::operator_count;++id){const auto& op=config.operators[id];primaries[QString::fromUtf8(config.operators[id].name)]=QJsonObject{{"vertical",op.vertical},{"horizontal",op.horizontal},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)},{"delay",op.delay}};}
     return QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},
         {"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},{"recoilMaster",true},{"rapidMaster",bool(config.rapid_master)},
-        {"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries}}).toJson();
+        {"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries},
+        {"sensitivity",config.sensitivity.valid()?QJsonValue(sensitivity::json(config.sensitivity)):QJsonValue(QJsonValue::Null)}}).toJson();
 }
 // Two-phase write: the sidecar is prepared without touching the disk copy and
 // only committed after the primary binary write succeeded.

@@ -12,16 +12,18 @@ A Windows desktop app with 78 operator profiles, independent primary and seconda
 2. Open **Azec.exe**. It installs for your Windows user, opens the app, and adds **Azec** to the Start menu. Qt and the Visual C++ runtime are bundled; no source code, command prompt, or administrator rights are needed. No runtime folder appears beside the download.
 3. Select an operator, adjust its settings, and click **Save**. Recoil and rapid fire start off.
 
+The first-start tour points to the controls with an animated yellow arrow and a compact instruction box above the taskbar. Skip it at any time, or replay it from **Settings → General → Replay tour**. **Mouse setup** in the same category saves your mouse DPI and game sensitivity, reads `GameSettings.ini`, and offers a preview before rescaling recoil profiles after a sensitivity change.
+
 ### Connect your phone
 
 Keep the PC and phone on the same local network. Open **Settings → Phone control** on the PC, then open the displayed address in your phone browser and enter the pairing code. The code is shown as a large selectable chip; **Copy code** copies just the six digits, **Copy link** copies a link that skips code entry, and **New code** rotates the code and disconnects phones that were already paired. You can also explicitly reveal and scan the QR code. Keep Azec running on the PC.
 
-Phone edits update the same profiles as the desktop. Tap **Save changes** to keep them after restarting. The top **Output** card has the live global **Recoil active** switch and a **Rapid fire active** switch for the active weapon profile, so primary and secondary can differ. No external fonts, scripts, or cloud service are required. If Windows prompts, allow network access on your private network. Use the PC address shown in Settings, not `localhost` on your phone.
+Phone edits update the same profiles as the desktop. Tap **Save changes** to keep them after restarting. The top **Output** card has the live **Recoil active** switch and a **Rapid fire active** switch for the active weapon profile, so primary and secondary can differ. No external fonts, scripts, or cloud service are required. If Windows prompts, allow network access on your private network. Use the PC address shown in Settings, not `localhost` on your phone.
 
 ## Make it yours
 
-- **Recoil and Rapid fire:** the header shows both pills. Recoil is a single global switch; Rapid fire belongs to the active weapon profile, so primary and secondary can be set independently. The rapid-fire card holds the shot delay for each profile. The old “Master enable” gate is gone.
-- **Only in Rainbow Six:** this is on by default. Azec ignores global keys and mouse output when another application is active; Alt-tab to the game and it resumes. Turn it off in **Settings → General** only if you deliberately want the old system-wide behavior. No software change can make a game macro immune to the game’s rules or anti-cheat; this reduces accidents, not account risk.
+- **Recoil and Rapid fire:** the header shows both pills. Recoil has an on/off switch; Rapid fire belongs to the active weapon profile, so primary and secondary can be set independently. The rapid-fire card holds the shot delay for each profile. The old “Master enable” gate is gone.
+- **Only in Rainbow Six:** this is on by default. Azec ignores application shortcuts and mouse output when another application is active; Alt-tab to the game and it resumes. Turn it off in **Settings → General** only if you deliberately want the old system-wide behavior. No software change can make a game macro immune to the game’s rules or anti-cheat; this reduces accidents, not account risk.
 - **Goofy color themes:** **Charcoal & blush** is the default for fresh configurations. Choose it or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Goofy (original) in **Settings → Appearance**. Choose the same ten themes on the phone in **Settings → Color theme**. Changes from either screen sync to both and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
 - **Collapsible sidebar:** the **Collapse** button at the top of the Goofy sidebar switches between operator names and a compact icon rail. A star shortcut appears above the operator icons when you have favorites. Search stays at the bottom; click its compact icon to expand smoothly and start searching. The sidebar remembers your choice.
 - **Settings categories:** General, Appearance, Shortcuts, Phone control, and Profile backup keep related options together.
@@ -44,7 +46,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 | Ctrl+F | Focus the operator search |
 | Esc | Leave Settings, or clear the search field |
 
-Weapon and action bindings are configurable in Settings. Global actions reject ordinary typing and list-navigation keys. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits and plays a soft two-note “no” cue; it does not use the Windows error beep.
+Weapon and action bindings are configurable in Settings. Show/hide, recoil-toggle and panic shortcuts reject ordinary typing and list-navigation keys. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits and plays a soft two-note “no” cue; it does not use the Windows error beep.
 
 ## Build from source
 

@@ -12,6 +12,11 @@
 #include <atomic>
 
 namespace r6 {
+bool SensitivitySetup::validGame() const {
+    return std::isfinite(horizontal)&&std::isfinite(vertical)&&std::isfinite(multiplier)&&
+        horizontal>=1&&horizontal<=100&&vertical>=1&&vertical<=100&&multiplier>=0.000001&&multiplier<=1;
+}
+bool SensitivitySetup::valid() const {return dpi>=50&&dpi<=100000&&validGame();}
 // FUN_140063d90 constructs 73 names but stops after index 70. Zero and Zofia
 // are embedded strings, but never enter the original's 71-element list. The
 // live roster additions from Noor onward are appended as extensions and never

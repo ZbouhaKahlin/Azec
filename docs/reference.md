@@ -32,7 +32,7 @@ The desktop window: a seamless header with the pixel-font Azec wordmark, the 200
 
 ![Azec phone page](ui-phone.png)
 
-The paired phone page reuses the same GoofyUI materials: cream canvas, white cards with chunky ink outlines and hard offset shadows, sticker section chips, yellow number chips, and face toggles. The first card is **Output**, with the global Recoil switch and a Rapid fire switch for the active weapon profile.
+The paired phone page reuses the same GoofyUI materials: cream canvas, white cards with chunky ink outlines and hard offset shadows, sticker section chips, yellow number chips, and face toggles. The first card is **Output**, with the Recoil switch and a Rapid fire switch for the active weapon profile.
 
 ![Hotkey dialog](ui-hotkey-dialog.png)
 
@@ -51,9 +51,9 @@ The shared **`dist\Azec.exe`** installs for the current Windows user: program fi
 Settings → General → Updates checks the public releases repository anonymously and asks before downloading. The complete EXE must match the published SHA-256 before execution. Updates wait for the old app to exit and prepare a versioned runtime before replacing the installed launcher. The data folder is untouched; one previous runtime is retained. Launching an older downloaded installer opens the newer installed app. The optional portable zip is produced by `package-release.ps1`, with its launcher, runtime, licenses, and no personal data.
 
 - **Insert:** show or hide the window.
-- **F6:** toggle recoil activity; starts OFF. The header keeps a global **Recoil** switch and a **Rapid fire** switch for the active weapon profile. The old Master enable gate is removed; rapid fire is stored separately for primary and secondary.
+- **F6:** toggle recoil activity; starts OFF. The header keeps a **Recoil** switch and a **Rapid fire** switch for the active weapon profile. The old Master enable gate is removed; rapid fire is stored separately for primary and secondary.
 - **End:** immediate panic exit; unsaved edits are discarded. It is ignored while Azec is the active window or a text/number field is focused. With **Only in Rainbow Six** enabled (the default), it also requires the game to be the foreground window.
-- **1 / 2:** select primary / secondary weapon when separate profiles are enabled for that operator. Both keys can be changed in Settings. Global actions reject ordinary typing and list-navigation keys.
+- **1 / 2:** select primary / secondary weapon when separate profiles are enabled for that operator. Both keys can be changed in Settings. Show/hide, recoil-toggle and panic shortcuts reject ordinary typing and list-navigation keys.
 - Arrow keys make 0.1-step recoil adjustments while this window is active and a text/number field or list is not focused.
 
 Click an operator's icon/name to edit its profile. Right-click an operator for a compact Favorite / Remove favorite context-menu action with an outlined star. There is no nested push button; the action's quiet hover stays inset from the menu edge. Favorited operators move out of All operators into Favorites and return when unfavorited; each operator appears once. Both groups share one scrolling sidebar and follow the search field. The entire Favorites group is hidden when empty or when none match the search, with no placeholder or reserved space. Favorites save automatically to `azec_ui.json` beside the launcher and reload on startup. Selecting an operator persists only the selection, so browsing the roster is not an unsaved profile edit.
@@ -62,9 +62,21 @@ Enable **Separate secondary profile** on an operator to add independent secondar
 
 The weapon tabs expand/collapse with a 220 ms height and opacity transition, and their selection highlights fade over 160 ms. Profile changes apply immediately. Repeated toggles reverse from the displayed position and settle on the last choice.
 
+## First-start tour and mouse setup
+
+The first start without a saved tour-completion marker opens six short steps: Ace, primary/secondary profiles, recoil, rapid fire, shortcuts, and mouse setup. The app remains usable throughout. The approved 112 px yellow arrow uses four tapered crease marks and a small, paused tapping motion; there is no spotlight or dimming. The compact instruction pill is an owned tool window above the current screen's taskbar. Both hide when the app is hidden, minimized, inactive, or showing a modal dialog. The arrow follows its actual target and stays hidden when that control is outside its scroll viewport. Clicking Ace advances the first step; Next advances the remaining explanations. Skip and completion save `onboardingVersion` in `azec_ui.json` without replacing favorites or appearance preferences. Replay tour is under Settings → General. Dry-run instances do not start the tour automatically.
+
+**Settings → General → Mouse setup** accepts DPI, horizontal/vertical game sensitivity, and the sensitivity multiplier. It reads only the `[INPUT]` values in a local `GameSettings.ini`. Discovery checks the Documents game-settings folders; multiple accounts require an explicit file choice. An unreadable or missing file leaves manual entry available. The source path is shown only in a tooltip and stays in the local sidecar. No game configuration is modified, and no game process or screen is inspected. Read occurs during setup, on the Read action, and once at startup for a previously saved file; it is not polled during play.
+
+Save starting values uses the normal profile save path. Finishing the tour also saves a valid first setup if it has not already been saved. Completion is unavailable until all four values are valid; Skip remains available. On later starts, a changed saved file produces a review notice. Updating DPI alone saves a reference value and does not alter recoil output.
+
+Rescale profiles previews horizontal and vertical factors before applying them to every operator's primary and initialized secondary profile, including disabled secondary profiles retained for later use. The factors are `old horizontal × old multiplier / (new horizontal × new multiplier)` and the corresponding vertical ratio. DPI is reference metadata because Azec synthesizes movement independently of the physical mouse sensor. This follows the sensitivity terms in [Ubisoft's input-sensitivity explanation](https://www.ubisoft.com/en-gb/game/rainbow-six/siege/news-updates/6kY6b5JByBY3P6vQWWinla); Windows documents synthetic movement in [MOUSEINPUT](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput). This estimates the base sensitivity change; scope/ADS and Windows pointer settings still need separate tuning, and in-game behavior has not been verified.
+
+The change is rejected in full if any affected profile would exceed the existing vertical or horizontal limits. Successful rescaling rounds to the controls' 0.1 increments, updates the reference, and leaves the changes unsaved until Save. Shot delay, rapid fire, humanization, and selection are preserved. The reference is stored in `azec_weapons.json` alongside the profiles, using their existing synchronized save and rollback path. Profile backups include the numeric reference but omit the machine's INI path; older backups remain accepted. The 3,734-byte binary configuration is unchanged.
+
 ## Output switches
 
-Azec has exactly two global output switches, and no master gate:
+Azec has one Recoil switch and one Rapid fire toggle for the active weapon profile:
 
 | Switch | Where | Persisted | Notes |
 | --- | --- | --- | --- |
@@ -79,13 +91,13 @@ Recoil uses a 12 ms step while the active profile's rapid fire is off and a 30 m
 
 **Settings → General → Only in Rainbow Six** is on by default. While it is on:
 
-- Global keys (show/hide, recoil toggle, weapon slots, panic) only fire while the Rainbow Six process is the foreground window.
+- Application shortcuts (show/hide, recoil toggle, primary/secondary selection, panic) only fire while the Rainbow Six process is the foreground window.
 - Mouse output — recoil movement and rapid fire — is suppressed while any other application is focused, and while Azec itself is active.
 - The panic key is ignored while Azec, one of its dialogs, or a dropdown is active, so End keeps its normal meaning in lists and dialogs.
 
 Azec identifies the game by the foreground process name (`RainbowSix*.exe`), with a window-title fallback. The preference is stored in `azec_weapons.json`. Turn it off in Settings → General only if you deliberately want system-wide behavior. The gate prevents accidents in other applications; it does not change how the game or its anti-cheat behaves, and it is not a claim of undetectability.
 
-Global actions also refuse unsafe keys: ordinary typing and list-navigation keys (letters, digits, Space, Tab, Enter, Esc, Backspace, and punctuation) cannot be bound to show/hide, recoil toggle, or panic exit. Weapon slots keep accepting digits and letters.
+Show/hide, recoil-toggle and panic shortcuts also refuse unsafe keys: ordinary typing and list-navigation keys (letters, digits, Space, Tab, Enter, Esc, Backspace, and punctuation) cannot be bound to show/hide, recoil toggle, or panic exit. Weapon slots keep accepting digits and letters.
 
 ## Keyboard and pointer behavior
 
@@ -126,7 +138,7 @@ The Steady Spark logo also appears beside the desktop wordmark, in the window an
 
 See [testing.md](testing.md) for optional rendered QR decoding checks.
 
-The phone page edits the same in-memory profiles and global settings as the desktop, including both weapon slots. The top **Output** card has the global **Recoil active** switch and the active weapon profile's **Rapid fire active** switch. **Only while aiming** lives in the collapsed Settings section. Tap the operator identity to open a scrollable icon grid with saved desktop Favorites above All operators; search opens the keyboard only when tapped. Favorites also appear as one-tap shortcuts below the operator identity, with no separate favorite-edit button. The **Weapon profiles** disclosure holds the independent secondary-profile option. Shot delay uses a 30–150 ms slider with **−5 ms / +5 ms** buttons on both desktop and phone; its yellow value chip is read-only. Changes apply immediately; the sticky **Save changes** button keeps them after restarting and finishes any pending slider edits before saving. It refreshes desktop changes while you are not editing an input and pauses polling while the page is hidden. It embeds its display font and has no external fonts, libraries, or internet dependency. Keep the PC app running. If Windows requests network permission, allow the app on the private network used by the phone.
+The phone page edits the same in-memory profiles and application settings as the desktop, including both weapon slots. The top **Output** card has the **Recoil active** switch and the active weapon profile's **Rapid fire active** switch. **Only while aiming** lives in the collapsed Settings section. Tap the operator identity to open a scrollable icon grid with saved desktop Favorites above All operators; search opens the keyboard only when tapped. Favorites also appear as one-tap shortcuts below the operator identity, with no separate favorite-edit button. The **Weapon profiles** disclosure holds the independent secondary-profile option. Shot delay uses a 30–150 ms slider with **−5 ms / +5 ms** buttons on both desktop and phone; its yellow value chip is read-only. Changes apply immediately; the sticky **Save changes** button keeps them after restarting and finishes any pending slider edits before saving. It refreshes desktop changes while you are not editing an input and pauses polling while the page is hidden. It embeds its display font and has no external fonts, libraries, or internet dependency. Keep the PC app running. If Windows requests network permission, allow the app on the private network used by the phone.
 
 Phone access can be disabled in Settings. Pairing codes and tokens change when the app restarts. API calls require the session token, pairing attempts are rate-limited, and foreign origins/hosts are rejected. The app does not configure router forwarding or expose a public service. This HTTP control page is intended for a trusted local network.
 
