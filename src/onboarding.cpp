@@ -125,7 +125,7 @@ void MainWindow::setTourStep(int step){
     if(step<4){
         showOperators();
     }else {
-        if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(step==4?2:0);
+        if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(step==4?2:mouse_setup_category_);
     }
     const UiText titles[]={UiText::TourChooseTitle,UiText::WeaponProfiles,UiText::RecoilControl,UiText::RapidFire,UiText::Shortcuts,UiText::MouseSetup};
     const UiText descriptions[]={UiText::TourChooseHint,UiText::TourProfilesHint,UiText::TourRecoilHint,UiText::TourRapidHint,UiText::TourShortcutsHint,UiText::TourSetupHint};
@@ -138,8 +138,12 @@ void MainWindow::setTourStep(int step){
         if(tour_step_!=step)return;
         if(step==0){auto* list=favorites_.contains("Ace")?favorites_list_:operators_;
             for(int i=0;i<list->count();++i)if(list->item(i)->data(Qt::UserRole).toInt()==0){
-                const auto row=list->visualItemRect(list->item(i));const int y=list->viewport()->mapTo(sidebar_scroll_->widget(),row.topLeft()).y();
-                sidebar_scroll_->verticalScrollBar()->setValue(std::max(0,y-12));break;
+                const auto row=list->visualItemRect(list->item(i)).intersected(list->viewport()->rect());
+                const QRect target(list->viewport()->mapToGlobal(row.topLeft()),row.size());auto* viewport=sidebar_scroll_->viewport();
+                if(!QRect(viewport->mapToGlobal(QPoint()),viewport->size()).contains(target)){
+                    const int y=list->viewport()->mapTo(sidebar_scroll_->widget(),row.topLeft()).y();
+                    sidebar_scroll_->verticalScrollBar()->setValue(std::max(0,y-48));
+                }break;
             }
         }
         QWidget* target=step==1?static_cast<QWidget*>(dual_):step==2?static_cast<QWidget*>(vertical_):step==3?static_cast<QWidget*>(rapid_active_):nullptr;
@@ -179,11 +183,11 @@ void MainWindow::positionTour(){
     QRect target;QWidget* widget=nullptr;
     if(tour_step_==0&&pages_->currentWidget()==operator_page_){
         auto* list=favorites_.contains("Ace")?favorites_list_:operators_;
-        for(int i=0;i<list->count();++i)if(list->item(i)->data(Qt::UserRole).toInt()==0){const auto rect=list->visualItemRect(list->item(i));target=QRect(list->viewport()->mapToGlobal(rect.topLeft()),rect.size());break;}
+        for(int i=0;i<list->count();++i)if(list->item(i)->data(Qt::UserRole).toInt()==0){const auto rect=list->visualItemRect(list->item(i)).intersected(list->viewport()->rect());target=QRect(list->viewport()->mapToGlobal(rect.topLeft()),rect.size());break;}
     }else if(tour_step_<4&&pages_->currentWidget()==operator_page_){
         widget=tour_step_==1?static_cast<QWidget*>(dual_):tour_step_==2?static_cast<QWidget*>(vertical_):static_cast<QWidget*>(rapid_active_);
     }else if(tour_step_==4&&pages_->currentWidget()==preferences_&&preference_category_==2)widget=key_buttons_[0];
-    else if(tour_step_==5&&pages_->currentWidget()==preferences_&&preference_category_==0)widget=mouse_dpi_;
+    else if(tour_step_==5&&pages_->currentWidget()==preferences_&&preference_category_==mouse_setup_category_)widget=mouse_dpi_;
     if(widget&&widget->isVisible())target=QRect(widget->mapToGlobal(QPoint()),widget->size());
     const QRect windowArea(mapToGlobal(QPoint()),size());
     auto* viewport=tour_step_==0?sidebar_scroll_->viewport():tour_step_<4?scroll_->viewport():preferences_scroll_->viewport();

@@ -165,4 +165,5 @@ inline const char* const lang_de[]={
     "Gib DPI, beide Empfindlichkeiten und den Faktor ein.",
     "Profile angepasst. Speichere die Änderungen.",
     "Ohne Anpassung speichern",
+    "DPI und Empfindlichkeit",
 };

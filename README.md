@@ -12,7 +12,7 @@ A Windows desktop app with 78 operator profiles, independent primary and seconda
 2. Open **Azec.exe**. It installs for your Windows user, opens the app, and adds **Azec** to the Start menu. Qt and the Visual C++ runtime are bundled; no source code, command prompt, or administrator rights are needed. No runtime folder appears beside the download.
 3. Select an operator, adjust its settings, and click **Save**. Recoil and rapid fire start off.
 
-The first-start tour points to the controls with an animated yellow arrow and a compact instruction box above the taskbar. Skip it at any time, or replay it from **Settings → General → Replay tour**. **Mouse setup** in the same category saves your mouse DPI and game sensitivity, reads `GameSettings.ini`, and offers a preview before rescaling recoil profiles after a sensitivity change.
+The first-start tour points to the controls with an animated yellow arrow and a compact instruction box above the taskbar. Skip it at any time, or replay it from **Settings → General → Replay tour**. The separate **Settings → Mouse setup** tab saves your mouse DPI and game sensitivity, reads `GameSettings.ini`, and offers a preview before rescaling recoil profiles after a sensitivity change.
 
 ### Connect your phone
 
@@ -26,7 +26,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 - **Only in Rainbow Six:** this is on by default. Azec ignores application shortcuts and mouse output when another application is active; Alt-tab to the game and it resumes. Turn it off in **Settings → General** only if you deliberately want the old system-wide behavior. No software change can make a game macro immune to the game’s rules or anti-cheat; this reduces accidents, not account risk.
 - **Goofy color themes:** **Charcoal & blush** is the default for fresh configurations. Choose it or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Goofy (original) in **Settings → Appearance**. Choose the same ten themes on the phone in **Settings → Color theme**. Changes from either screen sync to both and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
 - **Collapsible sidebar:** the **Collapse** button at the top of the Goofy sidebar switches between operator names and a compact icon rail. A star shortcut appears above the operator icons when you have favorites. Search stays at the bottom; click its compact icon to expand smoothly and start searching. The sidebar remembers your choice.
-- **Settings categories:** General, Appearance, Shortcuts, Phone control, and Profile backup keep related options together.
+- **Settings categories:** General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup keep related options together.
 - **Independent profiles:** enabling a secondary profile copies the primary once, then keeps edits separate. Disabling it preserves those edits.
 - **Favorites and search:** right-click an operator to favorite it. Favorites appear once and save automatically.
 - **Portable backups:** export or import profiles, favorites, the active color theme, the collapsed-sidebar choice, and the output and safety switches in **Settings → Profile backup**. Imported profile changes remain unsaved until you click Save.

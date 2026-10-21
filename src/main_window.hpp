@@ -84,6 +84,7 @@ class MainWindow final : public QWidget {
     IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;StickerStarButton* sidebar_favorites_=nullptr;
     QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false,sidebar_animating_=false,favorites_shown_=false;
     QVector<ThemeCard*> theme_cards_;QVector<QWidget*> preference_categories_;int preference_category_=0;
+    static constexpr int mouse_setup_category_=5;
     QVariantAnimation operator_transition_;
     FadeLabel *name_opacity_=nullptr,*icon_opacity_=nullptr;
     QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr,*subtitle_=nullptr;
@@ -297,9 +298,9 @@ class MainWindow final : public QWidget {
         setWidgetOpacity(sidebar_favorites_,1.0-expanded);
     }
     void updateSettingsNavLabels(){
-        const QString names[]={text(UiText::General),text(UiText::Appearance),text(UiText::Shortcuts),text(UiText::PhoneControl),text(UiText::ProfileBackup)};
-        const QString hints[]={text(UiText::SettingsGeneralHint),text(UiText::SettingsAppearanceHint),text(UiText::SettingsShortcutsHint),text(UiText::SettingsPhoneHint),text(UiText::SettingsBackupHint)};
-        for(int i=0;i<settings_nav_buttons_.size()&&i<5;++i){settings_nav_buttons_[i]->setText(names[i]);settings_nav_buttons_[i]->setDescription(hints[i]);settings_nav_buttons_[i]->setToolTip(names[i]+QStringLiteral(" — ")+hints[i]);settings_nav_buttons_[i]->setAccessibleName(names[i]+QStringLiteral(". ")+hints[i]);}
+        const QString names[]={text(UiText::General),text(UiText::Appearance),text(UiText::Shortcuts),text(UiText::PhoneControl),text(UiText::ProfileBackup),text(UiText::MouseSetup)};
+        const QString hints[]={text(UiText::SettingsGeneralHint),text(UiText::SettingsAppearanceHint),text(UiText::SettingsShortcutsHint),text(UiText::SettingsPhoneHint),text(UiText::SettingsBackupHint),text(UiText::MouseSetupTabHint)};
+        for(int i=0;i<settings_nav_buttons_.size()&&i<int(std::size(names));++i){settings_nav_buttons_[i]->setText(names[i]);settings_nav_buttons_[i]->setDescription(hints[i]);settings_nav_buttons_[i]->setToolTip(names[i]+QStringLiteral(" — ")+hints[i]);settings_nav_buttons_[i]->setAccessibleName(names[i]+QStringLiteral(". ")+hints[i]);}
     }
     void updateSidebarControls(){
         if(!sidebar_)return;
@@ -367,7 +368,7 @@ class MainWindow final : public QWidget {
         theme_cards_.clear();delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;
         auto* outer=new QVBoxLayout(content);outer->setContentsMargins(2,0,10,0);outer->setSpacing(14);
         const auto categoryLayout=[&]{auto* page=new QWidget;page->setMinimumWidth(0);auto* layout=new QVBoxLayout(page);layout->setContentsMargins(0,0,0,0);layout->setSpacing(14);outer->addWidget(page);preference_categories_.append(page);return layout;};
-        auto* generalLayout=categoryLayout();auto* preferencesLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();
+        auto* generalLayout=categoryLayout();auto* preferencesLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();auto* mouseLayout=categoryLayout();
         auto* colorTitle=new StickerLabel(text(UiText::ColorTheme),kbtheme::blue);preferencesLayout->addWidget(colorTitle,0,Qt::AlignLeft);
         auto* themeGrid=new QWidget;themeGrid->setObjectName("themeGrid");auto* grid=new QGridLayout(themeGrid);
         themeGrid->setToolTip(text(UiText::ColorThemeHint));
@@ -427,7 +428,7 @@ class MainWindow final : public QWidget {
             phone_details_=new ExpandingContent(connection,300);phoneSection->body->addWidget(phone_details_);phone_details_->setExpanded(c.phone_enabled,false);
             updatePhoneDetails();
         }
-        buildMouseSetup(generalLayout);
+        buildMouseSetup(mouseLayout);
         auto* guideRow=new QHBoxLayout;
         auto* guide=new QPushButton(text(UiText::QuickGuide));guide->setObjectName("secondary");guideRow->addWidget(guide);connect(guide,&QPushButton::clicked,this,[this]{help();});
         auto* replay=new QPushButton(text(UiText::ReplayTour));replay->setObjectName("secondary");guideRow->addWidget(replay);connect(replay,&QPushButton::clicked,this,[this]{startTour();});guideRow->addStretch();generalLayout->addLayout(guideRow);

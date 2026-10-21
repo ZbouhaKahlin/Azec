@@ -165,4 +165,5 @@ inline const char* const lang_zh[]={
     "请先输入 DPI、两个灵敏度和倍率。",
     "配置已调整，请保存更改。",
     "保存但不调整",
+    "DPI 和灵敏度",
 };

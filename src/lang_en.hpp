@@ -165,4 +165,5 @@ inline const char* const lang_en[]={
     "Enter DPI, both sensitivity values, and the multiplier first.",
     "Profiles rescaled. Save to keep the changes.",
     "Save without rescaling",
+    "DPI and sensitivity",
 };

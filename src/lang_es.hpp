@@ -165,4 +165,5 @@ inline const char* const lang_es[]={
     "Introduce el DPI, ambas sensibilidades y el multiplicador.",
     "Perfiles reajustados. Guarda para conservar los cambios.",
     "Guardar sin reajustar",
+    "DPI y sensibilidad",
 };

@@ -173,7 +173,7 @@ protected:
 // face, a slightly darker extruded side and a hard ink outline. No gradients,
 // blur or glow; the depth comes from layered flat shapes like the rest of
 // GoofyUI.
-enum class SettingsGlyph{General,Appearance,Shortcuts,Phone,Profile};
+enum class SettingsGlyph{General,Appearance,Shortcuts,Phone,Profile,Mouse};
 
 inline QColor settingsGlyphColor(SettingsGlyph glyph){
     switch(glyph){
@@ -182,6 +182,7 @@ inline QColor settingsGlyphColor(SettingsGlyph glyph){
     case SettingsGlyph::Shortcuts:return kbtheme::blue;
     case SettingsGlyph::Phone:return kbtheme::lime;
     case SettingsGlyph::Profile:return kbtheme::defaultAccent;
+    case SettingsGlyph::Mouse:return kbtheme::pink;
     }
     return kbtheme::yellow;
 }
@@ -212,6 +213,7 @@ inline QPainterPath settingsGlyphShape(SettingsGlyph glyph){
     }
     case SettingsGlyph::Shortcuts:shape.addRoundedRect(QRectF(-9.5,-6.3,19,12.6),2.6,2.6);break;
     case SettingsGlyph::Phone:shape.addRoundedRect(QRectF(-6.4,-10.2,12.8,20.4),3.6,3.6);break;
+    case SettingsGlyph::Mouse:shape.addRoundedRect(QRectF(-7.4,-10,14.8,20),7.4,7.4);break;
     case SettingsGlyph::Profile:{
         shape.addEllipse(QPointF(0,-4.4),4.3,4.3);
         QPainterPath shoulders;shoulders.moveTo(-8.0,9.6);shoulders.cubicTo(-7.4,1.0,7.4,1.0,8.0,9.6);shoulders.lineTo(-8.0,9.6);shoulders.closeSubpath();
@@ -241,6 +243,10 @@ inline void paintSettingsGlyphDetails(QPainter& painter,SettingsGlyph glyph,cons
     case SettingsGlyph::Phone:
         painter.setBrush(mixColor(fill,ink,.55));painter.drawRoundedRect(QRectF(-4.2,-7.0,8.4,11.6),1.5,1.5);
         painter.setBrush(fill);painter.setPen(QPen(ink,1.4));painter.drawEllipse(QPointF(0,7.2),1.4,1.4);
+        break;
+    case SettingsGlyph::Mouse:
+        painter.drawLine(QPointF(0,-9),QPointF(0,-1));painter.drawLine(QPointF(-6.8,-1),QPointF(6.8,-1));
+        painter.setBrush(detail);painter.drawRoundedRect(QRectF(-1.5,-7.5,3,4.5),1.3,1.3);
         break;
     case SettingsGlyph::Profile:
         painter.setPen(QPen(ink,1.6));painter.setBrush(detail);painter.drawEllipse(QPointF(0,-4.2),2.1,2.1);

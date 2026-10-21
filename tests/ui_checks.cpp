@@ -352,8 +352,8 @@ QJsonObject MainWindow::selfTest(const QString& output){
         theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;theme.radius=250;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);const auto normalized=customTheme.snapshot();
         checks["removed_appearance_settings_normalize_on_load"]=customLoaded&&QColor::fromRgbF(normalized.neon[0],normalized.neon[1],normalized.neon[2]).name()=="#7248d7"&&std::abs(normalized.radius-130.f)<.001f&&std::abs(normalized.operators[4].vertical-theme.operators[4].vertical)<.001f;
         showPreferences();chooseSettingsCategory(1);wait(220);
-        checks["settings_has_five_categories"]=settings_nav_buttons_.size()==5&&preference_categories_.size()==5;
-        bool categoryVisibility=true;for(int index=0;index<5;++index){settings_nav_buttons_[index]->click();QApplication::processEvents();for(int i=0;i<5;++i)categoryVisibility&=preference_categories_[i]->isVisible()==(i==index);}
+        checks["settings_has_six_categories"]=settings_nav_buttons_.size()==6&&preference_categories_.size()==6;
+        bool categoryVisibility=true;for(int index=0;index<settings_nav_buttons_.size();++index){settings_nav_buttons_[index]->click();QApplication::processEvents();for(int i=0;i<preference_categories_.size();++i)categoryVisibility&=preference_categories_[i]->isVisible()==(i==index);}
         checks["settings_categories_show_only_selected_content"]=categoryVisibility;
         chooseSettingsCategory(3);pairing_qr_->click();chooseSettingsCategory(1);checks["changing_settings_category_conceals_qr"]=!pairing_qr_->revealed();
         wait(220);

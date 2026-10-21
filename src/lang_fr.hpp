@@ -165,4 +165,5 @@ inline const char* const lang_fr[]={
     "Saisissez le DPI, les deux sensibilités et le multiplicateur.",
     "Profils adaptés. Enregistrez pour conserver les changements.",
     "Enregistrer sans adapter",
+    "DPI et sensibilité",
 };
