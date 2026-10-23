@@ -1,0 +1,27 @@
+Open Azec.exe. It installs for your Windows account and adds Azec to the Start menu.
+
+Start in Settings, under Mouse setup. Enter your mouse DPI and your horizontal and vertical game sensitivity. If your game settings are found, you can read them directly. Save these starting values. When your sensitivity changes later, preview the profile rescaling before applying it.
+
+Back on the main screen, select an operator from the sidebar. Use search to find one quickly.
+
+Turn on Separate secondary profile if you want different settings for your second weapon. It copies the primary profile once. After that, each is independent. The default keys are one and two.
+
+Set Vertical force and Horizontal adjust for the selected weapon. Use the sliders for larger changes, then fine-tune in small increments. The Recoil switch at the top turns recoil output on or off.
+
+Rapid fire is separate for each weapon profile. Enable it for the weapon you want, then adjust Shot delay. Switching weapons brings back that weapon's own rapid-fire setting.
+
+Click Save to keep your profile edits after closing the app. Selecting another operator on its own doesn't create unsaved changes.
+
+In Settings, open Shortcuts to change your keys. Insert shows or hides the window, and F six toggles recoil by default. Click a binding, then press the key you want. A key that's already assigned is rejected.
+
+Under General, keep Only in Rainbow Six enabled. Output and application shortcuts then pause when another app is active. Language and feedback sounds are here too.
+
+To connect a phone, keep both devices on the same Wi-Fi network. Open Phone control, then reveal and scan the QR code, or open the displayed address and enter the pairing code.
+
+Keep Azec running on the PC. Phone edits update the same operator and weapon profiles. The Output card controls recoil and the active profile's rapid fire. Tap Save changes to keep your edits.
+
+Appearance changes the palette without moving the controls. You can change it from either screen. Right-click an operator to add it to Favorites.
+
+Use Profile backup to export your settings or import a backup. After importing profile changes, click Save.
+
+Check for updates in General. Your profiles stay in place when you update. You can also replay the built-in tour from here.
