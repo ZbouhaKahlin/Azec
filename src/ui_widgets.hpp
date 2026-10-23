@@ -31,6 +31,7 @@ class CodeBlock final : public QWidget {
     QLabel* code_;
     QPushButton* copy_;
     QString copyLabel_,copiedLabel_;
+    bool sized_=false;
 public:
     explicit CodeBlock(const QString& copy,const QString& copied,QWidget* parent=nullptr):QWidget(parent){
         setObjectName("codeBlock");
@@ -52,6 +53,17 @@ public:
     }
     void setText(const QString& text){code_->setText(text);}
     QString text() const{return code_->text();}
+protected:
+    // Reserve the wider of the two labels once the themed font is applied, so
+    // swapping to "Copied" cannot shrink the button and flash the layout.
+    void showEvent(QShowEvent* event) override{
+        QWidget::showEvent(event);
+        if(sized_)return;
+        sized_=true;
+        const auto metrics=copy_->fontMetrics();
+        const int width=qMax(metrics.horizontalAdvance(copyLabel_),metrics.horizontalAdvance(copiedLabel_));
+        copy_->setFixedWidth(width+34);
+    }
 };
 
 class InkPopup final : public QFrame {

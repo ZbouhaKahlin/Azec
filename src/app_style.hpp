@@ -100,6 +100,7 @@ inline QString applicationStyle(const QColor& accent){
         QLabel#bindingHint { color:$ink; font-size:16px; font-weight:600; }
         QLabel#bindingHint[invalid="true"] { color:$danger; }
         QDialog#helpDialog, QDialog#unsavedDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
+        QDialog#driverDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
         QDialog#palestinePopup { background:$paper; border:3px solid $outline; border-radius:24px; }
         QLabel#palestineArabic { color:$ink; font-size:24px; font-weight:900; }
         QToolTip { background:$surface; color:$ink; border:2px solid $outline; border-radius:10px; padding:6px 8px; font-size:12px; }
