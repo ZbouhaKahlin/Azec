@@ -106,6 +106,7 @@ class MainWindow final : public QWidget {
     QPointer<QPushButton> driver_check_;
     QPointer<QPushButton> driver_copy_command_;
     QPointer<QPushButton> driver_steps_;
+    QPointer<QWidget> driver_setup_row_;
     QPointer<ExpandingContent> driver_guide_;
     QPointer<CodeBlock> driver_code_;
     QString driver_installer_;
@@ -380,30 +381,34 @@ class MainWindow final : public QWidget {
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
     }
     void buildOutputMethod(QVBoxLayout* column){
-        auto* output=new Section(text(UiText::DriverOutput),false,true,kbtheme::blue);column->addWidget(output);
+        auto* output=new Section(text(UiText::DriverOutput),false,true,kbtheme::blue);output->body->setSpacing(0);column->addWidget(output);
 
-        auto* statusRow=new QHBoxLayout;statusRow->setContentsMargins(14,4,12,8);statusRow->setSpacing(8);
+        // State and the current action share one row; the setup actions appear
+        // underneath only while the driver is not usable yet.
+        auto* head=new QHBoxLayout;head->setContentsMargins(14,6,12,8);head->setSpacing(10);
         driver_status_=new QLabel(QString());driver_status_->setObjectName("driverState");
         driver_status_->setAlignment(Qt::AlignLeft|Qt::AlignVCenter);
-        statusRow->addWidget(driver_status_,0,Qt::AlignLeft);statusRow->addStretch();
-        output->body->addLayout(statusRow);
-
-        auto* actions=new QHBoxLayout;actions->setContentsMargins(14,0,12,8);actions->setSpacing(8);
-        driver_check_=new QPushButton(text(UiText::CheckDriver));driver_check_->setObjectName("secondary");
-        driver_check_->setAccessibleName(text(UiText::CheckDriver));actions->addWidget(driver_check_);
-        driver_download_=new QPushButton(text(UiText::DownloadAndPlace));driver_download_->setObjectName("secondary");
-        driver_download_->setAccessibleName(text(UiText::DownloadAndPlace));actions->addWidget(driver_download_);
-        driver_page_=new QPushButton(text(UiText::DriverDownload));driver_page_->setObjectName("secondary");
-        driver_page_->setAccessibleName(text(UiText::DriverDownload));actions->addWidget(driver_page_);
-        driver_copy_command_=new QPushButton(text(UiText::CopyCommand));driver_copy_command_->setObjectName("secondary");
-        driver_copy_command_->setAccessibleName(text(UiText::CopyCommand));actions->addWidget(driver_copy_command_);
+        head->addWidget(driver_status_,0,Qt::AlignVCenter);head->addStretch();
         driver_test_=new QPushButton(text(UiText::TestDriver));driver_test_->setObjectName("secondary");
-        driver_test_->setAccessibleName(text(UiText::TestDriver));actions->addWidget(driver_test_);
-        restart_admin_=new QPushButton(text(UiText::RestartAsAdmin));restart_admin_->setObjectName("secondary");
-        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));actions->addWidget(restart_admin_);
-        actions->addStretch();output->body->addLayout(actions);
+        driver_test_->setAccessibleName(text(UiText::TestDriver));head->addWidget(driver_test_,0,Qt::AlignVCenter);
+        output->body->addLayout(head);
 
-        // The walkthrough is a real button that opens the steps in place.
+        auto* setupRow=new QWidget;auto* setup=new QHBoxLayout(setupRow);
+        setup->setContentsMargins(14,0,12,8);setup->setSpacing(8);
+        driver_check_=new QPushButton(text(UiText::CheckDriver));driver_check_->setObjectName("secondary");
+        driver_check_->setAccessibleName(text(UiText::CheckDriver));setup->addWidget(driver_check_);
+        driver_download_=new QPushButton(text(UiText::DownloadAndPlace));driver_download_->setObjectName("secondary");
+        driver_download_->setAccessibleName(text(UiText::DownloadAndPlace));setup->addWidget(driver_download_);
+        driver_page_=new QPushButton(text(UiText::DriverDownload));driver_page_->setObjectName("secondary");
+        driver_page_->setAccessibleName(text(UiText::DriverDownload));setup->addWidget(driver_page_);
+        driver_copy_command_=new QPushButton(text(UiText::CopyCommand));driver_copy_command_->setObjectName("secondary");
+        driver_copy_command_->setAccessibleName(text(UiText::CopyCommand));setup->addWidget(driver_copy_command_);
+        restart_admin_=new QPushButton(text(UiText::RestartAsAdmin));restart_admin_->setObjectName("secondary");
+        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));setup->addWidget(restart_admin_);
+        setup->addStretch();output->body->addWidget(setupRow);
+        driver_setup_row_=setupRow;
+
+        // A real button that opens the walkthrough in place.
         auto* toggleRow=new QHBoxLayout;toggleRow->setContentsMargins(14,0,12,10);toggleRow->setSpacing(8);
         driver_steps_=new QPushButton;driver_steps_->setObjectName("secondary");
         driver_steps_->setCursor(Qt::PointingHandCursor);
@@ -561,10 +566,14 @@ class MainWindow final : public QWidget {
                                          :QStringLiteral("missing"));
         driver_status_->style()->unpolish(driver_status_);driver_status_->style()->polish(driver_status_);
         const bool usable=driver_state==driver_input::State::Ready;
+        const bool refused=driver_state==driver_input::State::Refused;
         if(driver_test_)driver_test_->setEnabled(usable);
-        if(restart_admin_)restart_admin_->setVisible(driver_state==driver_input::State::Refused);
-        for(auto* button:{driver_check_.data(),driver_download_.data(),driver_page_.data(),driver_copy_command_.data()})
-            if(button)button->setVisible(!usable);
+        if(driver_setup_row_)driver_setup_row_->setVisible(!usable);
+        if(restart_admin_)restart_admin_->setVisible(refused);
+        // With the driver present but unelevated, only checking and elevating help.
+        if(driver_download_)driver_download_->setVisible(!usable&&!refused);
+        if(driver_page_)driver_page_->setVisible(!usable&&!refused);
+        if(driver_copy_command_)driver_copy_command_->setVisible(!usable&&!refused);
     }
     void buildPreferences(){
         if(!preferences_)return;
