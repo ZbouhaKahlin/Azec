@@ -1,6 +1,9 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+rem Capture the script folder before the argument loop: shift replaces %0,
+rem which would make a later %~dp0 point at the current directory instead.
+set "AZEC_SCRIPT_DIR=%~dp0"
+cd /d "%AZEC_SCRIPT_DIR%"
 set "DO_PUBLISH="
 set "QUICK="
 set "RUN_TESTS="
@@ -27,7 +30,7 @@ goto usage
 :argumentsready
 if defined QUICK if defined DO_PUBLISH goto usage
 
-set "AZEC_SHARE_ROOT=%~dp0"
+set "AZEC_SHARE_ROOT=%AZEC_SCRIPT_DIR%"
 rem Quick repackaging must retain the compiled app's version.
 if defined QUICK (
     if not exist .build\share-build\version.txt (
@@ -67,7 +70,7 @@ rem ------------------------------------------------------------- application
 if defined QUICK goto skipbuild
 if not exist .build\share-build mkdir .build\share-build
 pushd .build\share-build
-"%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0Azec.pro" -o Makefile
+"%NEON_QT_ROOT%\bin\qmake.exe" "%AZEC_SCRIPT_DIR%Azec.pro" -o Makefile
 if errorlevel 1 ( popd & exit /b 1 )
 nmake /nologo
 if errorlevel 1 ( popd & exit /b 1 )
@@ -80,7 +83,7 @@ if not exist .build\share-build\release\Azec.exe (
 )
 
 rem -------------------------------------------------------- stage the payload
-set "PAYLOAD=%~dp0.build\share-payload"
+set "PAYLOAD=%AZEC_SCRIPT_DIR%.build\share-payload"
 powershell -NoProfile -Command "$root=[IO.Path]::GetFullPath($env:AZEC_SHARE_ROOT); $target=[IO.Path]::GetFullPath((Join-Path $root '.build\share-payload')); if(-not $target.StartsWith((Join-Path $root '.build\'),[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe staging path'}; if(Test-Path -LiteralPath $target){Remove-Item -LiteralPath $target -Recurse -Force}"
 if errorlevel 1 exit /b 1
 mkdir "%PAYLOAD%\runtime"

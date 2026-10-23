@@ -398,7 +398,11 @@ class MainWindow final : public QWidget {
 
         // Inline walkthrough. Only maximumHeight is animated, so the content is
         // laid out normally the whole time: no snapshot, no flash, no jump.
-        auto* body=new QWidget;body->setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Maximum);
+        // Preferred, not Maximum: a Maximum vertical policy caps the body at its
+        // sizeHint, which under-reports wrapped labels that carry line breaks and
+        // clipped the troubleshooting text. The column's trailing stretch keeps
+        // the expanded body at its natural height.
+        auto* body=new QWidget;body->setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Preferred);
         auto* steps=new QVBoxLayout(body);steps->setContentsMargins(14,0,12,10);steps->setSpacing(4);
 
         auto* actions=new QHBoxLayout;actions->setSpacing(8);
