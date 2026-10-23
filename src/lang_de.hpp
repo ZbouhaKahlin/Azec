@@ -180,4 +180,10 @@ inline const char* const lang_de[]={
     "Bewegung über den installierten Interception-Treiber statt über Windows SendInput senden. Treiber installieren und interception.dll neben Azec ablegen.",
     "Interception-Treiber erkannt.",
     "Interception-Treiber nicht gefunden. Installieren und interception.dll neben Azec ablegen.",
+    "Interception ist installiert, aber Azec kann es nicht öffnen. Starte Azec als Administrator.",
+    "Treiber testen",
+    "Testbewegung gesendet. Wenn der Cursor sich nicht bewegt hat, erreicht der Treiber Windows nicht.",
+    "Der Treiber hat die Testbewegung abgelehnt.",
+    "Als Administrator neu starten",
+    "Treiber herunterladen",
 };

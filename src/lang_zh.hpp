@@ -180,4 +180,10 @@ inline const char* const lang_zh[]={
     "通过已安装的 Interception 驱动发送移动，而不是 Windows SendInput。请安装驱动并把 interception.dll 放在 Azec 旁边。",
     "已检测到 Interception 驱动。",
     "未找到 Interception 驱动。请安装后把 interception.dll 放在 Azec 旁边。",
+    "Interception 已安装，但 Azec 无法打开它。请以管理员身份启动 Azec。",
+    "测试驱动",
+    "已发送测试移动。如果光标没有移动，说明驱动未到达 Windows。",
+    "驱动拒绝了测试移动。",
+    "以管理员身份重启",
+    "获取驱动",
 };

@@ -30,14 +30,18 @@ inline constexpr unsigned short move_relative=0x000;
 inline constexpr unsigned short left_button_down=0x001;
 inline constexpr unsigned short left_button_up=0x002;
 
-// The virtual device Azec writes to. Interception numbers mice 1-10; injecting
-// on the first mouse path behaves like the primary physical mouse.
-inline constexpr int mouse_device=1;
+// Interception reserves 1-10 for keyboards and numbers mice from 11
+// (INTERCEPTION_MOUSE(0) = INTERCEPTION_MAX_KEYBOARD + 0 + 1). Sending to 1
+// addresses a keyboard device, which silently produced no pointer movement.
+inline constexpr int first_mouse_device=11;
+inline constexpr int mouse_device=first_mouse_device;
 
 namespace detail {
 using CreateContext=void*(*)();
 using DestroyContext=void(*)(void*);
 using SendStrokes=int(*)(void*,int,const void*,unsigned int);
+using IsInvalidHandle=int(*)(void*);
+using IsMouse=int(*)(int);
 
 inline HMODULE loadModule(){
     if(const HMODULE module=LoadLibraryW(L"interception.dll"))return module;
@@ -52,11 +56,14 @@ struct Backend {
     void* context=nullptr;
     SendStrokes send=nullptr;
     DestroyContext destroy=nullptr;
+    IsInvalidHandle invalid=nullptr;
+    IsMouse is_mouse=nullptr;
+    int device=mouse_device;
     std::mutex mutex;
     bool tried=false;
 
     // Resolves the exports and opens a context. The context only exists when the
-    // driver itself is installed, so this doubles as the availability check.
+    // driver itself answered, so this doubles as the availability check.
     bool ensure(){
         if(tried)return context!=nullptr;
         tried=true;
@@ -65,27 +72,44 @@ struct Backend {
         const auto create=reinterpret_cast<CreateContext>(GetProcAddress(module,"interception_create_context"));
         send=reinterpret_cast<SendStrokes>(GetProcAddress(module,"interception_send"));
         destroy=reinterpret_cast<DestroyContext>(GetProcAddress(module,"interception_destroy_context"));
+        invalid=reinterpret_cast<IsInvalidHandle>(GetProcAddress(module,"interception_is_invalid_handle"));
+        is_mouse=reinterpret_cast<IsMouse>(GetProcAddress(module,"interception_is_mouse"));
         if(!create||!send)return false;
         context=create();
-        return context!=nullptr;
+        if(!context)return false;
+        // An invalid handle means the driver refused the open, usually because
+        // the caller is not elevated.
+        if(invalid&&invalid(context)){context=nullptr;refused=true;return false;}
+        if(is_mouse)for(int candidate=first_mouse_device;candidate<first_mouse_device+10;++candidate)
+            if(is_mouse(candidate)){device=candidate;break;}
+        return true;
     }
+
+    bool refused=false;
 
     bool stroke(MouseStroke& value){
         std::lock_guard lock(mutex);
         if(!ensure())return false;
-        return send(context,mouse_device,&value,1)>0;
+        return send(context,device,&value,1)>0;
     }
 };
 
 inline Backend& backend(){static Backend instance;return instance;}
 }
 
-// True when interception.dll resolved and its driver answered with a context.
-inline bool available(){
-    auto& state=detail::backend();
-    std::lock_guard lock(state.mutex);
-    return state.ensure();
+// Ready: the driver answered and strokes can be sent.
+// Missing: interception.dll or the driver is absent.
+// Refused: the driver is installed but rejected the open (usually no admin).
+enum class State { Ready, Missing, Refused };
+
+inline State state(){
+    auto& backend=detail::backend();
+    std::lock_guard lock(backend.mutex);
+    if(backend.ensure())return State::Ready;
+    return backend.refused?State::Refused:State::Missing;
 }
+
+inline bool available(){return state()==State::Ready;}
 
 inline bool move(int dx,int dy){
     if(dx==0&&dy==0)return true;
@@ -98,5 +122,13 @@ inline bool button(bool down){
     MouseStroke value{};
     value.state=down?left_button_down:left_button_up;
     return detail::backend().stroke(value);
+}
+
+// Short right/left sweep for the Settings test button: the cursor visibly moves
+// when the driver path works, independently of any game.
+inline bool test(){
+    if(!move(40,0))return false;
+    Sleep(60);
+    return move(-40,0);
 }
 } // namespace driver_input

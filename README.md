@@ -34,6 +34,18 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 - **Phone pairing:** sessions rotate on restart. **New code** rotates the code and disconnect paired phones; **Copy code** copies just the six-digit code. Phone access can be disabled in Settings.
 - **Safe saving:** failed saves show a persistent banner with the problem instead of only changing the icon. The old and new settings files are rolled back together if the second write fails.
 
+## Driver output setup
+
+Interception is a one-time install per PC. It is not bundled with Azec (it is an LGPL kernel driver, and it needs administrator rights), so each person installs it once:
+
+1. Download **Interception** from <https://github.com/oblitum/Interception/releases> and extract it.
+2. In an Administrator command prompt, run `install-interception.exe /install` from its `command line installer` folder.
+3. Reboot, then copy `library\x64\interception.dll` next to `Azec.exe`.
+4. Start Azec as administrator — **Settings → General → Output method** shows a **Restart as administrator** button when it detects the driver but cannot open it.
+5. Turn on **Interception driver**, click **Test driver** (the cursor should jump ~40 px and back), then **Save**.
+
+Output stays limited to Rainbow Six while **Only in Rainbow Six** is enabled, which is the default.
+
 ## Default shortcuts
 
 | Key | Action |

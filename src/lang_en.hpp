@@ -180,4 +180,10 @@ inline const char* const lang_en[]={
     "Send movement through the installed Interception driver instead of Windows SendInput. Install the driver and place interception.dll next to Azec.",
     "Interception driver detected.",
     "Interception driver not found. Install it, then place interception.dll next to Azec.",
+    "Interception is installed but Azec cannot open it. Start Azec as administrator.",
+    "Test driver",
+    "Test move sent. If the cursor did not move, the driver is not reaching Windows.",
+    "The driver rejected the test move.",
+    "Restart as administrator",
+    "Get the driver",
 };

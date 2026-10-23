@@ -180,4 +180,10 @@ inline const char* const lang_fr[]={
     "Envoyer le mouvement via le pilote Interception installé au lieu de SendInput de Windows. Installez le pilote et placez interception.dll à côté d'Azec.",
     "Pilote Interception détecté.",
     "Pilote Interception introuvable. Installez-le, puis placez interception.dll à côté d'Azec.",
+    "Interception est installé mais Azec ne peut pas l'ouvrir. Lancez Azec en administrateur.",
+    "Tester le pilote",
+    "Mouvement de test envoyé. Si le curseur n'a pas bougé, le pilote n'atteint pas Windows.",
+    "Le pilote a refusé le mouvement de test.",
+    "Redémarrer en administrateur",
+    "Obtenir le pilote",
 };

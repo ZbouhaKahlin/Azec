@@ -180,4 +180,10 @@ inline const char* const lang_ar[]={
     "إرسال الحركة عبر تعريف Interception المثبَّت بدل SendInput في Windows. ثبّت التعريف وضع interception.dll بجانب Azec.",
     "تم العثور على تعريف Interception.",
     "لم يتم العثور على تعريف Interception. ثبّته ثم ضع interception.dll بجانب Azec.",
+    "Interception مثبّت لكن Azec لا يستطيع فتحه. شغّل Azec كمسؤول.",
+    "اختبار التعريف",
+    "تم إرسال حركة اختبار. إن لم يتحرك المؤشر فالتعريف لا يصل إلى Windows.",
+    "رفض التعريف حركة الاختبار.",
+    "إعادة التشغيل كمسؤول",
+    "تنزيل التعريف",
 };

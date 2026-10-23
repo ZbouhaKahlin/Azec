@@ -180,4 +180,10 @@ inline const char* const lang_ja[]={
     "Windows の SendInput ではなく、インストール済みの Interception ドライバーで移動を送ります。ドライバーを導入し、interception.dll を Azec の隣に置いてください。",
     "Interception ドライバーを検出しました。",
     "Interception ドライバーが見つかりません。導入後、interception.dll を Azec の隣に置いてください。",
+    "Interception はインストールされていますが、Azec が開けません。Azec を管理者として起動してください。",
+    "ドライバーをテスト",
+    "テスト移動を送信しました。カーソルが動かなければ、ドライバーが Windows に届いていません。",
+    "ドライバーがテスト移動を拒否しました。",
+    "管理者として再起動",
+    "ドライバーを入手",
 };

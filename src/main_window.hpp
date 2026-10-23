@@ -19,6 +19,7 @@
 #include "app_paths.hpp"
 #include "onboarding_widgets.hpp"
 #include <windows.h>
+#include <shellapi.h>
 #include <dwmapi.h>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -101,6 +102,9 @@ class MainWindow final : public QWidget {
     QPointer<Toggle> logitech_output_;
     QPointer<Toggle> driver_output_;
     QPointer<QPushButton> logitech_export_;
+    QPointer<QPushButton> driver_test_;
+    QPointer<QPushButton> restart_admin_;
+    QPointer<QPushButton> driver_download_;
     QPointer<QLabel> logitech_status_;
     QPointer<QLabel> phone_address_;
     QPointer<QLabel> phone_code_;
@@ -368,34 +372,70 @@ class MainWindow final : public QWidget {
 
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
     }
-    void buildLogitechOutput(QVBoxLayout* column){
+    void buildOutputMethod(QVBoxLayout* column){
         auto* output=new Section(text(UiText::OutputMethod),false,true,kbtheme::blue);column->addWidget(output);
         const int method=engine_.snapshot().output_method;
         logitech_output_=toggle(settingRow(output,text(UiText::LogitechOutput),text(UiText::LogitechOutputHint)),"Logitech G HUB output",method==1,[this](bool on){
             // One pull, one owner: exactly one backend emits movement.
             engine_.edit([&](r6::Config& config){config.output_method=on?1:0;});
             if(driver_output_)driver_output_->syncChecked(false);
-            engine_.output_method=on?1:0;dirty();refreshLogitechStatus();
+            engine_.output_method=on?1:0;dirty();refreshOutputStatus();
         });
         driver_output_=toggle(settingRow(output,text(UiText::DriverOutput),text(UiText::DriverOutputHint)),"Interception driver",method==2,[this](bool on){
             engine_.edit([&](r6::Config& config){config.output_method=on?2:0;});
             if(logitech_output_)logitech_output_->syncChecked(false);
-            engine_.output_method=on?2:0;dirty();refreshLogitechStatus();
+            engine_.output_method=on?2:0;dirty();refreshOutputStatus();
         });
         auto* hint=label(text(UiText::LogitechScriptHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,4,12,4);output->body->addWidget(hint);
         logitech_status_=label(QString(),"rowHint");logitech_status_->setWordWrap(true);logitech_status_->setContentsMargins(14,0,12,4);output->body->addWidget(logitech_status_);
         auto* actions=new QHBoxLayout;actions->setContentsMargins(14,2,12,10);actions->setSpacing(8);
+        driver_test_=new QPushButton(text(UiText::TestDriver));driver_test_->setObjectName("secondary");
+        driver_test_->setAccessibleName(text(UiText::TestDriver));
+        actions->addWidget(driver_test_);
+        restart_admin_=new QPushButton(text(UiText::RestartAsAdmin));restart_admin_->setObjectName("secondary");
+        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));actions->addWidget(restart_admin_);
+        driver_download_=new QPushButton(text(UiText::DriverDownload));driver_download_->setObjectName("secondary");
+        driver_download_->setAccessibleName(text(UiText::DriverDownload));actions->addWidget(driver_download_);
         logitech_export_=new QPushButton(text(UiText::ExportLogitechScript));logitech_export_->setObjectName("secondary");
         logitech_export_->setAccessibleName(text(UiText::ExportLogitechScript));
         actions->addWidget(logitech_export_);actions->addStretch();output->body->addLayout(actions);
+        connect(driver_test_,&QPushButton::clicked,this,[this]{
+            // A visible 40 px sweep proves the driver path without the game.
+            if(driver_input::test())showNotice(text(UiText::DriverTestSent));
+            else{diagnostic("driver test","interception_send rejected the test move");showNotice(text(UiText::DriverTestFailed),true,true);}
+        });
+        connect(restart_admin_,&QPushButton::clicked,this,[this]{restartElevated();});
+        connect(driver_download_,&QPushButton::clicked,this,[]{
+            QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/oblitum/Interception/releases")));
+        });
         connect(logitech_export_,&QPushButton::clicked,this,[this]{exportLogitechScript();});
-        refreshLogitechStatus();
+        refreshOutputStatus();
     }
-    void refreshLogitechStatus(){
+    // The Interception device only answers an elevated caller, so a refused
+    // context offers a one-click relaunch that keeps the current arguments.
+    void restartElevated(){
+        if(unsaved_&&!save())return;
+        QStringList arguments=QCoreApplication::arguments();arguments.removeFirst();
+        std::wstring parameters;
+        for(const auto& argument:arguments){
+            if(!parameters.empty())parameters+=L' ';
+            parameters+=L'"'+argument.toStdWString()+L'"';
+        }
+        const auto executable=QCoreApplication::applicationFilePath().toStdWString();
+        const auto result=ShellExecuteW(nullptr,L"runas",executable.c_str(),
+            parameters.empty()?nullptr:parameters.c_str(),nullptr,SW_SHOWNORMAL);
+        if(reinterpret_cast<INT_PTR>(result)<=32){showNotice(text(UiText::LogitechScriptFailed),true,true);return;}
+        force_close_=true;close();
+    }
+    void refreshOutputStatus(){
         if(!logitech_status_)return;
         const auto config=engine_.snapshot();
+        const auto driver_state=driver_input::state();
+        const UiText driverText=driver_state==driver_input::State::Ready?UiText::DriverFound
+                               :driver_state==driver_input::State::Refused?UiText::DriverBlocked
+                               :UiText::DriverMissing;
         QString state=text(logitech::installed()?UiText::LogitechHubFound:UiText::LogitechHubMissing);
-        state+=QStringLiteral(" · ")+text(driver_input::available()?UiText::DriverFound:UiText::DriverMissing);
+        state+=QStringLiteral(" · ")+text(driverText);
         if(config.output_method==1){
             const auto path=logitech::scriptPath();
             // Profiles edited after the last export would otherwise silently disagree.
@@ -404,7 +444,15 @@ class MainWindow final : public QWidget {
             logitech_status_->setToolTip(path);
         }else logitech_status_->setToolTip(QString());
         logitech_status_->setText(state);
-        if(logitech_export_)logitech_export_->setEnabled(!save_blocked_&&config.output_method==1);
+        // Only the relevant action is offered: export belongs to G HUB, the admin
+        // relaunch to a refused driver, the download to a missing one.
+        if(logitech_export_){
+            logitech_export_->setVisible(config.output_method==1);
+            logitech_export_->setEnabled(!save_blocked_&&config.output_method==1);
+        }
+        if(driver_test_)driver_test_->setEnabled(driver_state==driver_input::State::Ready);
+        if(restart_admin_)restart_admin_->setVisible(driver_state==driver_input::State::Refused);
+        if(driver_download_)driver_download_->setVisible(driver_state==driver_input::State::Missing);
     }
     void exportLogitechScript(){
         const auto bytes=logitech::script(engine_.snapshot(),engine_.ads_only.load());
@@ -415,7 +463,7 @@ class MainWindow final : public QWidget {
         }
         if(logitech_status_)logitech_status_->setToolTip(path);
         showNotice(text(UiText::LogitechScriptExported));
-        refreshLogitechStatus();
+        refreshOutputStatus();
     }
     void buildPreferences(){
         if(!preferences_)return;
@@ -444,7 +492,7 @@ class MainWindow final : public QWidget {
         for(const auto& entry:languageEntries())language_->addItem(languageFlag(entry.value),QString::fromUtf8(entry.label),entry.value);
         language_->setCurrentIndex(qMax(0,language_->findData(c.language)));langRow->addWidget(language_);
         connect(language_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){const int value=language_->itemData(index).toInt();engine_.edit([=](r6::Config& c){c.language=value;});dirty();if(value==6)QTimer::singleShot(0,this,[this]{showPalestineSurprise();});QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});});
-        buildLogitechOutput(generalLayout);
+        buildOutputMethod(generalLayout);
         auto* updates=new Section(text(UiText::Updates),false,true,kbtheme::blue);generalLayout->addWidget(updates);
         auto* versionRow=settingRow(updates,text(UiText::InstalledVersion),QString("Azec ")+QCoreApplication::applicationVersion());
         update_button_=new QPushButton(text(UiText::CheckForUpdates));update_button_->setObjectName("secondary");update_button_->setAccessibleName(text(UiText::CheckForUpdates));update_button_->setEnabled(!update_in_progress_);
@@ -639,7 +687,7 @@ class MainWindow final : public QWidget {
             mouse_setup_dirty_=false;
             const bool themeSaved=kbtheme::writeColorTheme(config_path_,kbtheme::activeColorTheme);
             updateSavePresentation("saved");save_feedback_.start();
-            refreshLogitechStatus();
+            refreshOutputStatus();
             if(notice_bar_&&notice_bar_->property("saveError").toBool()){notice_bar_->setProperty("saveError",false);notice_timer_.stop();notice_bar_->hide();}
             if(!themeSaved)showNotice(text(UiText::ThemeSaveFailed),true,true);
         }else{

@@ -180,4 +180,10 @@ inline const char* const lang_es[]={
     "Enviar el movimiento mediante el controlador Interception instalado en lugar de SendInput de Windows. Instala el controlador y coloca interception.dll junto a Azec.",
     "Controlador Interception detectado.",
     "No se encontró el controlador Interception. Instálalo y coloca interception.dll junto a Azec.",
+    "Interception está instalado pero Azec no puede abrirlo. Inicia Azec como administrador.",
+    "Probar controlador",
+    "Movimiento de prueba enviado. Si el cursor no se movió, el controlador no llega a Windows.",
+    "El controlador rechazó el movimiento de prueba.",
+    "Reiniciar como administrador",
+    "Obtener el controlador",
 };
