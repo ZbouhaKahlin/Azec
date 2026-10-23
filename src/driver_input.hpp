@@ -2,12 +2,14 @@
 #include <windows.h>
 #include <mutex>
 #include <string>
+#include "driver_setup.hpp"
 
 // Optional Interception backend (github.com/oblitum/Interception).
 //
 // The library is loaded at runtime and never linked or shipped with Azec: the
 // signed kernel driver stays the user's own installation, and `interception.dll`
-// must sit next to Azec.exe or in the Windows directory. Strokes produced here
+// is kept in Azec's persistent driver folder. Legacy adjacent/system copies
+// remain supported. Strokes produced here
 // enter the mouse device stack below the "injected input" flag that the game
 // now filters, while SendInput and G HUB scripting both carry that flag.
 //
@@ -44,7 +46,15 @@ using IsInvalidHandle=int(*)(void*);
 using IsMouse=int(*)(int);
 
 inline HMODULE loadModule(){
-    if(const HMODULE module=LoadLibraryW(L"interception.dll"))return module;
+    const auto target=driver_setup::dllTarget();
+    if(!QFileInfo::exists(target)){
+        const auto adjacent=QDir(QCoreApplication::applicationDirPath()).filePath("interception.dll");
+        const auto source=QFileInfo::exists(adjacent)?adjacent:driver_setup::findDll(driver_setup::workRoot());
+        if(!source.isEmpty())driver_setup::place(source);
+    }
+    const auto load=[](const QString& path){return LoadLibraryExW(reinterpret_cast<LPCWSTR>(path.utf16()),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32);};
+    if(const HMODULE module=load(target))return module;
+    if(const HMODULE module=load(QDir(QCoreApplication::applicationDirPath()).filePath("interception.dll")))return module;
     wchar_t directory[MAX_PATH]{};
     if(!GetSystemDirectoryW(directory,MAX_PATH))return nullptr;
     std::wstring path(directory);path+=L"\\interception.dll";
@@ -103,14 +113,7 @@ inline Backend& backend(){static Backend instance;return instance;}
 // DllMissing: interception.dll could not be loaded at all.
 enum class State { Ready, Refused, DriverMissing, DllMissing };
 
-inline std::wstring dllPath(){
-    wchar_t path[MAX_PATH]{};
-    const DWORD size=GetModuleFileNameW(nullptr,path,MAX_PATH);
-    if(!size)return L"interception.dll";
-    std::wstring full(path,size);
-    const auto slash=full.find_last_of(L'\\');
-    return (slash==std::wstring::npos?std::wstring():full.substr(0,slash+1))+L"interception.dll";
-}
+inline std::wstring dllPath(){return driver_setup::dllTarget().toStdWString();}
 
 inline State state(){
     auto& backend=detail::backend();
@@ -121,6 +124,11 @@ inline State state(){
 }
 
 inline bool available(){return state()==State::Ready;}
+
+inline void retryMissingLibrary(){
+    auto& backend=detail::backend();std::lock_guard lock(backend.mutex);
+    if(!backend.module)backend.tried=false;
+}
 
 inline bool move(int dx,int dy){
     if(dx==0&&dy==0)return true;

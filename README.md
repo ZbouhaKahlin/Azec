@@ -30,7 +30,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 - **Settings categories:** General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup keep related options together.
 - **Independent profiles:** enabling a secondary profile copies the primary once, then keeps edits separate. Disabling it preserves those edits.
 - **Favorites and search:** right-click an operator to favorite it. Favorites appear once and save automatically.
-- **Portable backups:** export or import profiles, favorites, the active color theme, the collapsed-sidebar choice, and the output and safety switches in **Settings → Profile backup**. Imported profile changes remain unsaved until you click Save.
+- **Portable backups:** export or import profiles, favorites, the active color theme, the collapsed-sidebar choice, and the output and safety switches in **Settings → Profile backup**. Imported profiles, favorites, theme, and sidebar choices remain unsaved until you click Save; closing with Discard keeps the previously saved values.
 - **Phone pairing:** sessions rotate on restart. **New code** rotates the code and disconnect paired phones; **Copy code** copies just the six-digit code. Phone access can be disabled in Settings.
 - **Safe saving:** failed saves show a persistent banner with the problem instead of only changing the icon. The old and new settings files are rolled back together if the second write fails.
 
@@ -38,7 +38,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 
 Interception is a one-time install per PC. It is not bundled with Azec (it is an LGPL kernel driver and needs administrator rights), but Azec can do the file work for you from **Settings → General → Interception driver**:
 
-1. **Download and place** — fetches the official Interception build (SHA-256 verified), extracts it under `%LOCALAPPDATA%\Azec\interception`, and copies `interception.dll` next to Azec.
+1. **Download and place** — fetches the official Interception build (SHA-256 verified), extracts it under `%LOCALAPPDATA%\Azec\interception`, and stores `interception.dll` in that persistent folder so updates retain it. Existing adjacent DLLs are migrated automatically.
 2. **Copy command** — puts the installer command on the clipboard with the real path. Run it in an Administrator command prompt, then **reboot**.
 3. **Restart as administrator** — the driver only answers elevated callers; the button keeps your arguments and relaunches.
 4. **Test driver** — the cursor should jump ~40 px right and back. That confirms the path before you open the game.
@@ -94,7 +94,7 @@ Requires Windows x64, Visual Studio 2022 C++ tools, a Windows SDK, Python, and Q
 
 To explicitly request the installer smoke test, add `test`: `.\share.cmd test`, `.\share.cmd quick test`, or `.\share.cmd publish test`. It launches an isolated copy of the app and can show a window; agents must not run it on your desktop unless it can run invisibly. The existing `AZEC_SKIP_TESTS=1` override still skips it even when `test` is supplied.
 
-`publish` uses the GitHub CLI and uploads to `github.com/Azec-Zuckerberg/Azec-releases`: the binaries are public while this source repository stays private. The stable link is `https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe`.
+`publish` uses the GitHub CLI and uploads to `github.com/Azec-Zuckerberg/Azec-releases`: the binaries are public while this source repository stays private. It then runs `verify-release.ps1` to match the tag and GitHub asset digest against the local EXE and fresh anonymous downloads, including the stable link. Missing digests or mismatches fail publication verification. The stable link is `https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe`.
 
 **Settings → General → Updates** checks the public release and asks before installing a newer build. The download must match its SHA-256 before it can run. Updates wait for Azec to close, prepare a separate versioned runtime, and preserve the data folder. Existing portable profiles beside the EXE are copied on first installation if the installed settings store is empty; originals are preserved and existing installed profiles are never overwritten. For a first installation with existing portable profiles, place this new EXE in the portable folder and run it after closing the old app. Later transfers use Profile backup. The app remains usable offline.
 

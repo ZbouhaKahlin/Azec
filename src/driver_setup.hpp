@@ -1,5 +1,8 @@
 #pragma once
 #include <QtCore>
+#include <windows.h>
+#include <iterator>
+#include "app_paths.hpp"
 
 // One-click Interception setup used by the Settings guide.
 //
@@ -18,11 +21,12 @@ inline bool verify(const QByteArray& data){
 // Everything the helper writes lives under the app's local data folder.
 inline QString workRoot(){
     const auto local=qEnvironmentVariable("LOCALAPPDATA");
-    const auto base=local.isEmpty()?QDir::tempPath():local+QStringLiteral("/Azec");
+    const auto base=azec_paths::installed()||QCoreApplication::arguments().contains("--dry-run")
+        ?QDir::currentPath():(local.isEmpty()?QDir::tempPath()+QStringLiteral("/Azec"):local+QStringLiteral("/Azec"));
     return base+QStringLiteral("/interception");
 }
 inline QString dllTarget(){
-    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("interception.dll"));
+    return QDir(workRoot()).filePath(QStringLiteral("interception.dll"));
 }
 
 // Look for library/x64/interception.dll inside an extracted release folder.
@@ -41,7 +45,7 @@ inline QString findDll(const QString& root,int depth=4){
     return {};
 }
 
-// Places a noob would leave an extracted download.
+// Common locations for a manually extracted download.
 inline QStringList searchRoots(){
     QStringList roots;
     const auto home=QDir::homePath();
@@ -61,12 +65,20 @@ inline QString locate(){
 
 inline bool place(const QString& source,QString* error=nullptr){
     const auto target=dllTarget();
-    if(QFileInfo::exists(target)&&QFileInfo(target).size()==QFileInfo(source).size())return true;
-    if(QFileInfo::exists(target)&&!QFile::remove(target)){
-        if(error)*error=QStringLiteral("could not replace ")+target;
+    QFile input(source);
+    if(!input.open(QIODevice::ReadOnly)||input.size()<=0||input.size()>16*1024*1024){
+        if(error)*error=QStringLiteral("could not read ")+source;
         return false;
     }
-    if(!QFile::copy(source,target)){
+    const auto bytes=input.readAll();
+    if(input.error()!=QFile::NoError||bytes.size()!=input.size())return false;
+    input.close();
+    QFile existing(target);
+    if(existing.open(QIODevice::ReadOnly)&&existing.size()==bytes.size()&&existing.readAll()==bytes)return true;
+    existing.close();
+    QSaveFile output(target);
+    if(!QDir().mkpath(QFileInfo(target).absolutePath())||!output.open(QIODevice::WriteOnly)||
+       output.write(bytes)!=bytes.size()||!output.commit()){
         if(error)*error=QStringLiteral("could not copy to ")+target;
         return false;
     }
@@ -88,22 +100,44 @@ inline QString installCommand(const QString& folder){
     return QStringLiteral("cd \"")+QDir::toNativeSeparators(folder)+QStringLiteral("\"\ninstall-interception.exe /install");
 }
 
+// Shared by the normal tar path and the PowerShell fallback. Neither opens a console.
+inline bool runExtractor(QProcess& process){
+    process.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args){
+        args->flags|=CREATE_NO_WINDOW;
+    });
+    process.start();
+    if(process.waitForStarted(5000)&&process.waitForFinished(120000))
+        return process.exitStatus()==QProcess::NormalExit&&process.exitCode()==0;
+    if(process.state()!=QProcess::NotRunning){process.kill();process.waitForFinished(5000);}
+    return false;
+}
+inline bool extractWithPowerShell(const QDir& system,const QString& archive,const QString& destination){
+    QProcess powershell;
+    powershell.setProgram(system.filePath(QStringLiteral("WindowsPowerShell/v1.0/powershell.exe")));
+    auto environment=QProcessEnvironment::systemEnvironment();
+    environment.insert(QStringLiteral("AZEC_DRIVER_ARCHIVE"),QDir::toNativeSeparators(QFileInfo(archive).absoluteFilePath()));
+    environment.insert(QStringLiteral("AZEC_DRIVER_DESTINATION"),QDir::toNativeSeparators(QFileInfo(destination).absoluteFilePath()));
+    powershell.setProcessEnvironment(environment);
+    powershell.setArguments({QStringLiteral("-NoProfile"),QStringLiteral("-NonInteractive"),QStringLiteral("-Command"),
+        QStringLiteral("Expand-Archive -LiteralPath $env:AZEC_DRIVER_ARCHIVE -DestinationPath $env:AZEC_DRIVER_DESTINATION -Force -ErrorAction Stop")});
+    return runExtractor(powershell);
+}
 inline bool extract(const QString& archive,const QString& destination,QString* error=nullptr){
     if(!QDir().mkpath(destination)){
         if(error)*error=QStringLiteral("could not create ")+destination;
         return false;
     }
+    wchar_t directory[32768]{};
+    const auto length=GetSystemDirectoryW(directory,DWORD(std::size(directory)));
+    if(!length||length>=std::size(directory)){
+        if(error)*error=QStringLiteral("could not locate Windows system tools");
+        return false;
+    }
+    const QDir system(QString::fromWCharArray(directory,int(length)));
     QProcess tar;
-    tar.setProgram(QStringLiteral("tar"));
+    tar.setProgram(system.filePath(QStringLiteral("tar.exe")));
     tar.setArguments({QStringLiteral("-xf"),archive,QStringLiteral("-C"),destination});
-    tar.start();
-    if(tar.waitForStarted(5000)&&tar.waitForFinished(120000)&&tar.exitCode()==0)return true;
-    QProcess powershell;
-    powershell.setProgram(QStringLiteral("powershell"));
-    powershell.setArguments({QStringLiteral("-NoProfile"),QStringLiteral("-NonInteractive"),QStringLiteral("-Command"),
-        QStringLiteral("Expand-Archive -LiteralPath '")+archive+QStringLiteral("' -DestinationPath '")+destination+QStringLiteral("' -Force")});
-    powershell.start();
-    if(powershell.waitForStarted(5000)&&powershell.waitForFinished(120000)&&powershell.exitCode()==0)return true;
+    if(runExtractor(tar)||extractWithPowerShell(system,archive,destination))return true;
     if(error)*error=QStringLiteral("extraction failed");
     return false;
 }

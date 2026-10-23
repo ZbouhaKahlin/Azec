@@ -10,7 +10,7 @@
 
 class PhoneServer final : public QObject {
     QTcpServer server_;
-    QString token_=QUuid::createUuid().toString(QUuid::Id128),code_=QString::number(QRandomGenerator::global()->bounded(100000,1000000));
+    QString token_=QUuid::createUuid().toString(QUuid::Id128),code_=QString::number(QRandomGenerator::system()->bounded(100000,1000000));
     std::function<QJsonObject()> state_;
     std::function<QJsonObject(const QJsonObject&)> update_;
     QHash<QString,QPair<int,qint64>> failures_;
@@ -135,7 +135,7 @@ public:
     // listening; already-paired phones receive 401 on their next request.
     void rotate(){
         token_=QUuid::createUuid().toString(QUuid::Id128);
-        code_=QString::number(QRandomGenerator::global()->bounded(100000,1000000));
+        code_=QString::number(QRandomGenerator::system()->bounded(100000,1000000));
         const auto sockets=findChildren<QTcpSocket*>();
         for(auto* socket:sockets)socket->abort();
         if(network_changed_)network_changed_();

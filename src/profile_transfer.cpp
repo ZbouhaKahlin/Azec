@@ -14,8 +14,11 @@ bool MainWindow::applyBackup(const QByteArray& bytes){
     if(bytes.size()>1024*1024)return false;
     QJsonParseError error;const auto document=QJsonDocument::fromJson(bytes,&error);r6::Config config;QSet<QString> favorites;BackupOptions options;
     if(error.error!=QJsonParseError::NoError||!document.isObject()||!parseBackup(document.object(),config,favorites,options))return false;
-    const auto old=favorites_;favorites_=favorites;
-    if(!persistFavorites()){favorites_=old;return false;}
+    // Keep imported UI choices in memory alongside the unsaved profiles.
+    // Save commits all three files; Discard (including panic exit) writes none.
+    QJsonObject ui;
+    if(!uiprefs::readDocument(uiprefs::filePath(config_path_),ui))return false;
+    imported_ui_pending_=true;favorites_=favorites;
     engine_.edit([&](r6::Config& current){current=config;});
     mouse_draft_.reset();mouse_source_.clear();mouse_setup_dirty_=false;
     if(options.gameFocusOnly)engine_.game_focus_only=*options.gameFocusOnly;

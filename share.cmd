@@ -41,8 +41,12 @@ if defined QUICK (
     goto writeversion
 )
 rem ---------------------------------------------------------------- version
+set "VERSION="
 for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "Get-Date -Format yyyy.MM.dd.HHmmss"`) do set "VERSION=%%T"
-if not defined VERSION set "VERSION=0.0.0.0"
+if not defined VERSION (
+    echo Could not generate the release version.
+    exit /b 1
+)
 :writeversion
 (
 echo #pragma once
@@ -139,6 +143,8 @@ if errorlevel 1 (
     if errorlevel 1 exit /b 1
 )
 gh release create "v%VERSION%" "dist\Azec.exe" --repo Azec-Zuckerberg/Azec-releases --title "Azec %VERSION%" --notes "Open Azec.exe to install and launch for your Windows user. Find Azec in Start afterward. Profiles are kept separately in LocalAppData\Azec and preserved by Settings - Updates."
+if errorlevel 1 exit /b 1
+powershell -NoProfile -File "%AZEC_SCRIPT_DIR%verify-release.ps1" -Version "%VERSION%"
 if errorlevel 1 exit /b 1
 
 :report

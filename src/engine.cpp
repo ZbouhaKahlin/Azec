@@ -3,6 +3,7 @@
 #include "profile_store.hpp"
 #include "diagnostics.hpp"
 #include "driver_input.hpp"
+#include "game_focus.hpp"
 #include <chrono>
 #include <cmath>
 #include <random>
@@ -35,38 +36,47 @@ bool Engine::load(const std::filesystem::path& file){
     ads_only=adsOnly;
     return true;
 }
-bool Engine::save(const std::filesystem::path& file) const {
+bool Engine::save(const std::filesystem::path& file,const QByteArray& uiPreferences) const {
     const auto config=snapshot();
-    const auto fileName=QString::fromStdWString(file.wstring());
-    bool hadPrevious=false;QByteArray previous;
-    {
-        QFile existing(fileName);
-        if(existing.exists()&&existing.open(QIODevice::ReadOnly)&&existing.size()>0&&existing.size()<=1024*1024){
-            previous=existing.readAll();hadPrevious=!previous.isEmpty();
+    const auto binaryPath=QString::fromStdWString(file.wstring());
+    const auto sidecarPath=weaponFile(file);
+    struct Previous {QString path;bool existed=false;QByteArray bytes;};
+    Previous binary{binaryPath},sidecar{sidecarPath};
+    const auto capture=[](Previous& previous){
+        QFile source(previous.path);previous.existed=source.exists();
+        if(!previous.existed)return true;
+        if(!source.open(QIODevice::ReadOnly)||source.size()>1024*1024)return false;
+        previous.bytes=source.readAll();return source.error()==QFile::NoError;
+    };
+    if(!capture(binary)||(!uiPreferences.isEmpty()&&!capture(sidecar))){
+        diagnostic("save configuration","Could not preserve existing files for rollback");return false;
+    }
+    const auto restore=[](const Previous& previous){
+        if(!previous.existed)return !QFileInfo::exists(previous.path)||QFile::remove(previous.path);
+        QSaveFile target(previous.path);
+        return target.open(QIODevice::WriteOnly)&&target.write(previous.bytes)==previous.bytes.size()&&target.commit();
+    };
+    QSaveFile ui;
+    if(!uiPreferences.isEmpty()){
+        ui.setFileName(QString::fromStdWString((file.parent_path()/L"azec_ui.json").wstring()));
+        if(!ui.open(QIODevice::WriteOnly)||ui.write(uiPreferences)!=uiPreferences.size()){
+            diagnostic("save imported preferences",ui.errorString());return false;
         }
     }
-    // Prepare the JSON sidecar first; if the binary write fails, the sidecar is
-    // discarded so the two files never disagree about the saved state.
-    QSaveFile sidecar;
-    if(!stageWeaponProfiles(config,game_focus_only.load(),ads_only.load(),file,sidecar)){
-        diagnostic("save weapon profiles",sidecar.errorString());return false;
+    QSaveFile profiles;
+    if(!stageWeaponProfiles(config,game_focus_only.load(),ads_only.load(),file,profiles)){
+        diagnostic("save weapon profiles",profiles.errorString());return false;
     }
     if(!config.save(file)){
-        sidecar.cancelWriting();
         diagnostic("save binary","Atomic replacement failed (Windows error "+QString::number(GetLastError())+")");return false;
     }
-    if(!sidecar.commit()){
-        // The binary was already replaced. Put the previous bytes back so a
-        // failed sidecar commit cannot leave the two files disagreeing.
-        bool restored=false;
-        if(hadPrevious){
-            QSaveFile restore(fileName);
-            restored=restore.open(QIODevice::WriteOnly)&&restore.write(previous)==previous.size()&&restore.commit();
-        }else{
-            restored=QFile::remove(fileName);
-        }
-        diagnostic("save weapon profiles",sidecar.errorString()+(restored?QStringLiteral("; previous binary restored"):QStringLiteral("; previous binary could not be restored")));
-        return false;
+    if(!profiles.commit()){
+        const bool restored=restore(binary);
+        diagnostic("save weapon profiles",profiles.errorString()+(restored?"; previous binary restored":"; rollback failed"));return false;
+    }
+    if(!uiPreferences.isEmpty()&&!ui.commit()){
+        const bool binaryRestored=restore(binary),profilesRestored=restore(sidecar);
+        diagnostic("save imported preferences",ui.errorString()+(binaryRestored&&profilesRestored?"; previous profiles restored":"; rollback failed"));return false;
     }
     return true;
 }
@@ -78,7 +88,7 @@ void Engine::stop(){
 }
 void Engine::sleep(int ms){std::unique_lock lock(stop_mutex_);stop_condition_.wait_for(lock,std::chrono::milliseconds(ms),[this]{return !running.load();});}
 void Engine::input(unsigned long flags,int x,int y){
-    if(dry_run_)return;
+    if(dry_run_||(game_focus_only&&!gameIsActive()))return;
     // The Interception driver is the only output: it takes relative moves and
     // left-button strokes at the device level, below Windows' injected flag.
     const bool sent=flags==MOUSEEVENTF_MOVE?driver_input::move(x,y)

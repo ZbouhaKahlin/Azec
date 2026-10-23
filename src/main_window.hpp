@@ -79,7 +79,7 @@ class MainWindow final : public QWidget {
     void buildGoofyLayout(QVBoxLayout* layout);
     QListWidget* operators_=nullptr;QListWidget* favorites_list_=nullptr;QLineEdit* search_=nullptr;
     QLabel *favorites_title_=nullptr,*preferences_title_=nullptr;QWidget* favorites_group_=nullptr;
-    IconButton* back_=nullptr;QSet<QString> favorites_;
+    IconButton* back_=nullptr;QSet<QString> favorites_;bool imported_ui_pending_=false;
     PageStack* pages_=nullptr;QWidget* operator_page_=nullptr;
     RaisedPanel* panel_=nullptr;QScrollArea* sidebar_scroll_=nullptr;
     QWidget *sidebar_=nullptr,*favorites_header_=nullptr,*favorites_heading_=nullptr,*operators_header_=nullptr,*sidebar_search_box_=nullptr,*settings_nav_=nullptr;
@@ -181,6 +181,7 @@ class MainWindow final : public QWidget {
         return result;
     }
     bool persistFavorites() const {
+        if(imported_ui_pending_)return true;
         QStringList names(favorites_.begin(),favorites_.end());names.sort(Qt::CaseInsensitive);
         return uiprefs::update(config_path_,[&](QJsonObject& root){root["favorites"]=QJsonArray::fromStringList(names);});
     }
@@ -204,7 +205,7 @@ class MainWindow final : public QWidget {
     void setFavorite(int id,bool enabled){
         if(id<0||id>=r6::operator_count)return;const auto name=QString::fromUtf8(engine_.snapshot().operators[id].name);const auto previous=favorites_;
         if(enabled)favorites_.insert(name);else favorites_.remove(name);
-        if(!persistFavorites()){favorites_=previous;updateSavePresentation("error");save_->setToolTip(text(UiText::CouldNotSaveFavorites));showNotice(text(UiText::CouldNotSaveFavorites),true,true);}
+        if(!persistFavorites()){favorites_=previous;showNotice(text(UiText::CouldNotSaveFavorites),true,true);}
         refreshFavorites();
     }
     void showOperatorMenu(QListWidget* list,const QPoint& position){
@@ -232,7 +233,7 @@ class MainWindow final : public QWidget {
     QLabel* label(const QString& text,const char* role="rowTitle"){auto* result=new QLabel(text);result->setObjectName(role);return result;}
     QHBoxLayout* settingRow(Section* section,const QString& title,const QString& description={},int height=44){
         auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(description.isEmpty()?height:56);auto* row=new QHBoxLayout(widget);row->setContentsMargins(14,8,12,8);row->setSpacing(12);
-        auto* text=new QWidget;auto* column=new QVBoxLayout(text);column->setContentsMargins(0,0,0,0);column->setSpacing(2);column->addWidget(label(title));
+        auto* text=new QWidget;auto* column=new QVBoxLayout(text);column->setContentsMargins(0,0,0,0);column->setSpacing(2);auto* titleLabel=label(title);titleLabel->setWordWrap(true);column->addWidget(titleLabel);
         if(!description.isEmpty()){auto* hint=label(description,"rowHint");hint->setWordWrap(true);column->addWidget(hint);widget->setToolTip(description);}
         row->addWidget(text,1);section->body->addWidget(widget);return row;
     }
@@ -265,8 +266,9 @@ class MainWindow final : public QWidget {
         const QColor background=error?kbtheme::pink:kbtheme::lavender;
         notice_bar_->setStyleSheet(QString("QWidget#noticeBar{background:%1;border:2px solid %2;border-radius:12px;}"
             "QLabel#startupNotice{color:%3;font-weight:600;}"
-            "QPushButton#noticeClose{background:transparent;border:0;color:%3;font-size:18px;font-weight:800;padding:0;}")
-            .arg(background.name(),kbtheme::outline.name(),kbtheme::readableOn(background).name()));
+            "QPushButton#noticeClose{background:transparent;border:2px solid transparent;border-radius:6px;color:%3;font-size:18px;font-weight:800;padding:0;}"
+            "QPushButton#noticeClose[keyboardFocus=\"true\"]{border-color:%4;}")
+            .arg(background.name(),kbtheme::outline.name(),kbtheme::readableOn(background).name(),accent().name()));
     }
     void applyStyle(){
         pages_->settle();qApp->setPalette(kbtheme::palette());setStyleSheet(applicationStyle(accent()));setPalette(kbtheme::palette());
@@ -283,7 +285,7 @@ class MainWindow final : public QWidget {
         return {};
     }
     bool chooseColorTheme(const QString& id){
-        if(!kbtheme::writeColorTheme(config_path_,id)){
+        if(!imported_ui_pending_&&!kbtheme::writeColorTheme(config_path_,id)){
             syncThemeCards();showNotice(text(UiText::ThemeSaveFailed),true,true);return false;
         }
         kbtheme::initialize(id);
@@ -340,7 +342,7 @@ class MainWindow final : public QWidget {
     }
     void setSidebarCollapsed(bool collapsed,bool animate=true,bool focusSearch=false){
         if(!sidebar_)return;
-        if(collapsed!=sidebar_collapsed_&&!uiprefs::update(config_path_,[=](QJsonObject& root){root["sidebarCollapsed"]=collapsed;})){
+        if(!imported_ui_pending_&&collapsed!=sidebar_collapsed_&&!uiprefs::update(config_path_,[=](QJsonObject& root){root["sidebarCollapsed"]=collapsed;})){
             updateSidebarControls();showNotice(text(UiText::SidebarSaveFailed),true,true);return;
         }
         sidebar_collapsed_=collapsed;focus_sidebar_search_=focusSearch&&!collapsed;
@@ -476,7 +478,7 @@ class MainWindow final : public QWidget {
                 QString error;
                 if(driver_setup::place(found,&error)){
                     showNotice(text(UiText::DriverPlaced));
-                    current=driver_input::state();
+                    driver_input::retryMissingLibrary();current=driver_input::state();
                 }else{
                     diagnostic("driver place",error);
                     showNotice(text(UiText::DriverPlaceFailed),true,true);
@@ -524,7 +526,7 @@ class MainWindow final : public QWidget {
                 diagnostic("driver place",error);
                 showNotice(text(UiText::DriverPlaceFailed),true,true);return;
             }
-            resolveInstaller();refreshOutputStatus();
+            driver_input::retryMissingLibrary();resolveInstaller();refreshOutputStatus();
             showNotice(text(UiText::DriverFilesReady));
         });
     }
@@ -759,10 +761,22 @@ class MainWindow final : public QWidget {
         if(isVisible()&&isActiveWindow()&&pages_->currentWidget()==operator_page_&&!editing&&!qobject_cast<QSlider*>(focused)&&!qobject_cast<QAbstractItemView*>(focused)&&clock_.elapsed()-last_tune_>80){const float y=(keyDown(VK_UP)? .1f:0)-(keyDown(VK_DOWN)? .1f:0),x=(keyDown(VK_RIGHT)? .1f:0)-(keyDown(VK_LEFT)? .1f:0);if(x||y){editOperator([=](r6::Operator& op){op.vertical=std::clamp(op.vertical+y,0.f,100.f);op.horizontal=std::clamp(op.horizontal+x,-50.f,50.f);});syncSelection();last_tune_=clock_.elapsed();}}
     }
     bool save(){
-        const bool saved=!save_blocked_&&engine_.save(config_path_);
+        QByteArray uiBytes;
+        if(imported_ui_pending_){
+            QJsonObject root;
+            if(!uiprefs::readDocument(uiprefs::filePath(config_path_),root)){
+                showNotice(text(UiText::CouldNotSaveConfiguration),true,true);return false;
+            }
+            QStringList names(favorites_.begin(),favorites_.end());names.sort(Qt::CaseInsensitive);
+            root["favorites"]=QJsonArray::fromStringList(names);root["colorTheme"]=kbtheme::activeColorTheme;
+            root["sidebarCollapsed"]=sidebar_collapsed_;root["version"]=1;root.remove("interface");
+            uiBytes=QJsonDocument(root).toJson();
+        }
+        const bool saved=!save_blocked_&&engine_.save(config_path_,uiBytes);
         if(saved){
             mouse_setup_dirty_=false;
-            const bool themeSaved=kbtheme::writeColorTheme(config_path_,kbtheme::activeColorTheme);
+            const bool themeSaved=imported_ui_pending_||kbtheme::writeColorTheme(config_path_,kbtheme::activeColorTheme);
+            imported_ui_pending_=false;
             updateSavePresentation("saved");save_feedback_.start();
             refreshOutputStatus();
             if(notice_bar_&&notice_bar_->property("saveError").toBool()){notice_bar_->setProperty("saveError",false);notice_timer_.stop();notice_bar_->hide();}
@@ -825,7 +839,6 @@ protected:
     void paintEvent(QPaintEvent*) override {
 
         ++paint_count_;QPainter p(this);p.fillRect(rect(),kbtheme::paper);QColor color=accent();p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);
-        static const QPixmap image("titio.png");if(!image.isNull()){p.setOpacity(.02);p.drawPixmap(rect(),image);p.setOpacity(1);}
         color.setAlpha(8);p.setBrush(color);
         for(int x=18;x<width();x+=45)for(int y=90;y<height()-12;y+=45)p.drawEllipse(QPointF(x,y),1.1,1.1);
     }

@@ -91,7 +91,7 @@ bool newer(const std::string& left,const std::string& right){
 }
 bool validVersion(const std::string& text){return !text.empty()&&text.size()<64&&std::all_of(text.begin(),text.end(),[](char c){return (c>='0'&&c<='9')||c=='.';});}
 bool completePayload(const fs::path& folder){
-    for(const auto* name:{L"runtime/Azec.exe",L"runtime/Qt6Core.dll",L"runtime/Qt6Gui.dll",L"runtime/Qt6Widgets.dll",L"runtime/Qt6Network.dll",L"runtime/Qt6Svg.dll",L"runtime/platforms/qwindows.dll",L"runtime/tls/qschannelbackend.dll",L"runtime/vcruntime140.dll",L"runtime/vcruntime140_1.dll",L"runtime/msvcp140.dll"})
+    for(const auto* name:{L"runtime/Azec.exe",L"runtime/Qt6Core.dll",L"runtime/Qt6Gui.dll",L"runtime/Qt6Widgets.dll",L"runtime/Qt6Network.dll",L"runtime/Qt6Svg.dll",L"runtime/platforms/qwindows.dll",L"runtime/tls/qschannelbackend.dll",L"runtime/vcruntime140.dll",L"runtime/vcruntime140_1.dll",L"runtime/msvcp140.dll",L"runtime/msvcp140_1.dll",L"runtime/msvcp140_2.dll"})
         if(!fs::is_regular_file(folder/name))return false;
     return fs::is_directory(folder/L"licenses");
 }
@@ -137,6 +137,16 @@ void migrateProfiles(const fs::path& source,const fs::path& destination){
         }catch(...){for(const auto& path:copied){std::error_code ignored;fs::remove(path,ignored);}throw;}
     }else writeText(destination/L"storage-initialized.txt","Azec user settings.\n");
 }
+void migrateDriver(const Layout& layout,const std::string& installed,const fs::path& portable){
+    const auto target=layout.data/L"interception"/L"interception.dll";
+    if(fs::exists(target))return;
+    auto source=validVersion(installed)?layout.program/L"versions"/wide(installed)/L"runtime"/L"interception.dll":fs::path();
+    if(!fs::is_regular_file(source))source=portable/L"runtime"/L"interception.dll";
+    if(!fs::is_regular_file(source))source=portable/L"interception.dll";
+    if(!fs::is_regular_file(source))return;
+    fs::create_directories(target.parent_path());
+    fs::copy_file(source,target);
+}
 void createShortcut(const Layout& layout){
     fs::create_directories(layout.shortcut.parent_path());IShellLinkW* link=nullptr;
     if(FAILED(CoCreateInstance(CLSID_ShellLink,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&link))))throw std::runtime_error("Start menu shortcut");
@@ -159,7 +169,7 @@ void replaceLauncher(const fs::path& source,const fs::path& target){
 void pruneVersions(const Layout& layout,const std::string& previous){
     if(activeProfile(layout.data))return;
     for(const auto& entry:fs::directory_iterator(layout.program/L"versions")){
-        const auto name=entry.path().filename().string();if(!validVersion(name)||name==AZEC_VERSION||name==previous)continue;
+        const auto name=entry.path().filename().string();if(!validVersion(name)||name==AZEC_VERSION||name==previous||newer(name,AZEC_VERSION))continue;
         std::error_code ignored;fs::remove_all(entry.path(),ignored);
     }
 }
@@ -186,9 +196,12 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int){
         {
             InstallLock lock(layout.program);fs::create_directories(layout.program);
             const auto installed=readText(layout.program/L"version.txt");
-            if(!samePath(self,launcher)&&validVersion(installed)&&newer(installed,AZEC_VERSION)&&fs::exists(launcher)){
+            if(validVersion(installed)&&newer(installed,AZEC_VERSION)){
+                if(samePath(self,launcher)||!fs::exists(launcher))
+                    throw std::runtime_error("A newer Azec installation exists. Download the latest Azec.exe to repair it; older copies cannot replace it.");
                 if(!startProcess(launcher,args,layout.program))throw std::runtime_error("start installed Azec");return 0;
             }
+            migrateDriver(layout,installed,migrationSource);
             preparePayload(layout.program);migrateProfiles(migrationSource,layout.data);replaceLauncher(self,launcher);
             if(installed!=AZEC_VERSION&&validVersion(installed))writeText(layout.program/L"previous-version.txt",installed);
             writeText(layout.program/L"version.txt",AZEC_VERSION);

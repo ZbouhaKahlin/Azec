@@ -22,3 +22,4 @@ QMAKE_LFLAGS += /MANIFEST:EMBED
 
 HEADERS += src/ui_preferences.hpp src/desktop_layout.hpp src/app_paths.hpp
 HEADERS += src/onboarding_widgets.hpp src/sensitivity.hpp src/driver_input.hpp
+HEADERS += src/driver_setup.hpp

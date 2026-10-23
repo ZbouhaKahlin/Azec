@@ -20,6 +20,8 @@ The files in `tests/` are development tools. They do not run when a user opens A
 | `qr_scan.py` | Decodes existing QR captures; launches no app | No |
 | `installation_test.py` | Checks the actual installer, updates, migration, and installed profiles in redirected folders | Yes |
 | `update_checks.cpp`, `update_checks.pro` | Separate console executable for updater downloads, hashes, and failure handling | No |
+| `review_regressions.cpp`, `review_regressions.pro` | Focus-name validation, LAN ranking, persistent DLL placement, archive extraction, save rollback, and launcher repair/cleanup helpers | No |
+| `phone_api_test.cjs` | Phone request/error handling and translation coverage using Node, without a browser or app | No |
 
 Every file has an active caller, build target, or documented standalone command. Keeping these optional tools preserves useful diagnostics. Their presence does not make testing mandatory.
 
@@ -60,13 +62,13 @@ The Windows GitHub Actions workflow is manual only. Its default run explicitly r
 
 ## What the checks cover today
 
-Input and output behaviour is only partially automatic. The fixtures run with `--dry-run`, so no mouse movement, synthetic clicks, or sounds are produced by the engine. Desktop windows can still appear. The real SendInput path, the game-focus gate with a live game, and the audible sound cues remain unverified by these suites.
+Input and output behaviour is only partially automatic. The fixtures run with `--dry-run`, so no mouse movement, synthetic clicks, or sounds are produced by the engine. Desktop windows can still appear. Real Interception output, the game-focus gate with a live game, and the audible sound cues remain unverified by these suites.
 
 Available automated coverage:
 
 - The Recoil switch updates live and starts off on launch; per-profile Rapid fire persists and reloads. Removed Master enable settings are rejected by the phone API.
-- The game-focus gate recognises `RainbowSix*.exe` and rejects unrelated processes, including the BattlEye helper.
-- Show/hide, recoil-toggle and panic bindings reject typing and list-navigation keys.
+- The game-focus gate recognises the explicit Rainbow Six executable names and rejects unrelated processes, including the BattlEye helper. Window titles never authorize output.
+- Non-panic bindings accept any supported key; panic retains the stricter safe-key filter, and conflicting assignments are rejected.
 - Browsing the roster does not mark the profile dirty, and the wheel over a number field does not change a value.
 - The pairing code chip, copy actions, new-code rotation, and the server-failure retry path are exercised in the desktop and browser suites.
 - The phone Output card, independent primary/secondary Rapid fire, removal of obsolete controls, and the shared palette are checked in the browser suite.
@@ -92,3 +94,9 @@ This suite runs the existing core checks plus targeted coverage for INI parsing,
 ## Update integrity checks
 
 Build `tests/update_checks.pro` with the pinned Qt qmake and nmake in `.build/update-checks`. Run the resulting `release/Azec-update-checks.exe` from `.build/verification`; it creates its own fresh temporary directory. It checks valid, corrupt, truncated, short, HTTP-error, missing-hash, and unwritable-file downloads against a local HTTP server. Add `--live-github` to query the real public release and download/verify its EXE without executing it. For deployment verification, copy this check executable into a fresh fixture containing the actual packaged runtime and run with only the system PATH. This is a separate verification executable and must never be included in the shared payload.
+
+## Focused review regressions
+
+Build `tests/review_regressions.pro` with qmake and nmake in a separate `.build/` folder. Run `Azec-review-checks.exe <fresh-empty-fixture> --dry-run`, using an absolute fixture path under `.build/verification`. It uses Qt Core/Network only, never invokes the launcher entry point or input workers, and runs archive tools without console windows. It exercises normal and PowerShell extraction with apostrophes, spaces, and dollar signs, same-size DLL replacement, rollback when each configuration file is locked, required runtime DLL detection, driver migration, and preservation of newer runtimes. It does not launch or smoke-test an installed app, render the desktop, or establish in-game behavior.
+
+Run `node --test tests/phone_api_test.cjs` for the phone request wrapper and translated error keys. Its mocked network requests exercise the actual embedded request function; they do not replace HTTP integration or physical-phone checks.

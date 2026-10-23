@@ -21,7 +21,7 @@ inline QString selectAddress(const QList<Adapter>& adapters){
     for(const auto& adapter:adapters){
         const auto ip=adapter.address;
         if(ip.protocol()!=QAbstractSocket::IPv4Protocol||ip.isLoopback()||ip.isLinkLocal()||ip.isNull()||(!adapter.physical&&!adapter.gateway))continue;
-        const int score=(adapter.gateway?200:0)+(adapter.physical?100:0)+(adapter.wifi?10:0);
+        const int score=(adapter.physical?400:0)+(adapter.gateway?200:0)+(adapter.wifi?10:0);
         if(score>bestScore||(score==bestScore&&adapter.metric<bestMetric)){
             best=ip.toString();bestScore=score;bestMetric=adapter.metric;
         }
