@@ -1,0 +1,10 @@
+QT = core network
+CONFIG += console c++17 release
+CONFIG -= app_bundle debug debug_and_release
+TEMPLATE = app
+TARGET = Azec-reliability-checks
+DESTDIR = $$OUT_PWD/release
+SOURCES += reliability_checks.cpp ../src/core.cpp ../src/engine.cpp
+DEFINES += NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS
+QMAKE_CXXFLAGS += /utf-8
+LIBS += -luser32 -lshell32 -lole32 -luuid

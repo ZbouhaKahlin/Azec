@@ -29,7 +29,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/AppData/Local/NeonManagerR6/Qt
-          key: qt-6.8.3-msvc2022-x64
+          key: qt-6.8.3-msvc2022-x64-${{ hashFiles('setup-qt.ps1') }}
       - name: Install pinned Qt kit
         shell: pwsh
         run: |
@@ -63,5 +63,7 @@ jobs:
             .build/verification/**/qr-scan-verification.json
             .build/verification/**/*.png
             !.build/verification/**/qr-revealed.png
+            !.build/verification/**/qr-revealing.png
+            !.build/verification/**/qr-concealing.png
             !.build/verification/**/phone-branded.png
           if-no-files-found: ignore

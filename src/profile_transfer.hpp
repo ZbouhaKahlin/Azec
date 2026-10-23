@@ -40,7 +40,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
             {"sensitivity",config.sensitivity.valid()?QJsonValue(setup):QJsonValue(QJsonValue::Null)},
             {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
 }
-inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>& favorites,BackupOptions& options){
+inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>& favorites,BackupOptions& options,const r6::Config* existing=nullptr){
     const auto number=[](const QJsonValue& value,double lo,double hi){return value.isDouble()&&std::isfinite(value.toDouble())&&value.toDouble()>=lo&&value.toDouble()<=hi;};
     const auto integer=[&](const QJsonValue& value,int lo,int hi){return number(value,lo,hi)&&std::floor(value.toDouble())==value.toDouble();};
     if(root["application"]!="Azec"||!integer(root["version"],1,1)||!root["operators"].isArray()||!root["favorites"].isArray()||!root["settings"].isObject())return false;
@@ -105,5 +105,13 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     if(settings.contains("colorTheme"))options.colorTheme=settings["colorTheme"].toString();
     QSet<QString> nextFavorites;
     for(const auto& name:root["favorites"].toArray()){if(!name.isString()||!seen.contains(name.toString()))return false;nextFavorites.insert(name.toString());}
+    // Older backups cannot describe newer operators. Preserve both weapon
+    // profiles and their enable/initialization state for every omitted name,
+    // including its rapid flags after the legacy global-switch migration.
+    if(existing)for(int id=0;id<r6::operator_count;++id){
+        if(seen.contains(QString::fromUtf8(next.operators[id].name)))continue;
+        next.operators[id]=existing->operators[id];next.secondary[id]=existing->secondary[id];
+        next.secondary_enabled[id]=existing->secondary_enabled[id];next.secondary_initialized[id]=existing->secondary_initialized[id];
+    }
     result=next;favorites=nextFavorites;return true;
 }

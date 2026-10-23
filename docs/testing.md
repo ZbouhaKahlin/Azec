@@ -2,7 +2,7 @@
 
 Tests run only when Azec explicitly requests tests or asks to investigate a bug. Normal edits, builds, and releases do not authorize them. This document lists available tools; it is not an instruction to run them. The shared policy is in [AGENTS.md](../AGENTS.md).
 
-When testing is requested, choose checks relevant to the problem and stop after they pass. Extra scales, languages, expiry waits, and matrices require an explicit request. Tests must not open visible windows, steal focus, move the cursor, or play sounds. A check that cannot run invisibly stays unrun; report that limitation instead of launching it.
+When testing is requested, choose checks relevant to the problem and stop after they pass. Extra scales, languages, expiry waits, and matrices require an explicit request. Tests must not open visible windows, steal focus, move the cursor, or play sounds. Desktop-backed Python runners use `hidden_process.py`: each GUI fixture runs on a noninteractive Windows station with its own desktop and a cleanup job covering descendants. The station has no access to your visible desktop or clipboard. Isolation failure stops the launch; there is no visible fallback.
 
 ## What the test files are
 
@@ -21,19 +21,23 @@ The files in `tests/` are development tools. They do not run when a user opens A
 | `installation_test.py` | Checks the actual installer, updates, migration, and installed profiles in redirected folders | Yes |
 | `update_checks.cpp`, `update_checks.pro` | Separate console executable for updater downloads, hashes, and failure handling | No |
 | `review_regressions.cpp`, `review_regressions.pro` | Focus-name validation, LAN ranking, persistent DLL placement, archive extraction, save rollback, and launcher repair/cleanup helpers | No |
+| `reliability_checks.cpp`, `reliability_checks.pro`, `driver_fixture.cpp`, `driver_fixture.pro` | Older-backup preservation, bounded driver downloads, context retries through a test-only DLL, optional installer failures, and empty UI-preference recovery | No |
+| `hidden_process.py`, `desktop_isolation_test.py` | Noninteractive GUI launch, fail-closed behavior, and complete fixture-process cleanup | Native probe only, isolated |
 | `phone_api_test.cjs` | Phone request/error handling and translation coverage using Node, without a browser or app | No |
 
 Every file has an active caller, build target, or documented standalone command. Keeping these optional tools preserves useful diagnostics. Their presence does not make testing mandatory.
 
 ## Commands
 
-These commands are explicit opt-ins, run from the repository root in PowerShell. The existing desktop-backed runners can display app windows: `--dry-run` disables input and sounds, not the window. `CREATE_NO_WINDOW` only suppresses console windows. Do not run these locally under the invisible-testing rule. Offscreen support has not been validated for the native Windows focus/corner checks.
+These commands are explicit opt-ins, run from the repository root in PowerShell. Desktop-backed runners use a noninteractive Windows station, including native Windows rendering; this is separate from Qt offscreen emulation. `--dry-run` suppresses input and sounds. Running the application directly bypasses the isolation wrapper and can show a window, so use the documented Python/build commands for invisible checks.
 
 | Purpose | Command |
 | --- | --- |
 | Build and deploy, no tests | `.\build.cmd` |
 | Build app + verifier, no tests | `.\build.cmd checks` |
-| Build app + verifier; core, HTTP, recovery, restart checks | `.\build.cmd test` |
+| Build app + all verifiers; console, HTTP, recovery, restart checks | `.\build.cmd test` |
+| Complete default suite: console, behavior, desktop UI and headless phone browser | `.\build.cmd test --suite` |
+| Repeat the complete suite against current binaries | `python tests/run_checks.py --suite` |
 | Repeat behavior checks against an already current build | `python tests/run_checks.py` |
 | Desktop checks at 100% | `python tests/run_checks.py --ui-only` |
 | Phone browser checks | `python tests/phone_browser_test.py` |
@@ -48,7 +52,7 @@ These commands are explicit opt-ins, run from the repository root in PowerShell.
 
 `--full` expands requested checks; it does not implicitly enable desktop checks. `build.cmd test --slow` includes expiry during a build. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across all ten palettes, representative pairing links, and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
 
-Build `runtime/Azec-checks.exe` with `build.cmd checks` to prepare desktop diagnostics without running tests. `build.cmd test` also builds it and explicitly runs behavior checks. Rebuild after changes to C++ or embedded assets; testing a stale executable does not validate source edits. The release app delegates `--ui-self-test` to the separate verification executable.
+Use `build.cmd checks` to prepare the desktop verifier and all console verifiers without running tests. Console binaries remain under `.build/checks-*/release`; only the desktop verifier goes in `runtime/Azec-checks.exe`. The test-only driver DLL is never copied into the app runtime. `build.cmd test` also builds it and explicitly runs behavior checks. Rebuild after changes to C++ or embedded assets; testing a stale executable does not validate source edits. The release app delegates `--ui-self-test` to the separate verification executable.
 
 ## Coverage when explicitly requested
 
@@ -62,7 +66,7 @@ The Windows GitHub Actions workflow is manual only. Its default run explicitly r
 
 ## What the checks cover today
 
-Input and output behaviour is only partially automatic. The fixtures run with `--dry-run`, so no mouse movement, synthetic clicks, or sounds are produced by the engine. Desktop windows can still appear. Real Interception output, the game-focus gate with a live game, and the audible sound cues remain unverified by these suites.
+Input and output behaviour is only partially automatic. The fixtures run with `--dry-run`, so no mouse movement, synthetic clicks, or sounds are produced by the engine. The native desktop windows remain inside the noninteractive fixture station. Real Interception output, the game-focus gate with a live game, and the audible sound cues remain unverified by these suites.
 
 Available automated coverage:
 
@@ -77,7 +81,7 @@ Still manual or not covered: a physical iPhone, real in-game input, the audible 
 
 ## Fixtures and artifacts
 
-Python runners create fresh directories under `.build/verification`, run isolated dry-run instances, and stop their test processes. Inspect JSON reports and relevant screenshots. Never run fixture checks against the user's configuration or from the project root: the native checks write settings into their working directory. Standalone `core-tests.exe` also needs a fresh fixture as its working directory; pass a filename within that fixture.
+Python runners create fresh directories under `.build/verification`, run isolated dry-run instances, and stop their entire process trees, including installer descendants. Independent groups use at most two workers by default (`--jobs 1` runs sequentially); GUI fixtures run below normal priority. Console checks cover binary compatibility, sensitivity, updater integrity and the five reliability fixes. Suite JSON reports record group timings and failures. Core checks are included once through the sensitivity verifier, rather than repeated in the build root. Inspect JSON reports and relevant screenshots. Never run fixture checks against the user's configuration or from the project root: the native checks write settings into their working directory. Standalone `core-tests.exe` also needs a fresh fixture as its working directory; pass a filename within that fixture.
 
 Only when visible manual inspection is explicitly requested, launch the absolute path to `runtime/Azec.exe` from a fresh fixture directory with `--dry-run`. For requested motion captures, run the verifier there with `--ui-self-test --motion-only`; add `--motion-timing-only` to omit frame capture. Fixture settings, pairing info, revealed QR images, and motion captures must remain local. CI excludes pairing-info files and revealed QR captures from uploads.
 
@@ -100,3 +104,7 @@ Build `tests/update_checks.pro` with the pinned Qt qmake and nmake in `.build/up
 Build `tests/review_regressions.pro` with qmake and nmake in a separate `.build/` folder. Run `Azec-review-checks.exe <fresh-empty-fixture> --dry-run`, using an absolute fixture path under `.build/verification`. It uses Qt Core/Network only, never invokes the launcher entry point or input workers, and runs archive tools without console windows. It exercises normal and PowerShell extraction with apostrophes, spaces, and dollar signs, same-size DLL replacement, rollback when each configuration file is locked, required runtime DLL detection, driver migration, and preservation of newer runtimes. It does not launch or smoke-test an installed app, render the desktop, or establish in-game behavior.
 
 Run `node --test tests/phone_api_test.cjs` for the phone request wrapper and translated error keys. Its mocked network requests exercise the actual embedded request function; they do not replace HTTP integration or physical-phone checks.
+
+## Focused reliability checks
+
+Build `tests/driver_fixture.pro` and then `tests/reliability_checks.pro` with qmake and nmake in a separate `.build/` folder. Both outputs go into that folder's `release/` directory. Run `release/Azec-reliability-checks.exe <fresh-empty-fixture> --dry-run` with an absolute new fixture under `.build/verification` and the pinned Qt kit's `bin` on PATH. The console runner loads only the explicitly named `Azec-driver-fixture.dll`, never the real Interception DLL, and sends no input. Its download cases use a local fixture HTTP server and short timeouts; launcher checks call helpers without starting the installer or desktop app. Neither the check executable nor the test-only DLL belongs in a release.

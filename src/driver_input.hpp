@@ -77,7 +77,7 @@ struct Backend {
     bool ensure(){
         if(tried)return context!=nullptr;
         tried=true;
-        module=loadModule();
+        if(!module)module=loadModule();
         if(!module)return false;
         const auto create=reinterpret_cast<CreateContext>(GetProcAddress(module,"interception_create_context"));
         send=reinterpret_cast<SendStrokes>(GetProcAddress(module,"interception_send"));
@@ -89,13 +89,17 @@ struct Backend {
         if(!context)return false;
         // An invalid handle means the driver refused the open, usually because
         // the caller is not elevated.
-        if(invalid&&invalid(context)){context=nullptr;refused=true;return false;}
+        if(invalid&&invalid(context)){if(destroy)destroy(context);context=nullptr;refused=true;return false;}
         if(is_mouse)for(int candidate=first_mouse_device;candidate<first_mouse_device+10;++candidate)
             if(is_mouse(candidate)){device=candidate;break;}
         return true;
     }
 
     bool refused=false;
+
+    // Keep the loaded library reference, but reopen a failed driver context on
+    // an explicit retry. A working context is never interrupted.
+    void retryInitialization(){if(!context){tried=false;refused=false;}}
 
     bool stroke(MouseStroke& value){
         std::lock_guard lock(mutex);
@@ -125,9 +129,9 @@ inline State state(){
 
 inline bool available(){return state()==State::Ready;}
 
-inline void retryMissingLibrary(){
+inline void retryInitialization(){
     auto& backend=detail::backend();std::lock_guard lock(backend.mutex);
-    if(!backend.module)backend.tried=false;
+    backend.retryInitialization();
 }
 
 inline bool move(int dx,int dy){

@@ -7,14 +7,15 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from hidden_process import HiddenProcess, run as run_hidden, stop as stop_hidden
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = Path(os.environ.get('AZEC_APP', ROOT / 'runtime' / 'Azec.exe'))
 CHECKS = Path(os.environ.get('AZEC_CHECKS', ROOT / 'runtime' / 'Azec-checks.exe'))
 
 def start(folder):
-    process = subprocess.Popen([str(APP), '--dry-run', '--phone-info=phone-info.json'], cwd=folder,
-                               creationflags=subprocess.CREATE_NO_WINDOW)
+    process = HiddenProcess([str(APP), '--dry-run', '--phone-info=phone-info.json'], cwd=folder)
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         try:
@@ -24,16 +25,14 @@ def start(folder):
         except (OSError, ValueError):
             pass
         if process.poll() is not None:
-            raise RuntimeError('Dry-run instance exited before startup completed')
+            code=process.returncode;stop(process)
+            raise RuntimeError(f'Dry-run instance exited before startup completed: {code:#x}')
         time.sleep(.05)
-    process.terminate()
-    process.wait(timeout=5)
+    stop(process)
     raise TimeoutError('Dry-run app did not write pairing info within 20 seconds')
 
 def stop(process):
-    if process and process.poll() is None:
-        process.terminate()
-        process.wait(timeout=10)
+    stop_hidden(process)
 
 def run_http(parent, slow=False):
     folder = Path(tempfile.mkdtemp(prefix='http-', dir=parent))
@@ -45,8 +44,8 @@ def run_http(parent, slow=False):
         report = json.loads((folder / 'http-verification.json').read_text())
         if not report['passed']:
             raise RuntimeError('HTTP checks reported a failure')
-        duplicate = subprocess.run([str(APP), '--dry-run', '--phone-info=duplicate-info.json'],
-                                   cwd=folder, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
+        duplicate = run_hidden([str(APP), '--dry-run', '--phone-info=duplicate-info.json'],
+                               cwd=folder, timeout=10)
         if duplicate.returncode != 0 or (folder / 'duplicate-info.json').exists():
             raise RuntimeError('Second instance was not rejected')
         old_token = info['token']
@@ -76,23 +75,23 @@ def run_http(parent, slow=False):
         # Session credentials must never be uploaded as verification artifacts.
         (folder / 'phone-info.json').unlink(missing_ok=True)
 
-def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False):
+def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,console=False,browser=False,jobs=2):
     started = time.monotonic()
     parent = ROOT / '.build' / 'verification'
     parent.mkdir(parents=True, exist_ok=True)
+    tasks=[]
     if not ui_only:
-        run_http(parent, slow=slow or full)
         from recovery_test import run as run_recovery
-        run_recovery(parent)
         from preferences_restart_test import run as run_preferences
-        run_preferences(parent)
-    if ui:
+        tasks.extend([('HTTP and restart',lambda:run_http(parent,slow=slow or full)),
+                      ('Recovery',lambda:run_recovery(parent)),('Preferences restart',lambda:run_preferences(parent))])
+    def run_ui():
         for scale in (('1', '1.5') if full else ('1',)):
             fixture = Path(tempfile.mkdtemp(prefix='ui-goofy-' + scale + '-', dir=parent))
             env = os.environ.copy()
             env['QT_SCALE_FACTOR'] = scale
-            subprocess.run([str(CHECKS), '--ui-self-test']
-                           + (['--all-languages'] if full else []), cwd=fixture, env=env, check=True, timeout=150)
+            run_hidden([str(CHECKS), '--ui-self-test']
+                       + (['--all-languages'] if full else []), cwd=fixture, env=env, timeout=150)
             report = json.loads((fixture / 'ui-verification.json').read_text())
             if not report['passed']:
                 raise RuntimeError('UI report failed at scale ' + scale)
@@ -100,8 +99,51 @@ def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False):
                 from qr_scan import verify
                 if not verify(fixture):
                     raise RuntimeError('QR decoding failed at scale ' + scale)
+    if ui:tasks.append(('Desktop UI',run_ui))
+    if console:tasks.append(('Console regressions',lambda:run_console(parent)))
+    if browser:
+        from phone_browser_test import run as run_browser
+        def browser_checks():
+            if not run_browser(full):raise RuntimeError('Phone browser verification failed')
+        tasks.append(('Phone browser',browser_checks))
+    timings={};failures=[]
+    def timed(name,action):
+        began=time.monotonic();action();return name,round(time.monotonic()-began,2)
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        pending={pool.submit(timed,name,action):name for name,action in tasks}
+        for future in as_completed(pending):
+            name=pending[future]
+            try:
+                _,timings[name]=future.result();print(f'PASS {name}: {timings[name]:.2f}s')
+            except Exception as error:
+                failures.append(name);print(f'FAIL {name}: {error}')
+    report={'passed':not failures,'seconds':round(time.monotonic()-started,2),'jobs':jobs,
+            'timings':timings,'failures':failures,'isolation':'noninteractive Windows station and per-process cleanup job',
+            'skipped':([] if full else ['150% scale','all-language layout matrix'])+([] if (full or slow) and not ui_only else ['real-time pairing expiry'])}
+    summary=parent/('suite-'+str(time.time_ns())+'.json');summary.write_text(json.dumps(report,indent=2))
     print('Verification artifacts: ' + str(parent))
     print(f'Completed in {time.monotonic() - started:.1f}s')
+    if failures:raise RuntimeError('Failed groups: '+', '.join(failures))
+
+def run_console(parent):
+    env=os.environ.copy()
+    qt=Path(env.get('NEON_QT_ROOT',Path(env['LOCALAPPDATA'])/'NeonManagerR6/Qt/6.8.3/msvc2022_64'))
+    env['PATH']=str(qt/'bin')+os.pathsep+env['PATH']
+    targets=[('sensitivity_checks','Azec-sensitivity-checks',False),('reliability_checks','Azec-reliability-checks',True),
+             ('review_regressions','Azec-review-checks',True),('update_checks','Azec-update-checks',None)]
+    for target,name,dry in targets:
+        executable=ROOT/'.build'/('checks-'+target)/'release'/(name+'.exe')
+        if not executable.exists():raise FileNotFoundError(f'{executable}: run build.cmd checks first')
+        fixture=Path(tempfile.mkdtemp(prefix=target+'-',dir=parent))
+        args=[str(executable)]+([str(fixture)]+(['--dry-run'] if dry else []) if dry is not None else [])
+        result=subprocess.run(args,cwd=fixture,env=env,capture_output=True,text=True,timeout=90,
+                              creationflags=subprocess.CREATE_NO_WINDOW|subprocess.BELOW_NORMAL_PRIORITY_CLASS)
+        (fixture/'console.log').write_text(result.stdout+result.stderr,encoding='utf-8')
+        if result.returncode:raise RuntimeError(f'{name} failed; see {fixture / "console.log"}')
+        print(f'PASS {name}')
+    for script in ('desktop_isolation_test.py',):
+        subprocess.run([sys.executable,str(ROOT/'tests'/script)],check=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
+    subprocess.run(['node','--test',str(ROOT/'tests/phone_api_test.cjs')],check=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -110,5 +152,10 @@ if __name__ == '__main__':
     parser.add_argument('--qr-scan', action='store_true', help='Decode UI QR captures (requires opencv-python-headless)')
     parser.add_argument('--full', action='store_true', help='Include 150%% UI scaling, all UI languages, and real-time HTTP expiry')
     parser.add_argument('--slow', action='store_true', help='Include real-time HTTP expiry without expanding the UI matrix')
+    parser.add_argument('--console',action='store_true',help='Run the built core, sensitivity, reliability, installer-helper and updater checks')
+    parser.add_argument('--browser',action='store_true',help='Run the headless Chrome phone suite')
+    parser.add_argument('--suite',action='store_true',help='Run console, behavior, desktop and browser coverage without extended matrices')
+    parser.add_argument('--jobs',type=int,choices=(1,2),default=2,help='Concurrent independent groups; default 2')
     args=parser.parse_args()
-    run(args.ui or args.ui_only or args.qr_scan,args.ui_only,args.qr_scan,args.full,args.slow)
+    run(args.ui or args.ui_only or args.qr_scan or args.suite,args.ui_only,args.qr_scan,args.full,args.slow,
+        args.console or args.suite,args.browser or args.suite,args.jobs)

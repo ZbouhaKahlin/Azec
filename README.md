@@ -30,7 +30,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 - **Settings categories:** General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup keep related options together.
 - **Independent profiles:** enabling a secondary profile copies the primary once, then keeps edits separate. Disabling it preserves those edits.
 - **Favorites and search:** right-click an operator to favorite it. Favorites appear once and save automatically.
-- **Portable backups:** export or import profiles, favorites, the active color theme, the collapsed-sidebar choice, and the output and safety switches in **Settings → Profile backup**. Imported profiles, favorites, theme, and sidebar choices remain unsaved until you click Save; closing with Discard keeps the previously saved values.
+- **Portable backups:** export or import profiles, favorites, the active color theme, the collapsed-sidebar choice, and the output and safety switches in **Settings → Profile backup**. Importing an older backup preserves profiles for operators missing from that backup. Imported profiles, favorites, theme, and sidebar choices remain unsaved until you click Save; closing with Discard keeps the previously saved values.
 - **Phone pairing:** sessions rotate on restart. **New code** rotates the code and disconnect paired phones; **Copy code** copies just the six-digit code. Phone access can be disabled in Settings.
 - **Safe saving:** failed saves show a persistent banner with the problem instead of only changing the icon. The old and new settings files are rolled back together if the second write fails.
 
@@ -77,7 +77,7 @@ Requires Windows x64, Visual Studio 2022 C++ tools, a Windows SDK, Python, and Q
 
 `setup-qt.ps1` installs the pinned Qt kit. Set `NEON_QT_ROOT` to use another compatible installation. Build intermediates live in `.build/`; the launcher is `Azec.exe`, with deployed files in `runtime/`.
 
-**Tests are optional and run only when explicitly requested or when investigating a reported bug.** Normal edits, builds, and releases do not require them. `.\build.cmd checks` builds the separate verifier without running it; `.\build.cmd test` explicitly requests behavior tests. The desktop-backed test runners can open app windows, so agents must follow the visibility restrictions in [AGENTS.md](AGENTS.md). See [Testing](docs/testing.md) for the purpose of each test file and the available commands. Scale/language matrices are never automatic.
+**Tests are optional and run only when explicitly requested or when investigating a reported bug.** Normal edits, builds, and releases do not require them. `.\build.cmd checks` builds the separate verifier without running it; `.\build.cmd test` explicitly requests behavior tests. Desktop-backed runners isolate windows on a noninteractive Windows station; a failed isolation setup aborts without opening the app. `build.cmd test --suite` runs console, desktop UI, HTTP/restart and headless phone-browser checks, with at most two groups at once. See [Testing](docs/testing.md) for the purpose of each test file and the available commands. Scale/language matrices are never automatic.
 
 ## Share one file
 
@@ -92,7 +92,7 @@ Requires Windows x64, Visual Studio 2022 C++ tools, a Windows SDK, Python, and Q
 .\share.cmd publish    # also upload the build to a public releases-only repository
 ```
 
-To explicitly request the installer smoke test, add `test`: `.\share.cmd test`, `.\share.cmd quick test`, or `.\share.cmd publish test`. It launches an isolated copy of the app and can show a window; agents must not run it on your desktop unless it can run invisibly. The existing `AZEC_SKIP_TESTS=1` override still skips it even when `test` is supplied.
+To explicitly request the installer smoke test, add `test`: `.\share.cmd test`, `.\share.cmd quick test`, or `.\share.cmd publish test`. It launches the app on a noninteractive Windows station and redirects installation paths into a disposable fixture. The existing `AZEC_SKIP_TESTS=1` override still skips it even when `test` is supplied.
 
 `publish` uses the GitHub CLI and uploads to `github.com/Azec-Zuckerberg/Azec-releases`: the binaries are public while this source repository stays private. It then runs `verify-release.ps1` to match the tag and GitHub asset digest against the local EXE and fresh anonymous downloads, including the stable link. Missing digests or mismatches fail publication verification. The stable link is `https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe`.
 

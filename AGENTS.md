@@ -33,7 +33,7 @@ When testing is authorized, choose checks relevant to the requested investigatio
 
 - Build app only: `.\build.cmd`.
 - Build app and verification executable without running tests: `.\build.cmd checks`.
-- Explicit behavior-test command: `.\build.cmd test` runs core, isolated HTTP, recovery, and restart checks. It skips the real 61-second expiry wait. The existing desktop-backed runners can open windows, so do not use them locally under the invisible-testing rule.
+- Explicit behavior-test command: `.\build.cmd test` runs core, isolated HTTP, recovery, and restart checks. It skips the real 61-second expiry wait. Desktop-backed runners use `tests/hidden_process.py` to create a noninteractive Windows station and a job that cleans up the entire fixture process tree. Isolation failure must abort; never add a visible fallback. `build.cmd test --suite` adds default desktop UI and headless phone-browser coverage without opting into extended matrices.
 - `share.cmd`, `share.cmd quick`, and `share.cmd publish` package without tests. Add `test` only when the installer smoke test is explicitly authorized and can run without disturbing the user. `AZEC_SKIP_TESTS=1` still overrides that request.
 - Desktop/browser matrices, QR decoding, and real-time expiry remain available for explicitly requested diagnostics. See the command reference and its visibility notes before choosing them. The GitHub workflow is manual only; desktop and extended checks are separate opt-ins.
 

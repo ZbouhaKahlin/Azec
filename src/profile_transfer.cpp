@@ -12,8 +12,8 @@ void MainWindow::exportProfiles(){
 }
 bool MainWindow::applyBackup(const QByteArray& bytes){
     if(bytes.size()>1024*1024)return false;
-    QJsonParseError error;const auto document=QJsonDocument::fromJson(bytes,&error);r6::Config config;QSet<QString> favorites;BackupOptions options;
-    if(error.error!=QJsonParseError::NoError||!document.isObject()||!parseBackup(document.object(),config,favorites,options))return false;
+    QJsonParseError error;const auto document=QJsonDocument::fromJson(bytes,&error);const auto existing=engine_.snapshot();r6::Config config;QSet<QString> favorites;BackupOptions options;
+    if(error.error!=QJsonParseError::NoError||!document.isObject()||!parseBackup(document.object(),config,favorites,options,&existing))return false;
     // Keep imported UI choices in memory alongside the unsaved profiles.
     // Save commits all three files; Discard (including panic exit) writes none.
     QJsonObject ui;

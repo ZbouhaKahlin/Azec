@@ -265,7 +265,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["drag_keeps_all_scrollbars_visible"]=sidebarBar->opacity()>.99&&operatorBar->opacity()>.99&&preferenceBar->opacity()>.99;
         for(auto* bar:{sidebarBar,operatorBar,preferenceBar})bar->setSliderDown(false);wait(3350);for(int attempt=0;attempt<80&&(sidebarBar->opacity()>0||operatorBar->opacity()>0||preferenceBar->opacity()>0);++attempt)wait(50);
         checks["scrollbars_fade_after_drag_release"]=sidebarBar->opacity()==0&&operatorBar->opacity()==0&&preferenceBar->opacity()==0;
-        settings_->setMinimumHeight(0);preferences_scroll_->widget()->setMinimumHeight(0);back_->click();sidebarBar->setValue(0);scroll_->verticalScrollBar()->setValue(0);showNormal();raise();activateWindow();wait(3400);capture(output+"/finished.png");
+        settings_->setMinimumHeight(0);preferences_scroll_->widget()->setMinimumHeight(0);back_->click();sidebarBar->setValue(0);scroll_->verticalScrollBar()->setValue(0);showNormal();raise();activateWindow();wait(220);capture(output+"/finished.png");
         const auto unchanged=engine_.snapshot().bytes();
         bool bindingFits=true;
         QTimer::singleShot(80,this,[&]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/binding.png");bindingFits&=modal->objectName()=="hotkeyDialog"&&modal->width()<=360&&modal->findChild<QLabel*>("bindingHint")->wordWrap();for(auto* label:modal->findChildren<QLabel*>())bindingFits&=modal->rect().contains(QRect(label->mapTo(modal,QPoint()),label->size()));modal->reject();}});bindKey(0);checks["cancel_key_binding_preserves_settings"]=engine_.snapshot().bytes()==unchanged;
@@ -349,13 +349,19 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["legacy_backup_rapid_migrates_to_both_profiles"]=parseBackup(legacyBackup,legacyConfig,legacyFavorites,legacyOptions)&&legacyConfig.operators[4].rapid&&legacyConfig.secondary[4].rapid;
         auto shortBackup=backup;auto shortEntries=backup["operators"].toArray();while(shortEntries.size()>72)shortEntries.removeLast();shortBackup["operators"]=shortEntries;r6::Config shortConfig;QSet<QString> shortFavorites;BackupOptions shortOptions;
         checks["older_backup_sizes_import_by_name"]=parseBackup(shortBackup,shortConfig,shortFavorites,shortOptions)&&std::string(shortConfig.operators[71].name)=="Noor"&&std::string(shortConfig.operators[72].name)=="Nomad";
+        engine_.edit([](r6::Config& config){config.operators[77].vertical=17.6f;config.secondary[77].vertical=27.8f;config.secondary_initialized[77]=true;config.secondary_enabled[77]=false;});
+        const bool olderApplied=applyBackup(QJsonDocument(shortBackup).toJson());
+        {const auto current=engine_.snapshot();checks["older_backup_keeps_absent_operator_in_production_import"]=olderApplied&&qAbs(current.operators[77].vertical-17.6f)<.001f&&qAbs(current.secondary[77].vertical-27.8f)<.001f&&current.secondary_initialized[77]&&!current.secondary_enabled[77];}
+        {r6::Engine restored(true);checks["older_backup_preserved_operator_survives_save"]=save()&&restored.load(config_path_)&&qAbs(restored.snapshot().operators[77].vertical-17.6f)<.001f&&qAbs(restored.snapshot().secondary[77].vertical-27.8f)<.001f;}
+        applyBackup(QJsonDocument(backup).toJson());
         auto malformedBackup=backup;auto entries=backup["operators"].toArray();while(entries.size()>=r6::legacy_operator_count)entries.removeLast();malformedBackup["operators"]=entries;
         const auto unchangedBeforeImport=engine_.snapshot().bytes();
         checks["invalid_import_preserves_profiles"]=!applyBackup(QJsonDocument(malformedBackup).toJson())&&engine_.snapshot().bytes()==unchangedBeforeImport;
         checks["valid_import_updates_production_ui"]=applyBackup(QJsonDocument(backup).toJson())&&unsaved_&&engine_.snapshot().bytes()==baseline.bytes();
         checks["all_hotkeys_checked_for_conflicts"]=hotkeyConflict(baseline,2,baseline.menu_key)==0&&hotkeyConflict(baseline,2,0)==-1;
         checks["phone_rejects_global_hotkey_collision"]=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key2",baseline.menu_key}}}}).contains("error");
-        checks["phone_rejects_unbindable_mouse_keys"]=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",1}}}}).contains("error");
+        checks["phone_accepts_mouse_hotkeys"]=!mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",1}}}}).contains("error");
+        mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",baseline.recoil_key}}}});
         {r6::Operator slow;slow.delay=500;checks["stored_delay_above_ui_range_clamps_for_workers"]=r6::rapid_interval(slow)==150;}
         applyStyle();dirty();wait(180);
         // Count pixels painted in the live accent so the check covers both the
@@ -476,8 +482,32 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["unsupported_appearance_schema_uses_defaults"]=kbtheme::readColorTheme(uiFixture)=="charcoal"&&!uiprefs::sidebarCollapsed(uiFixture);
         QFile invalidUi(uiprefs::filePath(uiFixture));invalidUi.open(QIODevice::WriteOnly);invalidUi.write("{broken");invalidUi.close();
         checks["invalid_ui_preferences_are_not_overwritten"]=!kbtheme::writeColorTheme(uiFixture,"midnight")&&!uiprefs::update(uiFixture,[](QJsonObject& root){root["sidebarCollapsed"]=true;});
+        invalidUi.open(QIODevice::WriteOnly|QIODevice::Truncate);invalidUi.close();
+        checks["empty_ui_preferences_recover_through_theme_save"]=kbtheme::writeColorTheme(uiFixture,"rose")&&kbtheme::readColorTheme(uiFixture)=="rose";
         invalidUi.open(QIODevice::WriteOnly|QIODevice::Truncate);invalidUi.write("{\"version\":1,\"interface\":\"retired\",\"favorites\":[\"Ash\"],\"colorTheme\":\"deep-sea\",\"sidebarCollapsed\":true}");invalidUi.close();
         kbtheme::writeColorTheme(uiFixture,"midnight");QJsonObject migratedUi;uiprefs::readDocument(uiprefs::filePath(uiFixture),migratedUi);
         checks["obsolete_interface_removed_without_losing_preferences"]=!migratedUi.contains("interface")&&migratedUi["favorites"].toArray().contains("Ash")&&kbtheme::readColorTheme(uiFixture)=="midnight"&&uiprefs::sidebarCollapsed(uiFixture);
-        QJsonObject report;report["theme_samples"]=themeSamples;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("goofy");report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="SendInput";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
+        // Newer mouse-setup and onboarding features use real production handlers.
+        if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(mouse_setup_category_);wait(220);
+        checks["mouse_setup_rejects_incomplete_values"]=mouse_save_&&!mouse_save_->isEnabled()&&mouse_rescale_&&!mouse_rescale_->isEnabled();
+        const auto iniPath=QString::fromStdWString((config_path_.parent_path()/L"GameSettings-fixture.ini").wstring());
+        const QByteArray iniBytes="[INPUT]\nMouseSensitivityHorizontal=50\nMouseSensitivityVertical=50\nMouseSensitivityMultiplierUnit=0.02\n";
+        {QFile ini(iniPath);ini.open(QIODevice::WriteOnly);ini.write(iniBytes);}
+        mouse_dpi_->setValue(800);mouse_source_=iniPath;readGameSensitivity();
+        const auto beforeSetup=engine_.snapshot().bytes();
+        checks["mouse_setup_reads_fixture_without_changing_profiles"]=mouse_horizontal_->value()==50&&mouse_vertical_->value()==50&&mouse_save_->isEnabled()&&engine_.snapshot().bytes()==beforeSetup;
+        {r6::Engine restored(true);checks["mouse_setup_save_persists_without_rescaling"]=saveMouseSetup()&&restored.load(config_path_)&&restored.snapshot().sensitivity.valid()&&restored.snapshot().sensitivity.dpi==800&&restored.snapshot().bytes()==beforeSetup;}
+        const auto beforeRescale=engine_.snapshot();mouse_horizontal_->setValue(100);mouse_vertical_->setValue(100);
+        QTimer::singleShot(40,this,[]{if(auto* dialog=qobject_cast<QDialog*>(QApplication::activeModalWidget()))dialog->accept();});
+        rescaleMouseProfiles();
+        checks["mouse_setup_confirmed_rescale_changes_profiles_and_marks_dirty"]=unsaved_&&qAbs(engine_.snapshot().operators[0].vertical-beforeRescale.operators[0].vertical*.5f)<.001f;
+        {QFile ini(iniPath);ini.open(QIODevice::ReadOnly);checks["mouse_setup_never_writes_game_ini"]=ini.readAll()==iniBytes;}
+        checks["dry_run_skips_automatic_tour"]=tour_step_==-1&&!tour_pill_;
+        const auto beforeTour=engine_.snapshot().bytes();QApplication::setActiveWindow(this);startTour();
+        checks["manual_tour_owns_its_instruction_windows"]=tour_pill_&&tour_arrow_&&tour_pill_->parentWidget()==this&&tour_arrow_->parentWidget()==this;
+        bool tourSteps=true;for(int step=0;step<6;++step){setTourStep(step);tourSteps&=tour_step_==step&&tour_pill_->isVisible();}
+        finishTour();QJsonObject tourPrefs;uiprefs::readDocument(uiprefs::filePath(config_path_),tourPrefs);
+        checks["manual_tour_finishes_and_preserves_profiles"]=tourSteps&&tour_step_==-1&&!tour_pill_->isVisible()&&tourPrefs["onboardingVersion"].toInt()==1&&engine_.snapshot().bytes()==beforeTour;
+        testDriver();checks["dry_run_driver_test_never_injects_input"]=engine_.injected_events==0;
+        QJsonObject report;report["theme_samples"]=themeSamples;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("goofy");report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="Interception (suppressed in dry-run)";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }

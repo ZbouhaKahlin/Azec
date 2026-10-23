@@ -95,6 +95,11 @@ bool completePayload(const fs::path& folder){
         if(!fs::is_regular_file(folder/name))return false;
     return fs::is_directory(folder/L"licenses");
 }
+bool removeOptionalFile(const fs::path& path){
+    std::error_code error;fs::remove(path,error);
+    if(error)OutputDebugStringW(L"Azec: optional temporary-file cleanup skipped.\n");
+    return !error;
+}
 void extractPayload(const fs::path& folder){
     fs::create_directories(folder);const auto archive=folder/L"azec-payload.zip";
     const HRSRC resource=FindResourceW(nullptr,L"AZEC_PAYLOAD",RT_RCDATA);
@@ -108,7 +113,7 @@ void extractPayload(const fs::path& folder){
     if(!CreateProcessW(tar.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,folder.c_str(),&startup,&process))throw std::runtime_error("unpack payload");
     const auto result=WaitForSingleObject(process.hProcess,180000);DWORD code=1;
     if(result==WAIT_OBJECT_0)GetExitCodeProcess(process.hProcess,&code);else{TerminateProcess(process.hProcess,1);WaitForSingleObject(process.hProcess,5000);}
-    CloseHandle(process.hThread);CloseHandle(process.hProcess);fs::remove(archive);
+    CloseHandle(process.hThread);CloseHandle(process.hProcess);removeOptionalFile(archive);
     if(code||!completePayload(folder))throw std::runtime_error("incomplete payload");
     writeText(folder/L"runtime"/L"version.txt",AZEC_VERSION);
 }
@@ -137,15 +142,21 @@ void migrateProfiles(const fs::path& source,const fs::path& destination){
         }catch(...){for(const auto& path:copied){std::error_code ignored;fs::remove(path,ignored);}throw;}
     }else writeText(destination/L"storage-initialized.txt","Azec user settings.\n");
 }
-void migrateDriver(const Layout& layout,const std::string& installed,const fs::path& portable){
-    const auto target=layout.data/L"interception"/L"interception.dll";
-    if(fs::exists(target))return;
-    auto source=validVersion(installed)?layout.program/L"versions"/wide(installed)/L"runtime"/L"interception.dll":fs::path();
-    if(!fs::is_regular_file(source))source=portable/L"runtime"/L"interception.dll";
-    if(!fs::is_regular_file(source))source=portable/L"interception.dll";
-    if(!fs::is_regular_file(source))return;
-    fs::create_directories(target.parent_path());
-    fs::copy_file(source,target);
+bool migrateDriver(const Layout& layout,const std::string& installed,const fs::path& portable){
+    try{
+        const auto target=layout.data/L"interception"/L"interception.dll";
+        if(fs::exists(target))return true;
+        auto source=validVersion(installed)?layout.program/L"versions"/wide(installed)/L"runtime"/L"interception.dll":fs::path();
+        if(!fs::is_regular_file(source))source=portable/L"runtime"/L"interception.dll";
+        if(!fs::is_regular_file(source))source=portable/L"interception.dll";
+        if(!fs::is_regular_file(source))return true;
+        fs::create_directories(target.parent_path());
+        fs::copy_file(source,target);
+        return true;
+    }catch(const fs::filesystem_error& error){
+        OutputDebugStringW(L"Azec: optional driver migration skipped.\n");
+        OutputDebugStringA(error.what());return false;
+    }
 }
 void createShortcut(const Layout& layout){
     fs::create_directories(layout.shortcut.parent_path());IShellLinkW* link=nullptr;

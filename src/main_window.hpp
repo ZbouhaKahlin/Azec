@@ -9,6 +9,7 @@
 #include "hotkeys.hpp"
 #include "driver_input.hpp"
 #include "driver_setup.hpp"
+#include "driver_download.hpp"
 #include "strings.hpp"
 #include "flags.hpp"
 #include "diagnostics.hpp"
@@ -443,6 +444,7 @@ class MainWindow final : public QWidget {
         resolveInstaller();refreshOutputStatus();
     }
     void testDriver(){
+        if(engine_.dry_run()){showNotice(text(UiText::DriverTestFailed),true);return;}
         // A visible 40 px sweep proves the driver path without the game.
         if(driver_input::test())showNotice(text(UiText::DriverTestSent));
         else{diagnostic("driver test","interception_send rejected the test move");showNotice(text(UiText::DriverTestFailed),true,true);}
@@ -466,11 +468,12 @@ class MainWindow final : public QWidget {
     // Finds an extracted Interception folder anywhere obvious and keeps the
     // display command pointing at its installer.
     void resolveInstaller(){
-        const auto found=driver_setup::locate();
+        const auto found=engine_.dry_run()?QString():driver_setup::locate();
         driver_installer_=driver_setup::installerFolder(found);
         if(driver_code_)driver_code_->setText(driver_setup::installCommand(driver_installer_));
     }
     void checkDriver(){
+        driver_input::retryInitialization();
         auto current=driver_input::state();
         if(current==driver_input::State::DllMissing){
             const auto found=driver_setup::locate();
@@ -478,7 +481,7 @@ class MainWindow final : public QWidget {
                 QString error;
                 if(driver_setup::place(found,&error)){
                     showNotice(text(UiText::DriverPlaced));
-                    driver_input::retryMissingLibrary();current=driver_input::state();
+                    driver_input::retryInitialization();current=driver_input::state();
                 }else{
                     diagnostic("driver place",error);
                     showNotice(text(UiText::DriverPlaceFailed),true,true);
@@ -493,17 +496,12 @@ class MainWindow final : public QWidget {
     void downloadDriver(){
         if(!network_)network_=new QNetworkAccessManager(this);
         if(driver_download_)driver_download_->setEnabled(false);
-        QNetworkRequest request{QUrl(driver_setup::downloadUrl())};
-        request.setHeader(QNetworkRequest::UserAgentHeader,QStringLiteral("Azec/")+AZEC_VERSION);
-        auto* reply=network_->get(request);
-        connect(reply,&QNetworkReply::finished,this,[this,reply]{
-            reply->deleteLater();
+        driver_setup::downloadArchive(network_,this,QUrl(driver_setup::downloadUrl()),[this](QByteArray payload,QString error){
             if(driver_download_)driver_download_->setEnabled(true);
-            const auto payload=reply->readAll();
             // The pinned hash is the only thing trusted here; a rewritten URL or
             // a captive portal fails before anything touches the disk.
-            if(reply->error()!=QNetworkReply::NoError||!driver_setup::verify(payload)){
-                diagnostic("driver download",reply->errorString());
+            if(!error.isEmpty()||!driver_setup::verify(payload)){
+                diagnostic("driver download",error.isEmpty()?QStringLiteral("Archive checksum mismatch"):error);
                 showNotice(text(UiText::DriverDownloadFailed),true,true);return;
             }
             const auto root=driver_setup::workRoot();
@@ -515,7 +513,6 @@ class MainWindow final : public QWidget {
                 showNotice(text(UiText::DriverDownloadFailed),true,true);return;
             }
             file.close();
-            QString error;
             if(!driver_setup::extract(archive,root,&error)){
                 diagnostic("driver extract",error);
                 showNotice(text(UiText::DriverDownloadFailed),true,true);return;
@@ -526,7 +523,7 @@ class MainWindow final : public QWidget {
                 diagnostic("driver place",error);
                 showNotice(text(UiText::DriverPlaceFailed),true,true);return;
             }
-            driver_input::retryMissingLibrary();resolveInstaller();refreshOutputStatus();
+            driver_input::retryInitialization();resolveInstaller();refreshOutputStatus();
             showNotice(text(UiText::DriverFilesReady));
         });
     }
@@ -534,7 +531,7 @@ class MainWindow final : public QWidget {
     // instead of offering a choice.
     void refreshOutputStatus(){
         if(!driver_status_)return;
-        const auto driver_state=driver_input::state();
+        const auto driver_state=engine_.dry_run()?driver_input::State::DllMissing:driver_input::state();
         driver_status_->setText(text(driver_state==driver_input::State::Ready?UiText::DriverStateReady
                                     :driver_state==driver_input::State::Refused?UiText::DriverStateBlocked
                                     :UiText::DriverStateMissing));

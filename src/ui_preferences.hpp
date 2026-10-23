@@ -10,7 +10,11 @@ inline QString filePath(const std::filesystem::path& configuration){return QStri
 inline bool readDocument(const QString& path,QJsonObject& root){
     QFile file(path);if(!file.exists()){root={};return true;}
     if(!file.open(QIODevice::ReadOnly)||file.size()>1024*1024)return false;
-    QJsonParseError error;const auto document=QJsonDocument::fromJson(file.readAll(),&error);
+    const auto bytes=file.readAll();if(file.error()!=QFile::NoError)return false;
+    // A successfully read empty file contains no preferences to preserve.
+    // Recover it like a missing file; nonempty malformed files still fail closed.
+    if(bytes.isEmpty()){root={};return true;}
+    QJsonParseError error;const auto document=QJsonDocument::fromJson(bytes,&error);
     if(error.error!=QJsonParseError::NoError||!document.isObject())return false;
     root=document.object();return !root.contains("version")||root["version"].toInt(-1)==1;
 }

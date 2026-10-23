@@ -45,12 +45,6 @@ rc /nologo /I "..\assets" /fo azec-icon.res "..\assets\app.rc"
 if errorlevel 1 exit /b 1
 cl /nologo /std:c++17 /O2 /EHsc /MT /DUNICODE /D_UNICODE ..\src\launcher.cpp azec-icon.res /Fe:"..\Azec.exe" /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib ole32.lib uuid.lib
 if errorlevel 1 exit /b 1
-if /I "%~1"=="test" (
-    cl /nologo /std:c++17 /O2 /EHsc /MT /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS ..\tests\core_test.cpp ..\tests\core_checks.cpp ..\src\core.cpp /Fe:core-tests.exe
-    if errorlevel 1 exit /b 1
-    .\core-tests.exe test-config.bin
-    if errorlevel 1 exit /b 1
-)
 popd
 if defined BUILD_CHECKS (
     if not exist .build\verification-build mkdir .build\verification-build
@@ -62,9 +56,30 @@ if defined BUILD_CHECKS (
     popd
     copy /y ".build\verification-build\release\Azec-checks.exe" "runtime\Azec-checks.exe" > nul
     if errorlevel 1 exit /b 1
-)
-if /I "%~1"=="test" (
-    python tests\run_checks.py %2
+    for %%T in (driver_fixture sensitivity_checks reliability_checks review_regressions update_checks) do (
+        if not exist ".build\checks-%%T" mkdir ".build\checks-%%T"
+        pushd ".build\checks-%%T"
+        "%NEON_QT_ROOT%\bin\qmake.exe" "%~dp0tests\%%T.pro" -o Makefile
+        if errorlevel 1 exit /b 1
+        nmake /nologo
+        if errorlevel 1 exit /b 1
+        popd
+    )
+    copy /y ".build\checks-driver_fixture\release\Azec-driver-fixture.dll" ".build\checks-reliability_checks\release\" > nul
     if errorlevel 1 exit /b 1
 )
+if /I "%~1"=="test" goto runtests
 echo Build complete: Azec.exe
+exit /b 0
+
+:runtests
+shift /1
+set "TEST_ARGS="
+:testargs
+if "%~1"=="" goto testsready
+set TEST_ARGS=%TEST_ARGS% "%~1"
+shift /1
+goto testargs
+:testsready
+python tests\run_checks.py --console %TEST_ARGS%
+exit /b %errorlevel%

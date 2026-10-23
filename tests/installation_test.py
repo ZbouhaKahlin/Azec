@@ -1,39 +1,23 @@
 """Exercise the real shareable EXE without touching the user's installation."""
 import argparse
-import ctypes
-from ctypes import wintypes
 import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
 import tempfile
 import time
 import urllib.request
+from hidden_process import HiddenProcess, stop
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = ("r6_config.bin", "azec_weapons.json", "azec_ui.json")
-kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-kernel.OpenProcess.restype = wintypes.HANDLE
-kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
-kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-
-
+OWNERS = {}
 def wait_pid(pid, force=False):
-    handle = kernel.OpenProcess(0x100000 | 1, False, pid)
-    if not handle:
-        return
-    try:
-        if kernel.WaitForSingleObject(handle, 15000 if not force else 0) == 258:
-            kernel.TerminateProcess(handle, 1)
-            kernel.WaitForSingleObject(handle, 5000)
-            if not force:
-                raise RuntimeError("Dry-run app did not exit on its timer")
-    finally:
-        kernel.CloseHandle(handle)
+    # Terminate only process trees owned by this fixture, never a recycled PID.
+    process = OWNERS.pop(pid,None)
+    if process:
+        stop(process)
 
 
 def api(info, values=None):
@@ -71,9 +55,9 @@ class Installation:
         data = data or self.data
         info_file = data / "phone-info.json"
         info_file.unlink(missing_ok=True)
-        process = subprocess.Popen([str(executable or self.exe), *args, "--dry-run",
+        process = HiddenProcess([str(executable or self.exe), *args, "--dry-run",
                                     "--phone-info=phone-info.json", "--exit-after-ms=5000"],
-                                   cwd=self.downloads, env=self.env, creationflags=subprocess.CREATE_NO_WINDOW)
+                                cwd=self.downloads, env=self.env)
         self.launchers.append(process)
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:
@@ -81,6 +65,7 @@ class Installation:
                 info = json.loads(info_file.read_text())
                 if info.get("dryRun"):
                     self.pids.append(info["pid"])
+                    OWNERS[info['pid']] = process
                     self.infos.append(info_file)
                     process.wait(timeout=10)
                     assert process.returncode == 0, "Launcher failed"
@@ -95,9 +80,7 @@ class Installation:
         for pid in self.pids:
             wait_pid(pid, force=True)
         for process in self.launchers:
-            if process.poll() is None:
-                process.terminate()
-                process.wait(timeout=5)
+            stop(process)
         for path in self.infos:
             path.unlink(missing_ok=True)
 
