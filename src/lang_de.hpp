@@ -197,4 +197,7 @@ inline const char* const lang_de[]={
     "Treiberdateien konnten nicht geladen werden. Nutze Treiber herunterladen und kopiere interception.dll von Hand.",
     "interception.dll liegt neben Azec.",
     "interception.dll konnte nicht neben Azec kopiert werden.",
+    "Treiber erkannt",
+    "Administrator nötig",
+    "Treiber nicht gefunden",
 };

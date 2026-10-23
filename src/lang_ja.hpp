@@ -197,4 +197,7 @@ inline const char* const lang_ja[]={
     "ドライバーファイルを取得できませんでした。「ドライバーを入手」から手動で interception.dll をコピーしてください。",
     "interception.dll は Azec の隣にあります。",
     "interception.dll を Azec の隣にコピーできませんでした。",
+    "ドライバー検出済み",
+    "管理者権限が必要",
+    "ドライバーが見つかりません",
 };

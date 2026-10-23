@@ -197,4 +197,7 @@ inline const char* const lang_ar[]={
     "تعذر الحصول على ملفات التعريف. استخدم «تنزيل التعريف» وانسخ interception.dll يدويًا.",
     "interception.dll موجود بجانب Azec.",
     "تعذر نسخ interception.dll بجانب Azec.",
+    "تم العثور على التعريف",
+    "يتطلب مسؤولًا",
+    "التعريف غير موجود",
 };

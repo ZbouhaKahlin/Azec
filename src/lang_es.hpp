@@ -197,4 +197,7 @@ inline const char* const lang_es[]={
     "No se pudieron obtener los archivos. Usa Obtener el controlador y copia interception.dll manualmente.",
     "interception.dll está junto a Azec.",
     "No se pudo copiar interception.dll junto a Azec.",
+    "Controlador detectado",
+    "Requiere administrador",
+    "Controlador no encontrado",
 };

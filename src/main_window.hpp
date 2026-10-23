@@ -381,33 +381,40 @@ class MainWindow final : public QWidget {
     }
     void buildOutputMethod(QVBoxLayout* column){
         auto* output=new Section(text(UiText::DriverOutput),false,true,kbtheme::blue);column->addWidget(output);
-        driver_status_=label(QString(),"rowTitle");driver_status_->setWordWrap(true);
-        driver_status_->setContentsMargins(14,8,12,2);output->body->addWidget(driver_status_);
 
-        auto* first=new QHBoxLayout;first->setContentsMargins(14,2,12,6);first->setSpacing(8);
+        auto* statusRow=new QHBoxLayout;statusRow->setContentsMargins(14,4,12,8);statusRow->setSpacing(8);
+        driver_status_=new QLabel(QString());driver_status_->setObjectName("driverState");
+        driver_status_->setAlignment(Qt::AlignLeft|Qt::AlignVCenter);
+        statusRow->addWidget(driver_status_,0,Qt::AlignLeft);statusRow->addStretch();
+        output->body->addLayout(statusRow);
+
+        auto* actions=new QHBoxLayout;actions->setContentsMargins(14,0,12,8);actions->setSpacing(8);
         driver_check_=new QPushButton(text(UiText::CheckDriver));driver_check_->setObjectName("secondary");
-        driver_check_->setAccessibleName(text(UiText::CheckDriver));first->addWidget(driver_check_);
+        driver_check_->setAccessibleName(text(UiText::CheckDriver));actions->addWidget(driver_check_);
         driver_download_=new QPushButton(text(UiText::DownloadAndPlace));driver_download_->setObjectName("secondary");
-        driver_download_->setAccessibleName(text(UiText::DownloadAndPlace));first->addWidget(driver_download_);
+        driver_download_->setAccessibleName(text(UiText::DownloadAndPlace));actions->addWidget(driver_download_);
         driver_page_=new QPushButton(text(UiText::DriverDownload));driver_page_->setObjectName("secondary");
-        driver_page_->setAccessibleName(text(UiText::DriverDownload));first->addWidget(driver_page_);
-        first->addStretch();output->body->addLayout(first);
-
-        auto* second=new QHBoxLayout;second->setContentsMargins(14,0,12,8);second->setSpacing(8);
+        driver_page_->setAccessibleName(text(UiText::DriverDownload));actions->addWidget(driver_page_);
         driver_copy_command_=new QPushButton(text(UiText::CopyCommand));driver_copy_command_->setObjectName("secondary");
-        driver_copy_command_->setAccessibleName(text(UiText::CopyCommand));second->addWidget(driver_copy_command_);
+        driver_copy_command_->setAccessibleName(text(UiText::CopyCommand));actions->addWidget(driver_copy_command_);
         driver_test_=new QPushButton(text(UiText::TestDriver));driver_test_->setObjectName("secondary");
-        driver_test_->setAccessibleName(text(UiText::TestDriver));second->addWidget(driver_test_);
+        driver_test_->setAccessibleName(text(UiText::TestDriver));actions->addWidget(driver_test_);
         restart_admin_=new QPushButton(text(UiText::RestartAsAdmin));restart_admin_->setObjectName("secondary");
-        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));second->addWidget(restart_admin_);
-        second->addStretch();output->body->addLayout(second);
+        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));actions->addWidget(restart_admin_);
+        actions->addStretch();output->body->addLayout(actions);
 
-        // The walkthrough stays one click away and opens by itself while the
-        // driver is not usable yet.
+        // The walkthrough is a real button that opens the steps in place.
+        auto* toggleRow=new QHBoxLayout;toggleRow->setContentsMargins(14,0,12,10);toggleRow->setSpacing(8);
+        driver_steps_=new QPushButton;driver_steps_->setObjectName("secondary");
+        driver_steps_->setCursor(Qt::PointingHandCursor);
+        toggleRow->addWidget(driver_steps_);toggleRow->addStretch();
+        output->body->addLayout(toggleRow);
+
         auto* guide=new QWidget;auto* steps=new QVBoxLayout(guide);
-        steps->setContentsMargins(14,0,12,10);steps->setSpacing(5);
+        steps->setContentsMargins(14,0,12,10);steps->setSpacing(4);
         const auto step=[&](UiText title,UiText body){
-            auto* heading=label(text(title),"rowTitle");heading->setWordWrap(true);steps->addWidget(heading);
+            auto* heading=label(text(title),"rowTitle");heading->setWordWrap(true);
+            heading->setContentsMargins(0,6,0,0);steps->addWidget(heading);
             auto* explanation=label(text(body),"rowHint");explanation->setWordWrap(true);steps->addWidget(explanation);
         };
         step(UiText::DriverStepCheck,UiText::DriverStepCheckBody);
@@ -417,16 +424,15 @@ class MainWindow final : public QWidget {
         steps->addWidget(driver_code_);
         step(UiText::DriverStepAdmin,UiText::DriverStepAdminBody);
         step(UiText::DriverStepTest,UiText::DriverStepTestBody);
-        auto* troubleHeading=label(text(UiText::DriverTroubleshooting),"rowTitle");steps->addWidget(troubleHeading);
+        auto* divider=new QFrame;divider->setObjectName("driverDivider");steps->addWidget(divider);
+        auto* troubleHeading=label(text(UiText::DriverTroubleshooting),"rowTitle");
+        troubleHeading->setContentsMargins(0,6,0,0);steps->addWidget(troubleHeading);
         auto* trouble=label(text(UiText::DriverTroubleshootingBody),"rowHint");trouble->setWordWrap(true);steps->addWidget(trouble);
-        driver_guide_=new ExpandingContent(guide,260);output->body->addWidget(driver_guide_);
-        driver_steps_=new QPushButton(text(UiText::DriverStepsShow));driver_steps_->setObjectName("sectionHeading");
-        driver_steps_->setAccessibleName(text(UiText::DriverStepsShow));output->body->addWidget(driver_steps_);
+        driver_guide_=new ExpandingContent(guide,240);output->body->addWidget(driver_guide_);
 
         connect(driver_steps_,&QPushButton::clicked,this,[this]{
-            const bool open=!driver_guide_->expanded();
-            driver_guide_->setExpanded(open);
-            driver_steps_->setText(text(open?UiText::DriverStepsHide:UiText::DriverStepsShow));
+            driver_guide_->setExpanded(!driver_guide_->expanded());
+            updateGuideButton();
         });
         connect(driver_check_,&QPushButton::clicked,this,[this]{checkDriver();});
         connect(driver_download_,&QPushButton::clicked,this,[this]{downloadDriver();});
@@ -442,9 +448,15 @@ class MainWindow final : public QWidget {
         connect(restart_admin_,&QPushButton::clicked,this,[this]{restartElevated();});
         resolveInstaller();
         refreshOutputStatus();
-        const bool usable=driver_input::state()==driver_input::State::Ready;
-        driver_guide_->setExpanded(!usable,false);
-        driver_steps_->setText(text(usable?UiText::DriverStepsShow:UiText::DriverStepsHide));
+        driver_guide_->setExpanded(driver_input::state()!=driver_input::State::Ready,false);
+        updateGuideButton();
+    }
+    void updateGuideButton(){
+        if(!driver_steps_||!driver_guide_)return;
+        const bool open=driver_guide_->expanded();
+        const QString label=text(open?UiText::DriverStepsHide:UiText::DriverStepsShow);
+        driver_steps_->setText(label+QStringLiteral("  ")+(open?QStringLiteral("▲"):QStringLiteral("▼")));
+        driver_steps_->setAccessibleName(label);
     }
     // The Interception device only answers an elevated caller, so a refused
     // context offers a one-click relaunch that keeps the current arguments.
@@ -491,8 +503,7 @@ class MainWindow final : public QWidget {
         resolveInstaller();
         refreshOutputStatus();
         if(current==driver_input::State::Ready){showNotice(text(UiText::DriverFound));return;}
-        if(driver_guide_)driver_guide_->setExpanded(true);
-        if(driver_steps_)driver_steps_->setText(text(UiText::DriverStepsHide));
+        if(driver_guide_){driver_guide_->setExpanded(true);updateGuideButton();}
         showNotice(text(current==driver_input::State::Refused?UiText::DriverBlocked:UiText::DriverMissing),true);
     }
     void downloadDriver(){
@@ -532,8 +543,7 @@ class MainWindow final : public QWidget {
                 showNotice(text(UiText::DriverPlaceFailed),true,true);return;
             }
             resolveInstaller();refreshOutputStatus();
-            if(driver_guide_)driver_guide_->setExpanded(true);
-            if(driver_steps_)driver_steps_->setText(text(UiText::DriverStepsHide));
+            if(driver_guide_){driver_guide_->setExpanded(true);updateGuideButton();}
             showNotice(text(UiText::DriverFilesReady));
         });
     }
@@ -542,10 +552,14 @@ class MainWindow final : public QWidget {
     void refreshOutputStatus(){
         if(!driver_status_)return;
         const auto driver_state=driver_input::state();
-        const UiText driverText=driver_state==driver_input::State::Ready?UiText::DriverFound
-                               :driver_state==driver_input::State::Refused?UiText::DriverBlocked
-                               :UiText::DriverMissing;
+        const UiText driverText=driver_state==driver_input::State::Ready?UiText::DriverStateReady
+                               :driver_state==driver_input::State::Refused?UiText::DriverStateBlocked
+                               :UiText::DriverStateMissing;
         driver_status_->setText(text(driverText));
+        driver_status_->setProperty("state",driver_state==driver_input::State::Ready?QStringLiteral("ready")
+                                         :driver_state==driver_input::State::Refused?QStringLiteral("blocked")
+                                         :QStringLiteral("missing"));
+        driver_status_->style()->unpolish(driver_status_);driver_status_->style()->polish(driver_status_);
         const bool usable=driver_state==driver_input::State::Ready;
         if(driver_test_)driver_test_->setEnabled(usable);
         if(restart_admin_)restart_admin_->setVisible(driver_state==driver_input::State::Refused);
@@ -862,7 +876,7 @@ protected:
         if(tour_pill_)tour_pill_->hide();if(tour_arrow_)tour_arrow_->hide();tour_refresh_.stop();
         if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
-    void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);if(native_ready_)roundWindow(this);}
+    void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);if(native_ready_)roundWindow(this);layoutNotice();}
     bool eventFilter(QObject* object,QEvent* event) override {
         if(event->type()==QEvent::FocusIn||event->type()==QEvent::FocusOut||event->type()==QEvent::MouseButtonPress){
             if(auto* button=qobject_cast<QPushButton*>(object);button&&(isAncestorOf(button)||button->window()->parentWidget()==this)){
@@ -915,11 +929,13 @@ public:
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
         gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});top->addSpacing(7);auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
-        notice_bar_=new QWidget;notice_bar_->setObjectName("noticeBar");auto* noticeLayout=new QHBoxLayout(notice_bar_);noticeLayout->setContentsMargins(14,6,8,6);noticeLayout->setSpacing(8);
+        notice_bar_=new QWidget(this);notice_bar_->setObjectName("noticeBar");auto* noticeLayout=new QHBoxLayout(notice_bar_);noticeLayout->setContentsMargins(14,6,8,6);noticeLayout->setSpacing(8);
         notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);
         notice_close_=new QPushButton(QString::fromUtf8("×"));notice_close_->setObjectName("noticeClose");notice_close_->setFixedSize(24,24);notice_close_->setToolTip(text(UiText::Close));notice_close_->setAccessibleName(text(UiText::Close));
         connect(notice_close_,&QPushButton::clicked,this,[this]{notice_timer_.stop();notice_bar_->hide();});
-        noticeLayout->addWidget(notice_,1);noticeLayout->addWidget(notice_close_,0,Qt::AlignTop);notice_bar_->hide();layout->addWidget(notice_bar_);
+        // The notice floats above the content: putting it in the column layout
+        // pushed the whole window down whenever a message appeared.
+        noticeLayout->addWidget(notice_,1);noticeLayout->addWidget(notice_close_,0,Qt::AlignTop);notice_bar_->hide();
         buildGoofyLayout(layout);
         const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);item->setToolTip(name);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+operatorAssetName(name)+".svg");if(!renderer.isValid())icon_failures_<<name;}
         operators_->setCurrentRow(c.selected);
@@ -949,8 +965,19 @@ public:
     void showNotice(const QString& message,bool error=false,bool persistent=false){
         if(!notice_bar_||!notice_)return;
         notice_bar_->setProperty("saveError",false);notice_bar_->setProperty("phoneError",false);
-        notice_bar_->setProperty("error",error);notice_->setText(message);styleNotice();notice_bar_->show();notice_timer_.stop();
+        notice_bar_->setProperty("error",error);notice_->setText(message);styleNotice();
+        notice_bar_->show();layoutNotice();notice_timer_.stop();
         if(!persistent){notice_timer_.setInterval(error?6000:3500);notice_timer_.start();}
+    }
+    // The notice is an overlay under the header, so showing it never reflows the
+    // window content.
+    void layoutNotice(){
+        if(!notice_bar_||!notice_->isVisible())return;
+        constexpr int margin=12,top=68;
+        const int width=qMax(240,this->width()-margin*2);
+        const int height=qMax(32,notice_->heightForWidth(width-60));
+        notice_bar_->setGeometry(margin,top,width,height+14);
+        notice_bar_->raise();
     }
     void setStartupNotice(const QString& message,bool blockSaving){
         save_blocked_=blockSaving;

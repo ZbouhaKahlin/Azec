@@ -197,4 +197,7 @@ inline const char* const lang_fr[]={
     "Impossible de récupérer les fichiers. Utilisez Obtenir le pilote et copiez interception.dll manuellement.",
     "interception.dll est à côté d'Azec.",
     "Impossible de copier interception.dll à côté d'Azec.",
+    "Pilote détecté",
+    "Administrateur requis",
+    "Pilote introuvable",
 };

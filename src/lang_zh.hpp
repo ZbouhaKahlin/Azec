@@ -197,4 +197,7 @@ inline const char* const lang_zh[]={
     "无法获取驱动文件。请使用“获取驱动”并手动复制 interception.dll。",
     "interception.dll 已在 Azec 旁边。",
     "无法把 interception.dll 复制到 Azec 旁边。",
+    "已检测到驱动",
+    "需要管理员权限",
+    "未找到驱动",
 };

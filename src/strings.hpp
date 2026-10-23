@@ -201,8 +201,11 @@ enum class UiText {
     DriverDownloadFailed,
     DriverPlaced,
     DriverPlaceFailed,
+    DriverStateReady,
+    DriverStateBlocked,
+    DriverStateMissing,
 };
-inline constexpr int UiTextCount=197;
+inline constexpr int UiTextCount=200;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

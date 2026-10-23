@@ -197,4 +197,7 @@ inline const char* const lang_en[]={
     "Could not get the driver files. Use Get the driver and copy interception.dll manually.",
     "interception.dll is in place next to Azec.",
     "Could not copy interception.dll next to Azec.",
+    "Driver detected",
+    "Needs administrator",
+    "Driver not found",
 };
