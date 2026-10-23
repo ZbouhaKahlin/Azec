@@ -7,6 +7,7 @@
 #include "app_style.hpp"
 #include "pairing_qr.hpp"
 #include "hotkeys.hpp"
+#include "logitech_script.hpp"
 #include "strings.hpp"
 #include "flags.hpp"
 #include "diagnostics.hpp"
@@ -96,6 +97,9 @@ class MainWindow final : public QWidget {
     ExpandingContent* weapon_selector_=nullptr;WeaponButton *primary_=nullptr,*secondary_=nullptr;
     PhoneServer* phone_=nullptr;
     QPointer<PairingQr> pairing_qr_;
+    QPointer<Toggle> logitech_output_;
+    QPointer<QPushButton> logitech_export_;
+    QPointer<QLabel> logitech_status_;
     QPointer<QLabel> phone_address_;
     QPointer<QLabel> phone_code_;
     QPointer<ExpandingContent> phone_details_;
@@ -362,6 +366,44 @@ class MainWindow final : public QWidget {
 
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
     }
+    void buildLogitechOutput(QVBoxLayout* column){
+        auto* output=new Section(text(UiText::OutputMethod),false,true,kbtheme::blue);column->addWidget(output);
+        logitech_output_=toggle(settingRow(output,text(UiText::LogitechOutput),text(UiText::LogitechOutputHint)),"Logitech G HUB output",engine_.snapshot().output_method==1,[this](bool on){
+            // One pull, one owner: the workers stop injecting while G HUB moves the mouse.
+            engine_.edit([&](r6::Config& config){config.output_method=on?1:0;});
+            engine_.output_method=on?1:0;dirty();refreshLogitechStatus();
+        });
+        auto* hint=label(text(UiText::LogitechScriptHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,4,12,4);output->body->addWidget(hint);
+        logitech_status_=label(QString(),"rowHint");logitech_status_->setWordWrap(true);logitech_status_->setContentsMargins(14,0,12,4);output->body->addWidget(logitech_status_);
+        auto* actions=new QHBoxLayout;actions->setContentsMargins(14,2,12,10);actions->setSpacing(8);
+        logitech_export_=new QPushButton(text(UiText::ExportLogitechScript));logitech_export_->setObjectName("secondary");
+        logitech_export_->setAccessibleName(text(UiText::ExportLogitechScript));
+        actions->addWidget(logitech_export_);actions->addStretch();output->body->addLayout(actions);
+        connect(logitech_export_,&QPushButton::clicked,this,[this]{exportLogitechScript();});
+        refreshLogitechStatus();
+    }
+    void refreshLogitechStatus(){
+        if(!logitech_status_)return;
+        const auto config=engine_.snapshot();
+        const auto path=logitech::scriptPath();
+        QString state=text(logitech::installed()?UiText::LogitechHubFound:UiText::LogitechHubMissing);
+        // Profiles edited after the last export would otherwise silently disagree.
+        if(QFileInfo::exists(path)&&logitech::read(path)!=logitech::script(config,engine_.ads_only.load()))
+            state+=QStringLiteral(" · ")+text(UiText::LogitechScriptStale);
+        logitech_status_->setText(state);logitech_status_->setToolTip(path);
+        if(logitech_export_)logitech_export_->setEnabled(!save_blocked_);
+    }
+    void exportLogitechScript(){
+        const auto bytes=logitech::script(engine_.snapshot(),engine_.ads_only.load());
+        QString path,error;
+        if(!logitech::write(bytes,logitech::scriptPath(),&path,&error)){
+            diagnostic("write logitech script",error);
+            showNotice(text(UiText::LogitechScriptFailed),true,true);return;
+        }
+        if(logitech_status_)logitech_status_->setToolTip(path);
+        showNotice(text(UiText::LogitechScriptExported));
+        refreshLogitechStatus();
+    }
     void buildPreferences(){
         if(!preferences_)return;
         refreshing_=true;const auto c=engine_.snapshot();
@@ -389,6 +431,7 @@ class MainWindow final : public QWidget {
         for(const auto& entry:languageEntries())language_->addItem(languageFlag(entry.value),QString::fromUtf8(entry.label),entry.value);
         language_->setCurrentIndex(qMax(0,language_->findData(c.language)));langRow->addWidget(language_);
         connect(language_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){const int value=language_->itemData(index).toInt();engine_.edit([=](r6::Config& c){c.language=value;});dirty();if(value==6)QTimer::singleShot(0,this,[this]{showPalestineSurprise();});QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});});
+        buildLogitechOutput(generalLayout);
         auto* updates=new Section(text(UiText::Updates),false,true,kbtheme::blue);generalLayout->addWidget(updates);
         auto* versionRow=settingRow(updates,text(UiText::InstalledVersion),QString("Azec ")+QCoreApplication::applicationVersion());
         update_button_=new QPushButton(text(UiText::CheckForUpdates));update_button_->setObjectName("secondary");update_button_->setAccessibleName(text(UiText::CheckForUpdates));update_button_->setEnabled(!update_in_progress_);
@@ -583,6 +626,7 @@ class MainWindow final : public QWidget {
             mouse_setup_dirty_=false;
             const bool themeSaved=kbtheme::writeColorTheme(config_path_,kbtheme::activeColorTheme);
             updateSavePresentation("saved");save_feedback_.start();
+            refreshLogitechStatus();
             if(notice_bar_&&notice_bar_->property("saveError").toBool()){notice_bar_->setProperty("saveError",false);notice_timer_.stop();notice_bar_->hide();}
             if(!themeSaved)showNotice(text(UiText::ThemeSaveFailed),true,true);
         }else{

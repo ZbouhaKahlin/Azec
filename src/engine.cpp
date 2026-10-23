@@ -32,6 +32,7 @@ bool Engine::load(const std::filesystem::path& file){
     readWeaponProfiles(config_,focusOnly,adsOnly,file);
     game_focus_only=focusOnly;
     ads_only=adsOnly;
+    output_method=config_.output_method?1:0;
     return true;
 }
 bool Engine::save(const std::filesystem::path& file) const {
@@ -77,7 +78,8 @@ void Engine::stop(){
 }
 void Engine::sleep(int ms){std::unique_lock lock(stop_mutex_);stop_condition_.wait_for(lock,std::chrono::milliseconds(ms),[this]{return !running.load();});}
 void Engine::input(unsigned long flags,int x,int y){
-    if(dry_run_)return;
+    // G HUB owns the movement in device mode, so no injected event is emitted.
+    if(dry_run_||output_method.load())return;
     INPUT event{};event.type=INPUT_MOUSE;event.mi.dwFlags=flags;event.mi.dx=x;event.mi.dy=y;
     SendInput(1,&event,sizeof(event));++injected_events;
 }

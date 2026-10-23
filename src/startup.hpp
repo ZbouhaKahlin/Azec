@@ -65,6 +65,8 @@ inline ConfigurationRecovery loadConfiguration(r6::Engine& engine,const std::fil
     bool focusOnly=true,adsOnly=false;
     engine.edit([&](r6::Config& config){config.language=1;readWeaponProfiles(config,focusOnly,adsOnly,path);});
     engine.game_focus_only=focusOnly;engine.ads_only=adsOnly;
+    // The sidecar also carries the output method, so a recovery start honours it.
+    engine.output_method=engine.snapshot().output_method?1:0;
     const QString filename=QString::fromStdWString(path.wstring());QFile file(filename);
     if(!file.exists())return {};
     if(!file.open(QIODevice::ReadOnly)){
