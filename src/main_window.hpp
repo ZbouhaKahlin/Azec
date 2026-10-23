@@ -100,16 +100,11 @@ class MainWindow final : public QWidget {
     PhoneServer* phone_=nullptr;
     QPointer<PairingQr> pairing_qr_;
     QPointer<QPushButton> driver_test_;
-    QPointer<QPushButton> driver_steps_;
     QPointer<QPushButton> driver_check_;
     QPointer<QPushButton> driver_download_;
     QPointer<QPushButton> driver_page_;
-    QPointer<QPushButton> driver_copy_command_;
     QPointer<QPushButton> restart_admin_;
-    QPointer<QWidget> driver_guide_body_;
     QPointer<CodeBlock> driver_code_;
-    QVariantAnimation driver_guide_animation_;
-    bool driver_guide_open_=false,driver_steps_sized_=false;
     QString driver_installer_;
     QPointer<QLabel> driver_status_;
     QPointer<QLabel> phone_address_;
@@ -382,118 +377,68 @@ class MainWindow final : public QWidget {
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
     }
     void buildOutputMethod(QVBoxLayout* column){
-        auto* output=new Section(text(UiText::DriverOutput),false,true,kbtheme::blue);output->body->setSpacing(0);column->addWidget(output);
-        // The card only reports and verifies; the walkthrough opens in place.
-        auto* row=new QHBoxLayout;row->setContentsMargins(14,9,12,11);row->setSpacing(8);
+        auto* output=new Section(text(UiText::DriverOutput),false,true,kbtheme::blue);
+        output->body->setSpacing(14);column->addWidget(output);
         driver_status_=new QLabel(QString());driver_status_->setObjectName("driverState");
-        driver_status_->setAlignment(Qt::AlignLeft|Qt::AlignVCenter);
-        row->addWidget(driver_status_,0,Qt::AlignVCenter);row->addStretch();
-        driver_test_=new QPushButton(text(UiText::TestDriver));driver_test_->setObjectName("secondary");
-        driver_test_->setAccessibleName(text(UiText::TestDriver));row->addWidget(driver_test_,0,Qt::AlignVCenter);
-        driver_steps_=new QPushButton(text(UiText::DriverStepsShow));driver_steps_->setObjectName("secondary");
-        driver_steps_->setAccessibleName(text(UiText::DriverStepsShow));row->addWidget(driver_steps_,0,Qt::AlignVCenter);
-        output->body->addLayout(row);
-        connect(driver_test_,&QPushButton::clicked,this,[this]{testDriver();});
-        connect(driver_steps_,&QPushButton::clicked,this,[this]{setDriverGuideOpen(!driver_guide_open_,true);});
+        driver_status_->setAlignment(Qt::AlignLeading|Qt::AlignVCenter);
+        output->headerRow->addWidget(driver_status_,0,Qt::AlignVCenter);
 
-        // Inline walkthrough. Only maximumHeight is animated, so the content is
-        // laid out normally the whole time: no snapshot, no flash, no jump.
-        // Preferred, not Maximum: a Maximum vertical policy caps the body at its
-        // sizeHint, which under-reports wrapped labels that carry line breaks and
-        // clipped the troubleshooting text. The column's trailing stretch keeps
-        // the expanded body at its natural height.
-        auto* body=new QWidget;body->setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Preferred);
-        auto* steps=new QVBoxLayout(body);steps->setContentsMargins(14,0,12,10);steps->setSpacing(4);
-
-        auto* actions=new QHBoxLayout;actions->setSpacing(8);
-        driver_check_=new QPushButton(text(UiText::CheckDriver));driver_check_->setObjectName("secondary");
-        driver_check_->setAccessibleName(text(UiText::CheckDriver));actions->addWidget(driver_check_);
-        driver_download_=new QPushButton(text(UiText::DownloadAndPlace));driver_download_->setObjectName("secondary");
-        driver_download_->setAccessibleName(text(UiText::DownloadAndPlace));actions->addWidget(driver_download_);
-        driver_page_=new QPushButton(text(UiText::DriverDownload));driver_page_->setObjectName("secondary");
-        driver_page_->setAccessibleName(text(UiText::DriverDownload));actions->addWidget(driver_page_);
-        driver_copy_command_=new QPushButton(text(UiText::CopyCommand));driver_copy_command_->setObjectName("secondary");
-        driver_copy_command_->setAccessibleName(text(UiText::CopyCommand));actions->addWidget(driver_copy_command_);
-        restart_admin_=new QPushButton(text(UiText::RestartAsAdmin));restart_admin_->setObjectName("secondary");
-        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));actions->addWidget(restart_admin_);
-        actions->addStretch();steps->addLayout(actions);
-
-        const auto step=[&](UiText title,UiText description){
-            auto* heading=label(text(title),"rowTitle");heading->setWordWrap(true);
-            heading->setContentsMargins(0,8,0,0);steps->addWidget(heading);
-            auto* explanation=label(text(description),"rowHint");explanation->setWordWrap(true);steps->addWidget(explanation);
+        // One visible walkthrough: every action belongs to the step it explains.
+        auto* guide=new QFrame;guide->setObjectName("driverGuide");
+        auto* steps=new QVBoxLayout(guide);steps->setContentsMargins(16,16,16,16);steps->setSpacing(22);
+        const auto step=[&](int number,UiText title,UiText description){
+            auto* row=new QHBoxLayout;row->setContentsMargins(0,0,0,0);row->setSpacing(12);
+            auto* chip=new QLabel(QString::number(number));chip->setObjectName("driverStepNumber");
+            chip->setAlignment(Qt::AlignCenter);chip->setFixedSize(30,30);row->addWidget(chip,0,Qt::AlignTop);
+            auto* content=new QVBoxLayout;content->setContentsMargins(0,0,0,0);content->setSpacing(9);
+            auto* heading=label(text(title),"driverStepTitle");heading->setWordWrap(true);content->addWidget(heading);
+            auto* explanation=label(text(description),"rowHint");explanation->setWordWrap(true);content->addWidget(explanation);
+            row->addLayout(content,1);steps->addLayout(row);return content;
         };
-        step(UiText::DriverStepCheck,UiText::DriverStepCheckBody);
-        step(UiText::DriverStepFiles,UiText::DriverStepFilesBody);
-        step(UiText::DriverStepInstall,UiText::DriverStepInstallBody);
+        const auto button=[&](UiText title,const char* objectName="secondary"){
+            auto* result=new QPushButton(text(title));result->setObjectName(objectName);
+            result->setAccessibleName(text(title));return result;
+        };
+
+        auto* files=step(1,UiText::DriverStepFiles,UiText::DriverStepFilesBody);
+        auto* downloads=new QHBoxLayout;downloads->setSpacing(10);
+        driver_download_=button(UiText::DownloadAndPlace,"driverDownload");
+        driver_page_=button(UiText::DriverDownload,"driverManualDownload");
+        downloads->addWidget(driver_download_);downloads->addWidget(driver_page_);downloads->addStretch();
+        files->addLayout(downloads);
+
+        auto* install=step(2,UiText::DriverStepInstall,UiText::DriverStepInstallBody);
         driver_code_=new CodeBlock(text(UiText::CopyCommand),text(UiText::Copied));
-        steps->addWidget(driver_code_);
-        step(UiText::DriverStepAdmin,UiText::DriverStepAdminBody);
-        step(UiText::DriverStepTest,UiText::DriverStepTestBody);
-        auto* divider=new QFrame;divider->setObjectName("driverDivider");steps->addWidget(divider);
-        auto* troubleHeading=label(text(UiText::DriverTroubleshooting),"rowTitle");
-        troubleHeading->setContentsMargins(0,8,0,0);steps->addWidget(troubleHeading);
-        auto* trouble=label(text(UiText::DriverTroubleshootingBody),"rowHint");trouble->setWordWrap(true);steps->addWidget(trouble);
-        body->hide();body->setMaximumHeight(0);output->body->addWidget(body);
-        driver_guide_body_=body;
+        install->addWidget(driver_code_);
 
-        driver_guide_animation_.setDuration(200);
-        driver_guide_animation_.setEasingCurve(QEasingCurve::OutCubic);
-        connect(&driver_guide_animation_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){
-            if(driver_guide_body_)driver_guide_body_->setMaximumHeight(value.toInt());
-        });
-        connect(&driver_guide_animation_,&QVariantAnimation::finished,this,[this]{
-            if(!driver_guide_body_)return;
-            if(driver_guide_body_->maximumHeight()==0)driver_guide_body_->hide();
-            else driver_guide_body_->setMaximumHeight(QWIDGETSIZE_MAX);
-        });
+        auto* admin=step(3,UiText::DriverStepAdmin,UiText::DriverStepAdminBody);
+        restart_admin_=button(UiText::RestartAsAdmin);admin->addWidget(restart_admin_,0,Qt::AlignLeading);
 
+        auto* verify=step(4,UiText::DriverStepTest,UiText::DriverStepTestBody);
+        auto* checks=new QHBoxLayout;checks->setSpacing(10);
+        driver_check_=button(UiText::CheckDriver);checks->addWidget(driver_check_);
+        driver_test_=button(UiText::TestDriver);checks->addWidget(driver_test_);checks->addStretch();verify->addLayout(checks);
+
+        auto* help=new QWidget;auto* helpLayout=new QVBoxLayout(help);helpLayout->setContentsMargins(0,0,0,0);helpLayout->setSpacing(12);
+        auto* divider=new QFrame;divider->setObjectName("driverDivider");helpLayout->addWidget(divider);
+        auto* troubleButton=button(UiText::DriverTroubleshooting,"driverTroubleshooting");
+        troubleButton->setText(QString::fromUtf8("▸ ")+text(UiText::DriverTroubleshooting));
+        troubleButton->setCheckable(true);helpLayout->addWidget(troubleButton,0,Qt::AlignLeading);
+        auto* trouble=label(text(UiText::DriverTroubleshootingBody),"rowHint");trouble->setWordWrap(true);trouble->hide();
+        helpLayout->addWidget(trouble);connect(troubleButton,&QPushButton::toggled,trouble,&QWidget::setVisible);
+        connect(troubleButton,&QPushButton::toggled,this,[this,troubleButton](bool open){
+            troubleButton->setText(QString::fromUtf8(open?"▾ ":"▸ ")+text(UiText::DriverTroubleshooting));
+        });
+        steps->addWidget(help);output->body->addWidget(guide);
+
+        connect(driver_test_,&QPushButton::clicked,this,[this]{testDriver();});
         connect(driver_check_,&QPushButton::clicked,this,[this]{checkDriver();});
         connect(driver_download_,&QPushButton::clicked,this,[this]{downloadDriver();});
         connect(driver_page_,&QPushButton::clicked,this,[]{
             QDesktopServices::openUrl(QUrl(driver_setup::releasePage()));
         });
-        connect(driver_copy_command_,&QPushButton::clicked,this,[this]{copyInstallCommand();});
         connect(restart_admin_,&QPushButton::clicked,this,[this]{restartElevated();});
-
-        resolveInstaller();
-        refreshOutputStatus();
-        // A missing driver opens the walkthrough by itself, without animating.
-        if(driver_input::state()!=driver_input::State::Ready)QTimer::singleShot(0,this,[this]{setDriverGuideOpen(true,false);});
-    }
-    // The walkthrough opens and closes in place. Height is animated on the body
-    // itself, so wrapped labels stay laid out and nothing flashes.
-    void setDriverGuideOpen(bool open,bool animate=true){
-        if(!driver_guide_body_)return;
-        driver_guide_open_=open;
-        updateDriverGuideButton();
-        driver_guide_animation_.stop();
-        if(!animate){
-            driver_guide_body_->setMaximumHeight(open?QWIDGETSIZE_MAX:0);
-            driver_guide_body_->setVisible(open);
-            return;
-        }
-        if(open)driver_guide_body_->show();
-        const int available=driver_guide_body_->width()>0?driver_guide_body_->width():qMax(240,this->width()-80);
-        int target=driver_guide_body_->hasHeightForWidth()?driver_guide_body_->heightForWidth(available):0;
-        if(target<=0)target=driver_guide_body_->sizeHint().height();
-        driver_guide_animation_.setStartValue(open?0:driver_guide_body_->height());
-        driver_guide_animation_.setEndValue(open?target:0);
-        driver_guide_animation_.start();
-    }
-    void updateDriverGuideButton(){
-        if(!driver_steps_)return;
-        const auto metrics=driver_steps_->fontMetrics();
-        if(!driver_steps_sized_){
-            driver_steps_sized_=true;
-            int width=0;
-            for(const auto id:{UiText::DriverStepsShow,UiText::DriverStepsHide})
-                width=qMax(width,metrics.horizontalAdvance(text(id)+QStringLiteral("   ▲")));
-            driver_steps_->setMinimumWidth(width+30);
-        }
-        const QString label=text(driver_guide_open_?UiText::DriverStepsHide:UiText::DriverStepsShow);
-        driver_steps_->setText(label+QStringLiteral("   ")+(driver_guide_open_?QStringLiteral("▲"):QStringLiteral("▼")));
-        driver_steps_->setAccessibleName(label);
+        resolveInstaller();refreshOutputStatus();
     }
     void testDriver(){
         // A visible 40 px sweep proves the driver path without the game.
@@ -522,10 +467,6 @@ class MainWindow final : public QWidget {
         const auto found=driver_setup::locate();
         driver_installer_=driver_setup::installerFolder(found);
         if(driver_code_)driver_code_->setText(driver_setup::installCommand(driver_installer_));
-    }
-    void copyInstallCommand(){
-        QApplication::clipboard()->setText(driver_code_?driver_code_->text():driver_setup::installCommand(driver_installer_));
-        showNotice(text(UiText::Copied));
     }
     void checkDriver(){
         auto current=driver_input::state();
@@ -599,13 +540,7 @@ class MainWindow final : public QWidget {
                                          :driver_state==driver_input::State::Refused?QStringLiteral("blocked")
                                          :QStringLiteral("missing"));
         driver_status_->style()->unpolish(driver_status_);driver_status_->style()->polish(driver_status_);
-        const bool ready=driver_state==driver_input::State::Ready,refused=driver_state==driver_input::State::Refused;
-        if(driver_test_)driver_test_->setEnabled(ready);
-        if(driver_check_)driver_check_->setVisible(!ready);
-        if(driver_download_)driver_download_->setVisible(!ready&&!refused);
-        if(driver_page_)driver_page_->setVisible(!ready&&!refused);
-        if(driver_copy_command_)driver_copy_command_->setVisible(!ready&&!refused);
-        if(restart_admin_)restart_admin_->setVisible(refused);
+        if(driver_test_)driver_test_->setEnabled(driver_state==driver_input::State::Ready);
     }
     void buildPreferences(){
         if(!preferences_)return;

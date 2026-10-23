@@ -26,9 +26,30 @@ protected:
     }
 };
 
+// A selectable command view that can wrap inside a path segment. QLabel's
+// ordinary word wrap either reserves the longest token or clips that token.
+class WrappingCommandText final : public QTextEdit {
+public:
+    explicit WrappingCommandText(QWidget* parent=nullptr):QTextEdit(parent){
+        setObjectName("codeText");setReadOnly(true);setAcceptRichText(false);
+        setFrameShape(QFrame::NoFrame);document()->setDocumentMargin(0);
+        setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        setLineWrapMode(QTextEdit::WidgetWidth);setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        auto policy=QSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);policy.setHeightForWidth(true);setSizePolicy(policy);
+    }
+    bool hasHeightForWidth() const override{return true;}
+    int heightForWidth(int width) const override{
+        QTextDocument measurement;measurement.setDefaultFont(font());measurement.setDocumentMargin(0);
+        measurement.setDefaultTextOption(document()->defaultTextOption());measurement.setPlainText(toPlainText());
+        measurement.setTextWidth(qMax(1,width));return qCeil(measurement.size().height());
+    }
+    QSize minimumSizeHint() const override{return {0,fontMetrics().height()};}
+    QSize sizeHint() const override{return {240,heightForWidth(240)};}
+};
+
 // Monospace command box with its own copy action, used by setup guides.
 class CodeBlock final : public QWidget {
-    QLabel* code_;
+    WrappingCommandText* code_;
     QPushButton* copy_;
     QString copyLabel_,copiedLabel_;
     bool sized_=false;
@@ -37,8 +58,7 @@ public:
         setObjectName("codeBlock");
         copyLabel_=copy;copiedLabel_=copied;
         auto* layout=new QHBoxLayout(this);layout->setContentsMargins(12,9,10,9);layout->setSpacing(10);
-        code_=new QLabel;code_->setObjectName("codeText");code_->setWordWrap(true);
-        code_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        code_=new WrappingCommandText;
         QFont font(QStringLiteral("Consolas"));font.setStyleHint(QFont::Monospace);font.setPixelSize(12);
         code_->setFont(font);
         layout->addWidget(code_,1);
@@ -46,13 +66,13 @@ public:
         copy_->setAccessibleName(copyLabel_);
         layout->addWidget(copy_,0,Qt::AlignTop);
         connect(copy_,&QPushButton::clicked,this,[this]{
-            QApplication::clipboard()->setText(code_->text());
+            QApplication::clipboard()->setText(code_->toPlainText());
             copy_->setText(copiedLabel_);
             QTimer::singleShot(1400,copy_,[this]{if(copy_)copy_->setText(copyLabel_);});
         });
     }
-    void setText(const QString& text){code_->setText(text);}
-    QString text() const{return code_->text();}
+    void setText(const QString& text){code_->setPlainText(text);code_->updateGeometry();updateGeometry();}
+    QString text() const{return code_->toPlainText();}
 protected:
     // Reserve the wider of the two labels once the themed font is applied, so
     // swapping to "Copied" cannot shrink the button and flash the layout.
@@ -871,10 +891,10 @@ inline QColor sectionStickerColor(const QString& title){
 }
 class Section final : public QFrame {
 public:
-    QVBoxLayout* body;QWidget* content;QPushButton* heading=nullptr;
+    QVBoxLayout* body;QWidget* content;QPushButton* heading=nullptr;QHBoxLayout* headerRow;
     explicit Section(const QString& title,bool collapsible,bool expanded,const QColor& stickerColor=QColor(),QWidget* parent=nullptr):QFrame(parent) {
         setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(12,11,12,12);layout->setSpacing(0);
-        auto* header=new QWidget;auto* row=new QHBoxLayout(header);row->setContentsMargins(2,0,2,0);header->setMinimumHeight(24);
+        auto* header=new QWidget;auto* row=headerRow=new QHBoxLayout(header);row->setContentsMargins(2,0,2,0);header->setMinimumHeight(24);
         if(collapsible){heading=new QPushButton(title);heading->setObjectName("sectionHeading");heading->setCursor(Qt::PointingHandCursor);row->addWidget(heading,1);
             auto* arrow=new QLabel(expanded?QString::fromUtf8("⌄"):QString::fromUtf8("›"));arrow->setObjectName("sectionArrow");row->addWidget(arrow);
             layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);content->setVisible(expanded);layout->addWidget(content);if(!expanded)layout->setContentsMargins(12,4,12,4);

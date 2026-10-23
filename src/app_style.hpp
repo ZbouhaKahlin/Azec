@@ -22,13 +22,23 @@ inline QString applicationStyle(const QColor& accent){
         QLabel#pairingCode { background:$yellow; color:$chipInk; border:2px solid $outline; border-radius:8px; padding:4px 9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
         QLabel#rowTitle { color:$ink; font-size:14px; font-weight:600; }
         QLabel#rowHint { color:$muted; font-size:12px; }
-        QLabel#codeText { color:$ink; font-size:12px; }
+        QTextEdit#codeText { background:transparent; color:$ink; border:0; padding:0; font-family:'Consolas'; font-size:12px; }
         QWidget#codeBlock { background:$soft; border:2px solid $outline; border-radius:10px; }
+        QFrame#driverGuide { background:$surface; border:2px solid $outline; border-radius:18px; }
+        QLabel#driverStepNumber { background:$yellow; color:$chipInk; border:2px solid $outline; border-radius:9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
+        QLabel#driverStepTitle { color:$ink; font-family:'Fredoka'; font-size:18px; font-weight:500; }
+        QPushButton#driverDownload { background:%1; color:%2; border:2px solid $outline; border-radius:12px; padding:7px 12px; font-size:13px; font-weight:600; }
+        QPushButton#driverDownload:pressed { background:$soft; color:$ink; }
+        QPushButton#driverDownload:disabled { background:$soft; color:$muted; }
+        QPushButton#driverManualDownload,QPushButton#driverTroubleshooting { background:transparent; color:$muted; border:2px solid transparent; border-radius:8px; padding:7px 4px; font-size:12px; text-align:$sectionAlign; }
+        QPushButton#driverManualDownload { text-decoration:underline; }
+        QPushButton#driverTroubleshooting:checked { color:$ink; }
+        QPushButton#driverDownload[keyboardFocus="true"],QPushButton#driverManualDownload[keyboardFocus="true"],QPushButton#driverTroubleshooting[keyboardFocus="true"] { border-color:%1; }
         QLabel#driverState { border:2px solid $outline; border-radius:10px; padding:6px 12px; background:$surface; color:$ink; font-size:12px; font-weight:700; }
         QLabel#driverState[state="ready"] { background:$lime; color:$chipInk; }
         QLabel#driverState[state="blocked"] { background:$yellow; color:$chipInk; }
         QLabel#driverState[state="missing"] { background:$soft; color:$ink; }
-        QFrame#driverDivider { background:$soft; border:0; min-height:2px; max-height:2px; }
+        QFrame#driverDivider { background:$outline; border:0; min-height:2px; max-height:2px; }
         QLabel#panelTitle { font-family:'Fredoka'; color:$ink; font-size:17px; font-weight:600; }
         QLabel#cardTitle { font-family:'Fredoka'; color:$ink; font-size:18px; font-weight:600; }
         QLabel#sectionArrow { color:$muted; font-size:18px; }

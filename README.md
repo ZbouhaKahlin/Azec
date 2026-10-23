@@ -24,7 +24,7 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 
 - **Recoil and Rapid fire:** the header shows both pills. Recoil has an on/off switch; Rapid fire belongs to the active weapon profile, so primary and secondary can be set independently. The rapid-fire card holds the shot delay for each profile. The old “Master enable” gate is gone.
 - **Only in Rainbow Six:** this is on by default. Azec ignores application shortcuts and mouse output when another application is active; Alt-tab to the game and it resumes. Turn it off in **Settings → General** only if you deliberately want the old system-wide behavior. No software change can make a game macro immune to the game’s rules or anti-cheat; this reduces accidents, not account risk.
-- **Recoil output:** movement is sent only through the **Interception** driver — there is no SendInput or G HUB fallback. Setup is one time per PC (see [Driver output setup](#driver-output-setup)); the **Interception driver** card in **Settings → General** reports whether the driver is ready and offers **Test driver**, **Get the driver**, or **Restart as administrator**. Output still only happens while **Only in Rainbow Six** matches, and **Only while aiming** and the panic key apply as before.
+- **Recoil output:** movement is sent only through the **Interception** driver — there is no SendInput or G HUB fallback. Setup is one time per PC (see [Driver output setup](#driver-output-setup)); the **Interception driver** card in **Settings → General** reports whether the driver is ready and shows four setup steps, with each action beside its instructions. Output still only happens while **Only in Rainbow Six** matches, and **Only while aiming** and the panic key apply as before.
 - **Goofy color themes:** **Charcoal & blush** is the default for fresh configurations. Choose it or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Goofy (original) in **Settings → Appearance**. Choose the same ten themes on the phone in **Settings → Color theme**. Changes from either screen sync to both and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
 - **Collapsible sidebar:** the **Collapse** button at the top of the Goofy sidebar switches between operator names and a compact icon rail. A star shortcut appears above the operator icons when you have favorites. Search stays at the bottom; click its compact icon to expand smoothly and start searching. The sidebar remembers your choice.
 - **Settings categories:** General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup keep related options together.
@@ -43,7 +43,7 @@ Interception is a one-time install per PC. It is not bundled with Azec (it is an
 3. **Restart as administrator** — the driver only answers elevated callers; the button keeps your arguments and relaunches.
 4. **Test driver** — the cursor should jump ~40 px right and back. That confirms the path before you open the game.
 
-**Show the steps** in the same card holds the full walkthrough and what to do when something fails. Output stays limited to Rainbow Six while **Only in Rainbow Six** is enabled, which is the default.
+The full walkthrough stays visible in the same card. **Manual download** offers the official release page as an alternative, **Copy command** appears once beside the command, and **If something fails** expands troubleshooting below the steps. Output stays limited to Rainbow Six while **Only in Rainbow Six** is enabled, which is the default.
 
 ## Default shortcuts
 
@@ -59,6 +59,12 @@ Interception is a one-time install per PC. It is not bundled with Azec (it is an
 | Esc | Leave Settings, or clear the search field |
 
 Weapon and action bindings are configurable in Settings. Show/hide, recoil-toggle, and weapon bindings accept any key you choose, including arrows, the numeric keypad, mouse side buttons, modifiers, and Windows keys; if a key is already assigned, the binding is rejected with an “already used” message. The panic shortcut keeps a stricter safe-key filter. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits and plays a soft two-note “no” cue; it does not use the Windows error beep.
+
+## Source versions
+
+- **main** — Interception driver version; the default branch and current release.
+- **sendinput** — the previous Windows SendInput version, preserved from the old main branch.
+- **logitech** — the Logitech G HUB version.
 
 ## Build from source
 

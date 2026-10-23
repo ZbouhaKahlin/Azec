@@ -5,6 +5,44 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
         // Pause global hotkey polling; fixture actions call production handlers directly.
         poll_.stop();
+        if(QCoreApplication::arguments().contains("--tutorial-layout-only")){
+            // Geometry only, on Qt's offscreen platform. Never touch the live
+            // instance, clipboard, driver, focus, or personal configuration.
+            engine_.edit([](r6::Config& config){config.language=1;});
+            buildPreferences();updateLanguage();showPreferences();chooseSettingsCategory(0);
+            const QString command=QStringLiteral("cd \"C:\\Users\\Example\\Downloads\\Interception\\Interception\\command line installer\"\ninstall-interception.exe /install");
+            driver_code_->setText(command);wait(220);
+            QJsonArray samples;bool fits=true,commandPreserved=true,allCommandTextVisible=true;
+            for(const int windowWidth:{760,864}){
+                resize(windowWidth,664);wait(80);
+                preferences_scroll_->verticalScrollBar()->setValue(0);wait(30);
+                const int viewportWidth=preferences_scroll_->viewport()->width();
+                auto* guide=preferences_->findChild<QFrame*>("driverGuide");
+                bool childrenFit=true;QJsonArray overflowing;
+                for(auto* child:guide->findChildren<QWidget*>()){
+                    if(child->isHidden())continue;
+                    const int left=child->mapTo(preferences_scroll_->viewport(),QPoint()).x();
+                    if(left<0||left+child->width()>viewportWidth){
+                        childrenFit=false;
+                        overflowing.append(QJsonObject{{"name",child->objectName()},{"left",left},{"width",child->width()}});
+                    }
+                }
+                const bool contentFits=preferences_scroll_->widget()->width()<=viewportWidth;
+                auto* commandView=driver_code_->findChild<QTextEdit*>("codeText");
+                const bool textFits=commandView->document()->size().height()<=commandView->viewport()->height()+1
+                    &&commandView->document()->idealWidth()<=commandView->viewport()->width()+1;
+                allCommandTextVisible&=textFits;
+                fits&=contentFits&&childrenFit;commandPreserved&=driver_code_->text()==command;
+                samples.append(QJsonObject{{"windowWidth",width()},{"viewportWidth",viewportWidth},
+                    {"contentWidth",preferences_scroll_->widget()->width()},{"guideMinimumWidth",guide->minimumSizeHint().width()},
+                    {"codeMinimumWidth",driver_code_->minimumSizeHint().width()},{"fits",contentFits&&childrenFit},
+                    {"allCommandTextVisible",textFits},{"overflowing",overflowing}});
+                preferences_scroll_->ensureWidgetVisible(driver_code_);wait(30);
+                capture(output+QString("/tutorial-%1.png").arg(windowWidth));
+            }
+            return {{"passed",fits&&commandPreserved&&allCommandTextVisible},{"checks",QJsonObject{{"tutorial_fits_at_minimum_and_default_width",fits},
+                {"wrapped_command_remains_unchanged",commandPreserved},{"entire_command_fits_without_internal_clipping",allCommandTextVisible}}},{"samples",samples}};
+        }
         QJsonArray themeSamples;
         const auto checkSidebarMotion=[&]()->QJsonObject{
             QJsonObject motionChecks;
