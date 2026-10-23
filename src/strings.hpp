@@ -170,16 +170,6 @@ enum class UiText {
     ProfilesRescaled,
     SaveWithoutRescaling,
     MouseSetupTabHint,
-    OutputMethod,
-    LogitechOutput,
-    LogitechOutputHint,
-    LogitechScriptHint,
-    LogitechHubFound,
-    LogitechHubMissing,
-    ExportLogitechScript,
-    LogitechScriptExported,
-    LogitechScriptFailed,
-    LogitechScriptStale,
     DriverOutput,
     DriverOutputHint,
     DriverFound,
@@ -191,7 +181,7 @@ enum class UiText {
     RestartAsAdmin,
     DriverDownload,
 };
-inline constexpr int UiTextCount=186;
+inline constexpr int UiTextCount=176;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

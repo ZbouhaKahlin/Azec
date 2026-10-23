@@ -7,7 +7,6 @@
 #include "app_style.hpp"
 #include "pairing_qr.hpp"
 #include "hotkeys.hpp"
-#include "logitech_script.hpp"
 #include "driver_input.hpp"
 #include "strings.hpp"
 #include "flags.hpp"
@@ -99,13 +98,10 @@ class MainWindow final : public QWidget {
     ExpandingContent* weapon_selector_=nullptr;WeaponButton *primary_=nullptr,*secondary_=nullptr;
     PhoneServer* phone_=nullptr;
     QPointer<PairingQr> pairing_qr_;
-    QPointer<Toggle> logitech_output_;
-    QPointer<Toggle> driver_output_;
-    QPointer<QPushButton> logitech_export_;
     QPointer<QPushButton> driver_test_;
     QPointer<QPushButton> restart_admin_;
     QPointer<QPushButton> driver_download_;
-    QPointer<QLabel> logitech_status_;
+    QPointer<QLabel> driver_status_;
     QPointer<QLabel> phone_address_;
     QPointer<QLabel> phone_code_;
     QPointer<ExpandingContent> phone_details_;
@@ -373,21 +369,9 @@ class MainWindow final : public QWidget {
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
     }
     void buildOutputMethod(QVBoxLayout* column){
-        auto* output=new Section(text(UiText::OutputMethod),false,true,kbtheme::blue);column->addWidget(output);
-        const int method=engine_.snapshot().output_method;
-        logitech_output_=toggle(settingRow(output,text(UiText::LogitechOutput),text(UiText::LogitechOutputHint)),"Logitech G HUB output",method==1,[this](bool on){
-            // One pull, one owner: exactly one backend emits movement.
-            engine_.edit([&](r6::Config& config){config.output_method=on?1:0;});
-            if(driver_output_)driver_output_->syncChecked(false);
-            engine_.output_method=on?1:0;dirty();refreshOutputStatus();
-        });
-        driver_output_=toggle(settingRow(output,text(UiText::DriverOutput),text(UiText::DriverOutputHint)),"Interception driver",method==2,[this](bool on){
-            engine_.edit([&](r6::Config& config){config.output_method=on?2:0;});
-            if(logitech_output_)logitech_output_->syncChecked(false);
-            engine_.output_method=on?2:0;dirty();refreshOutputStatus();
-        });
-        auto* hint=label(text(UiText::LogitechScriptHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,4,12,4);output->body->addWidget(hint);
-        logitech_status_=label(QString(),"rowHint");logitech_status_->setWordWrap(true);logitech_status_->setContentsMargins(14,0,12,4);output->body->addWidget(logitech_status_);
+        auto* output=new Section(text(UiText::DriverOutput),false,true,kbtheme::blue);column->addWidget(output);
+        auto* hint=label(text(UiText::DriverOutputHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,4,12,4);output->body->addWidget(hint);
+        driver_status_=label(QString(),"rowHint");driver_status_->setWordWrap(true);driver_status_->setContentsMargins(14,0,12,4);output->body->addWidget(driver_status_);
         auto* actions=new QHBoxLayout;actions->setContentsMargins(14,2,12,10);actions->setSpacing(8);
         driver_test_=new QPushButton(text(UiText::TestDriver));driver_test_->setObjectName("secondary");
         driver_test_->setAccessibleName(text(UiText::TestDriver));
@@ -396,9 +380,7 @@ class MainWindow final : public QWidget {
         restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));actions->addWidget(restart_admin_);
         driver_download_=new QPushButton(text(UiText::DriverDownload));driver_download_->setObjectName("secondary");
         driver_download_->setAccessibleName(text(UiText::DriverDownload));actions->addWidget(driver_download_);
-        logitech_export_=new QPushButton(text(UiText::ExportLogitechScript));logitech_export_->setObjectName("secondary");
-        logitech_export_->setAccessibleName(text(UiText::ExportLogitechScript));
-        actions->addWidget(logitech_export_);actions->addStretch();output->body->addLayout(actions);
+        actions->addStretch();output->body->addLayout(actions);
         connect(driver_test_,&QPushButton::clicked,this,[this]{
             // A visible 40 px sweep proves the driver path without the game.
             if(driver_input::test())showNotice(text(UiText::DriverTestSent));
@@ -408,7 +390,6 @@ class MainWindow final : public QWidget {
         connect(driver_download_,&QPushButton::clicked,this,[]{
             QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/oblitum/Interception/releases")));
         });
-        connect(logitech_export_,&QPushButton::clicked,this,[this]{exportLogitechScript();});
         refreshOutputStatus();
     }
     // The Interception device only answers an elevated caller, so a refused
@@ -424,46 +405,21 @@ class MainWindow final : public QWidget {
         const auto executable=QCoreApplication::applicationFilePath().toStdWString();
         const auto result=ShellExecuteW(nullptr,L"runas",executable.c_str(),
             parameters.empty()?nullptr:parameters.c_str(),nullptr,SW_SHOWNORMAL);
-        if(reinterpret_cast<INT_PTR>(result)<=32){showNotice(text(UiText::LogitechScriptFailed),true,true);return;}
+        if(reinterpret_cast<INT_PTR>(result)<=32){showNotice(text(UiText::DriverTestFailed),true,true);return;}
         force_close_=true;close();
     }
+    // The driver is the only output backend, so the card reports its state
+    // instead of offering a choice.
     void refreshOutputStatus(){
-        if(!logitech_status_)return;
-        const auto config=engine_.snapshot();
+        if(!driver_status_)return;
         const auto driver_state=driver_input::state();
         const UiText driverText=driver_state==driver_input::State::Ready?UiText::DriverFound
                                :driver_state==driver_input::State::Refused?UiText::DriverBlocked
                                :UiText::DriverMissing;
-        QString state=text(logitech::installed()?UiText::LogitechHubFound:UiText::LogitechHubMissing);
-        state+=QStringLiteral(" · ")+text(driverText);
-        if(config.output_method==1){
-            const auto path=logitech::scriptPath();
-            // Profiles edited after the last export would otherwise silently disagree.
-            if(QFileInfo::exists(path)&&logitech::read(path)!=logitech::script(config,engine_.ads_only.load()))
-                state+=QStringLiteral(" · ")+text(UiText::LogitechScriptStale);
-            logitech_status_->setToolTip(path);
-        }else logitech_status_->setToolTip(QString());
-        logitech_status_->setText(state);
-        // Only the relevant action is offered: export belongs to G HUB, the admin
-        // relaunch to a refused driver, the download to a missing one.
-        if(logitech_export_){
-            logitech_export_->setVisible(config.output_method==1);
-            logitech_export_->setEnabled(!save_blocked_&&config.output_method==1);
-        }
+        driver_status_->setText(text(driverText));
         if(driver_test_)driver_test_->setEnabled(driver_state==driver_input::State::Ready);
         if(restart_admin_)restart_admin_->setVisible(driver_state==driver_input::State::Refused);
         if(driver_download_)driver_download_->setVisible(driver_state==driver_input::State::Missing);
-    }
-    void exportLogitechScript(){
-        const auto bytes=logitech::script(engine_.snapshot(),engine_.ads_only.load());
-        QString path,error;
-        if(!logitech::write(bytes,logitech::scriptPath(),&path,&error)){
-            diagnostic("write logitech script",error);
-            showNotice(text(UiText::LogitechScriptFailed),true,true);return;
-        }
-        if(logitech_status_)logitech_status_->setToolTip(path);
-        showNotice(text(UiText::LogitechScriptExported));
-        refreshOutputStatus();
     }
     void buildPreferences(){
         if(!preferences_)return;

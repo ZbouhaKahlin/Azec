@@ -74,9 +74,6 @@ struct Config {
     int weapon_slot = 0, primary_key = '1', secondary_key = '2';
     bool phone_enabled = true;
     SensitivitySetup sensitivity;
-    // 0 routes movement through SendInput, 1 exports it to Logitech G HUB.
-    // Persisted in azec_weapons.json; the binary layout is untouched.
-    int output_method = 0;
     Config();
     int active_slot() const { return weapon_slot == 1 && secondary_enabled[selected] ? 1 : 0; }
     Operator& active_operator() { return active_slot() ? secondary[selected] : operators[selected]; }

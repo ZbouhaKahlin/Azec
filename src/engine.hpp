@@ -25,9 +25,6 @@ class Engine {
 public:
     std::atomic_bool running{false}, recoil_active{false};
     std::atomic_bool game_focus_only{true}, ads_only{false}, input_allowed{false};
-    // 0 SendInput, 1 Logitech G HUB. The workers stop injecting when G HUB owns
-    // the movement so one recoil pull is never applied twice.
-    std::atomic_int output_method{0};
     std::atomic_bool menu_visible{true};
     std::atomic_uint injected_events{0};
     explicit Engine(bool dry_run);

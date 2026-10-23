@@ -33,7 +33,6 @@ bool Engine::load(const std::filesystem::path& file){
     readWeaponProfiles(config_,focusOnly,adsOnly,file);
     game_focus_only=focusOnly;
     ads_only=adsOnly;
-    output_method=config_.output_method;
     return true;
 }
 bool Engine::save(const std::filesystem::path& file) const {
@@ -80,21 +79,13 @@ void Engine::stop(){
 void Engine::sleep(int ms){std::unique_lock lock(stop_mutex_);stop_condition_.wait_for(lock,std::chrono::milliseconds(ms),[this]{return !running.load();});}
 void Engine::input(unsigned long flags,int x,int y){
     if(dry_run_)return;
-    const int method=output_method.load();
-    // G HUB runs the recoil loop itself, so Azec stays silent in that mode.
-    if(method==1)return;
-    if(method==2){
-        // The Interception driver takes relative moves and left-button strokes at
-        // the device level, below the injected-input flag.
-        const bool sent=flags==MOUSEEVENTF_MOVE?driver_input::move(x,y)
-                       :flags==MOUSEEVENTF_LEFTDOWN?driver_input::button(true)
-                       :flags==MOUSEEVENTF_LEFTUP?driver_input::button(false)
-                       :false;
-        if(sent)++injected_events;
-        return;
-    }
-    INPUT event{};event.type=INPUT_MOUSE;event.mi.dwFlags=flags;event.mi.dx=x;event.mi.dy=y;
-    SendInput(1,&event,sizeof(event));++injected_events;
+    // The Interception driver is the only output: it takes relative moves and
+    // left-button strokes at the device level, below Windows' injected flag.
+    const bool sent=flags==MOUSEEVENTF_MOVE?driver_input::move(x,y)
+                   :flags==MOUSEEVENTF_LEFTDOWN?driver_input::button(true)
+                   :flags==MOUSEEVENTF_LEFTUP?driver_input::button(false)
+                   :false;
+    if(sent)++injected_events;
 }
 std::pair<Operator,int> Engine::current_profile() const {std::lock_guard lock(config_mutex_);return {config_.active_operator(),config_.selected*2+config_.active_slot()};}
 void Engine::recoil_worker(){
