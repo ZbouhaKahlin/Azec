@@ -13,6 +13,47 @@ inline constexpr int operatorIconSize=44;
 inline constexpr qreal raisedPanelRadius=24;
 inline constexpr qreal raisedPanelBorder=3;
 
+// Double-clicking a slider returns it to the profile default for its control.
+class ResetSlider final : public QSlider {
+    int reset_=0;
+public:
+    explicit ResetSlider(Qt::Orientation orientation=Qt::Horizontal,QWidget* parent=nullptr):QSlider(orientation,parent){}
+    void setResetValue(int value){reset_=value;}
+protected:
+    void mouseDoubleClickEvent(QMouseEvent* event) override{
+        if(event->button()==Qt::LeftButton){setValue(reset_);event->accept();return;}
+        QSlider::mouseDoubleClickEvent(event);
+    }
+};
+
+// Monospace command box with its own copy action, used by setup guides.
+class CodeBlock final : public QWidget {
+    QLabel* code_;
+    QPushButton* copy_;
+    QString copyLabel_,copiedLabel_;
+public:
+    explicit CodeBlock(const QString& copy,const QString& copied,QWidget* parent=nullptr):QWidget(parent){
+        setObjectName("codeBlock");
+        copyLabel_=copy;copiedLabel_=copied;
+        auto* layout=new QHBoxLayout(this);layout->setContentsMargins(12,9,10,9);layout->setSpacing(10);
+        code_=new QLabel;code_->setObjectName("codeText");code_->setWordWrap(true);
+        code_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        QFont font(QStringLiteral("Consolas"));font.setStyleHint(QFont::Monospace);font.setPixelSize(12);
+        code_->setFont(font);
+        layout->addWidget(code_,1);
+        copy_=new QPushButton(copyLabel_);copy_->setObjectName("secondary");
+        copy_->setAccessibleName(copyLabel_);
+        layout->addWidget(copy_,0,Qt::AlignTop);
+        connect(copy_,&QPushButton::clicked,this,[this]{
+            QApplication::clipboard()->setText(code_->text());
+            copy_->setText(copiedLabel_);
+            QTimer::singleShot(1400,copy_,[this]{if(copy_)copy_->setText(copyLabel_);});
+        });
+    }
+    void setText(const QString& text){code_->setText(text);}
+    QString text() const{return code_->text();}
+};
+
 class InkPopup final : public QFrame {
 public:
     explicit InkPopup(QWidget* parent):QFrame(parent,Qt::Popup|Qt::FramelessWindowHint|Qt::NoDropShadowWindowHint){setAttribute(Qt::WA_TranslucentBackground);}

@@ -8,6 +8,7 @@
 #include "pairing_qr.hpp"
 #include "hotkeys.hpp"
 #include "driver_input.hpp"
+#include "driver_setup.hpp"
 #include "strings.hpp"
 #include "flags.hpp"
 #include "diagnostics.hpp"
@@ -101,6 +102,13 @@ class MainWindow final : public QWidget {
     QPointer<QPushButton> driver_test_;
     QPointer<QPushButton> restart_admin_;
     QPointer<QPushButton> driver_download_;
+    QPointer<QPushButton> driver_page_;
+    QPointer<QPushButton> driver_check_;
+    QPointer<QPushButton> driver_copy_command_;
+    QPointer<QPushButton> driver_steps_;
+    QPointer<ExpandingContent> driver_guide_;
+    QPointer<CodeBlock> driver_code_;
+    QString driver_installer_;
     QPointer<QLabel> driver_status_;
     QPointer<QLabel> phone_address_;
     QPointer<QLabel> phone_code_;
@@ -236,9 +244,11 @@ class MainWindow final : public QWidget {
         auto* surface=row->parentWidget();surface->setProperty("enabledSetting",checked);connect(result,&QAbstractButton::toggled,surface,[surface](bool on){surface->setProperty("enabledSetting",on);surface->style()->unpolish(surface);surface->style()->polish(surface);});
         connect(result,&QAbstractButton::toggled,this,[this,callback](bool on){if(!refreshing_)callback(on);});return result;
     }
-    QSlider* makeSlider(){return new QSlider(Qt::Horizontal);}
+    ResetSlider* makeSlider(){return new ResetSlider(Qt::Horizontal);}
     void amount(Section* section,const QString& title,bool vertical){
         auto* slider=makeSlider();slider->setRange(vertical?0:-500,vertical?1000:500);slider->setSingleStep(1);slider->setPageStep(5);slider->setAccessibleName(title);
+        // A double-click returns the value to the Operator defaults (10.0 / 0.0).
+        slider->setResetValue(vertical?100:0);
         auto* value=new QDoubleSpinBox;value->setDecimals(1);value->setSingleStep(.1);value->setRange(vertical?0:-50,vertical?100:50);value->setButtonSymbols(QAbstractSpinBox::NoButtons);value->setAccessibleName(title+text(UiText::Value));
         auto* row=settingRow(section,title,{},44);row->itemAt(0)->widget()->setFixedWidth(144);value->setFixedWidth(65);value->setAlignment(Qt::AlignCenter);
         // One step is 0.1; the arrows flank the slider and holding repeats.
@@ -358,6 +368,7 @@ class MainWindow final : public QWidget {
         delay_=new QSpinBox;delay_->setRange(30,150);delay_->setSuffix(text(UiText::Ms));delay_->setButtonSymbols(QAbstractSpinBox::NoButtons);delay_->setReadOnly(true);delay_->setFocusPolicy(Qt::NoFocus);delay_->setAlignment(Qt::AlignCenter);delay_->setFixedWidth(85);delay_->setAccessibleName(text(UiText::ShotDelay));delayRow->addWidget(delay_);
         delay_controls_=new QWidget;auto* delayControls=new QHBoxLayout(delay_controls_);delayControls->setContentsMargins(14,0,12,10);delayControls->setSpacing(10);
         delay_slider_=makeSlider();delay_slider_->setObjectName("shotDelaySlider");delay_slider_->setRange(30,150);delay_slider_->setSingleStep(1);delay_slider_->setPageStep(5);delay_slider_->setAccessibleName(text(UiText::ShotDelay));
+        static_cast<ResetSlider*>(delay_slider_)->setResetValue(50);
         const auto nudgeDelay=[this](int direction){delay_slider_->setValue(std::clamp(delay_slider_->value()+direction*5,30,150));};
         delay_minus_=new StepButton(QString::fromUtf8("−"),-1,nudgeDelay);delay_plus_=new StepButton("+",1,nudgeDelay);
         delay_minus_->setAccessibleName(text(UiText::ShotDelay)+QStringLiteral(" -5")+text(UiText::Ms));delay_plus_->setAccessibleName(text(UiText::ShotDelay)+QStringLiteral(" +5")+text(UiText::Ms));
@@ -370,27 +381,70 @@ class MainWindow final : public QWidget {
     }
     void buildOutputMethod(QVBoxLayout* column){
         auto* output=new Section(text(UiText::DriverOutput),false,true,kbtheme::blue);column->addWidget(output);
-        auto* hint=label(text(UiText::DriverOutputHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,4,12,4);output->body->addWidget(hint);
-        driver_status_=label(QString(),"rowHint");driver_status_->setWordWrap(true);driver_status_->setContentsMargins(14,0,12,4);output->body->addWidget(driver_status_);
-        auto* actions=new QHBoxLayout;actions->setContentsMargins(14,2,12,10);actions->setSpacing(8);
+        driver_status_=label(QString(),"rowTitle");driver_status_->setWordWrap(true);
+        driver_status_->setContentsMargins(14,8,12,2);output->body->addWidget(driver_status_);
+
+        auto* first=new QHBoxLayout;first->setContentsMargins(14,2,12,6);first->setSpacing(8);
+        driver_check_=new QPushButton(text(UiText::CheckDriver));driver_check_->setObjectName("secondary");
+        driver_check_->setAccessibleName(text(UiText::CheckDriver));first->addWidget(driver_check_);
+        driver_download_=new QPushButton(text(UiText::DownloadAndPlace));driver_download_->setObjectName("secondary");
+        driver_download_->setAccessibleName(text(UiText::DownloadAndPlace));first->addWidget(driver_download_);
+        driver_page_=new QPushButton(text(UiText::DriverDownload));driver_page_->setObjectName("secondary");
+        driver_page_->setAccessibleName(text(UiText::DriverDownload));first->addWidget(driver_page_);
+        first->addStretch();output->body->addLayout(first);
+
+        auto* second=new QHBoxLayout;second->setContentsMargins(14,0,12,8);second->setSpacing(8);
+        driver_copy_command_=new QPushButton(text(UiText::CopyCommand));driver_copy_command_->setObjectName("secondary");
+        driver_copy_command_->setAccessibleName(text(UiText::CopyCommand));second->addWidget(driver_copy_command_);
         driver_test_=new QPushButton(text(UiText::TestDriver));driver_test_->setObjectName("secondary");
-        driver_test_->setAccessibleName(text(UiText::TestDriver));
-        actions->addWidget(driver_test_);
+        driver_test_->setAccessibleName(text(UiText::TestDriver));second->addWidget(driver_test_);
         restart_admin_=new QPushButton(text(UiText::RestartAsAdmin));restart_admin_->setObjectName("secondary");
-        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));actions->addWidget(restart_admin_);
-        driver_download_=new QPushButton(text(UiText::DriverDownload));driver_download_->setObjectName("secondary");
-        driver_download_->setAccessibleName(text(UiText::DriverDownload));actions->addWidget(driver_download_);
-        actions->addStretch();output->body->addLayout(actions);
+        restart_admin_->setAccessibleName(text(UiText::RestartAsAdmin));second->addWidget(restart_admin_);
+        second->addStretch();output->body->addLayout(second);
+
+        // The walkthrough stays one click away and opens by itself while the
+        // driver is not usable yet.
+        auto* guide=new QWidget;auto* steps=new QVBoxLayout(guide);
+        steps->setContentsMargins(14,0,12,10);steps->setSpacing(5);
+        const auto step=[&](UiText title,UiText body){
+            auto* heading=label(text(title),"rowTitle");heading->setWordWrap(true);steps->addWidget(heading);
+            auto* explanation=label(text(body),"rowHint");explanation->setWordWrap(true);steps->addWidget(explanation);
+        };
+        step(UiText::DriverStepCheck,UiText::DriverStepCheckBody);
+        step(UiText::DriverStepFiles,UiText::DriverStepFilesBody);
+        step(UiText::DriverStepInstall,UiText::DriverStepInstallBody);
+        driver_code_=new CodeBlock(text(UiText::CopyCommand),text(UiText::Copied));
+        steps->addWidget(driver_code_);
+        step(UiText::DriverStepAdmin,UiText::DriverStepAdminBody);
+        step(UiText::DriverStepTest,UiText::DriverStepTestBody);
+        auto* troubleHeading=label(text(UiText::DriverTroubleshooting),"rowTitle");steps->addWidget(troubleHeading);
+        auto* trouble=label(text(UiText::DriverTroubleshootingBody),"rowHint");trouble->setWordWrap(true);steps->addWidget(trouble);
+        driver_guide_=new ExpandingContent(guide,260);output->body->addWidget(driver_guide_);
+        driver_steps_=new QPushButton(text(UiText::DriverStepsShow));driver_steps_->setObjectName("sectionHeading");
+        driver_steps_->setAccessibleName(text(UiText::DriverStepsShow));output->body->addWidget(driver_steps_);
+
+        connect(driver_steps_,&QPushButton::clicked,this,[this]{
+            const bool open=!driver_guide_->expanded();
+            driver_guide_->setExpanded(open);
+            driver_steps_->setText(text(open?UiText::DriverStepsHide:UiText::DriverStepsShow));
+        });
+        connect(driver_check_,&QPushButton::clicked,this,[this]{checkDriver();});
+        connect(driver_download_,&QPushButton::clicked,this,[this]{downloadDriver();});
+        connect(driver_page_,&QPushButton::clicked,this,[]{
+            QDesktopServices::openUrl(QUrl(driver_setup::releasePage()));
+        });
+        connect(driver_copy_command_,&QPushButton::clicked,this,[this]{copyInstallCommand();});
         connect(driver_test_,&QPushButton::clicked,this,[this]{
             // A visible 40 px sweep proves the driver path without the game.
             if(driver_input::test())showNotice(text(UiText::DriverTestSent));
             else{diagnostic("driver test","interception_send rejected the test move");showNotice(text(UiText::DriverTestFailed),true,true);}
         });
         connect(restart_admin_,&QPushButton::clicked,this,[this]{restartElevated();});
-        connect(driver_download_,&QPushButton::clicked,this,[]{
-            QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/oblitum/Interception/releases")));
-        });
+        resolveInstaller();
         refreshOutputStatus();
+        const bool usable=driver_input::state()==driver_input::State::Ready;
+        driver_guide_->setExpanded(!usable,false);
+        driver_steps_->setText(text(usable?UiText::DriverStepsShow:UiText::DriverStepsHide));
     }
     // The Interception device only answers an elevated caller, so a refused
     // context offers a one-click relaunch that keeps the current arguments.
@@ -408,6 +462,81 @@ class MainWindow final : public QWidget {
         if(reinterpret_cast<INT_PTR>(result)<=32){showNotice(text(UiText::DriverTestFailed),true,true);return;}
         force_close_=true;close();
     }
+    // Finds an extracted Interception folder anywhere obvious and keeps the
+    // display command pointing at its installer.
+    void resolveInstaller(){
+        const auto found=driver_setup::locate();
+        driver_installer_=driver_setup::installerFolder(found);
+        if(driver_code_)driver_code_->setText(driver_setup::installCommand(driver_installer_));
+    }
+    void copyInstallCommand(){
+        QApplication::clipboard()->setText(driver_code_?driver_code_->text():driver_setup::installCommand(driver_installer_));
+        showNotice(text(UiText::Copied));
+    }
+    void checkDriver(){
+        auto current=driver_input::state();
+        if(current==driver_input::State::DllMissing){
+            const auto found=driver_setup::locate();
+            if(!found.isEmpty()){
+                QString error;
+                if(driver_setup::place(found,&error)){
+                    showNotice(text(UiText::DriverPlaced));
+                    current=driver_input::state();
+                }else{
+                    diagnostic("driver place",error);
+                    showNotice(text(UiText::DriverPlaceFailed),true,true);
+                }
+            }
+        }
+        resolveInstaller();
+        refreshOutputStatus();
+        if(current==driver_input::State::Ready){showNotice(text(UiText::DriverFound));return;}
+        if(driver_guide_)driver_guide_->setExpanded(true);
+        if(driver_steps_)driver_steps_->setText(text(UiText::DriverStepsHide));
+        showNotice(text(current==driver_input::State::Refused?UiText::DriverBlocked:UiText::DriverMissing),true);
+    }
+    void downloadDriver(){
+        if(!network_)network_=new QNetworkAccessManager(this);
+        if(driver_download_)driver_download_->setEnabled(false);
+        QNetworkRequest request{QUrl(driver_setup::downloadUrl())};
+        request.setHeader(QNetworkRequest::UserAgentHeader,QStringLiteral("Azec/")+AZEC_VERSION);
+        auto* reply=network_->get(request);
+        connect(reply,&QNetworkReply::finished,this,[this,reply]{
+            reply->deleteLater();
+            if(driver_download_)driver_download_->setEnabled(true);
+            const auto payload=reply->readAll();
+            // The pinned hash is the only thing trusted here; a rewritten URL or
+            // a captive portal fails before anything touches the disk.
+            if(reply->error()!=QNetworkReply::NoError||!driver_setup::verify(payload)){
+                diagnostic("driver download",reply->errorString());
+                showNotice(text(UiText::DriverDownloadFailed),true,true);return;
+            }
+            const auto root=driver_setup::workRoot();
+            const auto archive=root+QStringLiteral("/Interception.zip");
+            QDir().mkpath(root);
+            QFile file(archive);
+            if(!file.open(QIODevice::WriteOnly)||file.write(payload)!=payload.size()){
+                diagnostic("driver download","could not write "+archive);
+                showNotice(text(UiText::DriverDownloadFailed),true,true);return;
+            }
+            file.close();
+            QString error;
+            if(!driver_setup::extract(archive,root,&error)){
+                diagnostic("driver extract",error);
+                showNotice(text(UiText::DriverDownloadFailed),true,true);return;
+            }
+            const auto found=driver_setup::findDll(root);
+            if(found.isEmpty()){diagnostic("driver extract","library/x64/interception.dll not found");showNotice(text(UiText::DriverDownloadFailed),true,true);return;}
+            if(!driver_setup::place(found,&error)){
+                diagnostic("driver place",error);
+                showNotice(text(UiText::DriverPlaceFailed),true,true);return;
+            }
+            resolveInstaller();refreshOutputStatus();
+            if(driver_guide_)driver_guide_->setExpanded(true);
+            if(driver_steps_)driver_steps_->setText(text(UiText::DriverStepsHide));
+            showNotice(text(UiText::DriverFilesReady));
+        });
+    }
     // The driver is the only output backend, so the card reports its state
     // instead of offering a choice.
     void refreshOutputStatus(){
@@ -417,9 +546,11 @@ class MainWindow final : public QWidget {
                                :driver_state==driver_input::State::Refused?UiText::DriverBlocked
                                :UiText::DriverMissing;
         driver_status_->setText(text(driverText));
-        if(driver_test_)driver_test_->setEnabled(driver_state==driver_input::State::Ready);
+        const bool usable=driver_state==driver_input::State::Ready;
+        if(driver_test_)driver_test_->setEnabled(usable);
         if(restart_admin_)restart_admin_->setVisible(driver_state==driver_input::State::Refused);
-        if(driver_download_)driver_download_->setVisible(driver_state==driver_input::State::Missing);
+        for(auto* button:{driver_check_.data(),driver_download_.data(),driver_page_.data(),driver_copy_command_.data()})
+            if(button)button->setVisible(!usable);
     }
     void buildPreferences(){
         if(!preferences_)return;
@@ -741,7 +872,11 @@ protected:
         }
         if(event->type()==QEvent::Wheel){
             auto* widget=qobject_cast<QWidget*>(object);
-            if(widget&&!widget->hasFocus()&&(qobject_cast<QAbstractSlider*>(widget)||qobject_cast<QAbstractSpinBox*>(widget)||qobject_cast<QComboBox*>(widget))){
+            // A dropdown never takes the wheel, even when it still holds focus
+            // after being clicked: scrolling the page must not change a setting.
+            const bool dropdown=qobject_cast<QComboBox*>(widget)!=nullptr;
+            const bool valueControl=dropdown||qobject_cast<QAbstractSlider*>(widget)||qobject_cast<QAbstractSpinBox*>(widget);
+            if(widget&&valueControl&&(dropdown||!widget->hasFocus())){
                 for(auto* parent=widget->parentWidget();parent;parent=parent->parentWidget()){
                     if(auto* area=qobject_cast<QScrollArea*>(parent)){
                         auto* wheel=static_cast<QWheelEvent*>(event);

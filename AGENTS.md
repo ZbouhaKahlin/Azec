@@ -14,6 +14,7 @@ Azec is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded loca
 - `src/core.hpp` / `src/core.cpp`: primary binary configuration layout, weapon profiles, and movement arithmetic.
 - `src/engine.hpp` / `src/engine.cpp`: synchronized configuration, active weapon selection, and input worker threads.
 - `src/driver_input.hpp`: the output backend — Interception loaded from `interception.dll` at runtime (nothing shipped or linked); relative mouse moves and left-button strokes at device level.
+- `src/driver_setup.hpp`: one-click setup — pinned release download with SHA-256 verification, extraction, DLL placement and installer command.
 - `src/profile_store.hpp`: secondary weapon profiles and additional preferences in JSON.
 - `src/phone_server.hpp`: paired HTTP server and request validation.
 - `src/lan_address.hpp`: Windows adapter discovery and LAN pairing-address selection.

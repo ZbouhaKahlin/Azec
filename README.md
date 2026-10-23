@@ -36,15 +36,14 @@ Phone edits update the same profiles as the desktop. Tap **Save changes** to kee
 
 ## Driver output setup
 
-Interception is a one-time install per PC. It is not bundled with Azec (it is an LGPL kernel driver, and it needs administrator rights), so each person installs it once:
+Interception is a one-time install per PC. It is not bundled with Azec (it is an LGPL kernel driver and needs administrator rights), but Azec can do the file work for you from **Settings → General → Interception driver**:
 
-1. Download **Interception** from <https://github.com/oblitum/Interception/releases> and extract it.
-2. In an Administrator command prompt, run `install-interception.exe /install` from its `command line installer` folder.
-3. Reboot, then copy `library\x64\interception.dll` next to `Azec.exe`.
-4. Start Azec as administrator — the **Interception driver** card in **Settings → General** shows **Restart as administrator** when it detects the driver but cannot open it.
-5. Click **Test driver**: the cursor should jump ~40 px and come back. If it does, the driver is working; there is nothing else to enable.
+1. **Download and place** — fetches the official Interception build (SHA-256 verified), extracts it under `%LOCALAPPDATA%\Azec\interception`, and copies `interception.dll` next to Azec.
+2. **Copy command** — puts the installer command on the clipboard with the real path. Run it in an Administrator command prompt, then **reboot**.
+3. **Restart as administrator** — the driver only answers elevated callers; the button keeps your arguments and relaunches.
+4. **Test driver** — the cursor should jump ~40 px right and back. That confirms the path before you open the game.
 
-Output stays limited to Rainbow Six while **Only in Rainbow Six** is enabled, which is the default.
+**Show the steps** in the same card holds the full walkthrough and what to do when something fails. Output stays limited to Rainbow Six while **Only in Rainbow Six** is enabled, which is the default.
 
 ## Default shortcuts
 

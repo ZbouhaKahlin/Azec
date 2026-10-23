@@ -98,15 +98,26 @@ inline Backend& backend(){static Backend instance;return instance;}
 }
 
 // Ready: the driver answered and strokes can be sent.
-// Missing: interception.dll or the driver is absent.
 // Refused: the driver is installed but rejected the open (usually no admin).
-enum class State { Ready, Missing, Refused };
+// DriverMissing: the DLL loaded but the driver did not answer.
+// DllMissing: interception.dll could not be loaded at all.
+enum class State { Ready, Refused, DriverMissing, DllMissing };
+
+inline std::wstring dllPath(){
+    wchar_t path[MAX_PATH]{};
+    const DWORD size=GetModuleFileNameW(nullptr,path,MAX_PATH);
+    if(!size)return L"interception.dll";
+    std::wstring full(path,size);
+    const auto slash=full.find_last_of(L'\\');
+    return (slash==std::wstring::npos?std::wstring():full.substr(0,slash+1))+L"interception.dll";
+}
 
 inline State state(){
     auto& backend=detail::backend();
     std::lock_guard lock(backend.mutex);
     if(backend.ensure())return State::Ready;
-    return backend.refused?State::Refused:State::Missing;
+    if(backend.refused)return State::Refused;
+    return backend.module?State::DriverMissing:State::DllMissing;
 }
 
 inline bool available(){return state()==State::Ready;}

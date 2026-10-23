@@ -22,6 +22,8 @@ inline QString applicationStyle(const QColor& accent){
         QLabel#pairingCode { background:$yellow; color:$chipInk; border:2px solid $outline; border-radius:8px; padding:4px 9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
         QLabel#rowTitle { color:$ink; font-size:14px; font-weight:600; }
         QLabel#rowHint { color:$muted; font-size:12px; }
+        QLabel#codeText { color:$ink; font-size:12px; }
+        QWidget#codeBlock { background:$soft; border:2px solid $outline; border-radius:10px; }
         QLabel#panelTitle { font-family:'Fredoka'; color:$ink; font-size:17px; font-weight:600; }
         QLabel#cardTitle { font-family:'Fredoka'; color:$ink; font-size:18px; font-weight:600; }
         QLabel#sectionArrow { color:$muted; font-size:18px; }
