@@ -23,7 +23,9 @@ inline void readWeaponProfiles(r6::Config& config,bool& gameFocusOnly,bool& adsO
     config.primary_key=validKey(root["primaryKey"],'1');config.secondary_key=validKey(root["secondaryKey"],'2');config.phone_enabled=root["phoneEnabled"].toBool(true);
     // Unknown or missing values fall back to the original SendInput output so an
     // older sidecar keeps behaving exactly as before.
-    config.output_method=root["outputMethod"].toString(QStringLiteral("sendinput")).compare(QStringLiteral("logitech"),Qt::CaseInsensitive)==0?1:0;
+    const auto method=root["outputMethod"].toString(QStringLiteral("sendinput"));
+    config.output_method=method.compare(QStringLiteral("logitech"),Qt::CaseInsensitive)==0?1
+                        :method.compare(QStringLiteral("driver"),Qt::CaseInsensitive)==0?2:0;
     bool legacyRapid=false;
     if(root.contains("rapidActive")&&root["rapidActive"].isBool())legacyRapid=root["rapidActive"].toBool();
     if(root.contains("gameFocusOnly")&&root["gameFocusOnly"].isBool())gameFocusOnly=root["gameFocusOnly"].toBool();
@@ -52,7 +54,7 @@ inline QByteArray weaponProfilesBytes(const r6::Config& config,bool gameFocusOnl
     // Extension operators keep their primary profile and the live selection here.
     for(int id=r6::legacy_operator_count;id<r6::operator_count;++id){const auto& op=config.operators[id];primaries[QString::fromUtf8(config.operators[id].name)]=QJsonObject{{"vertical",op.vertical},{"horizontal",op.horizontal},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)},{"delay",op.delay}};}
     return QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},
-        {"outputMethod",config.output_method?QStringLiteral("logitech"):QStringLiteral("sendinput")},
+        {"outputMethod",config.output_method==1?QStringLiteral("logitech"):config.output_method==2?QStringLiteral("driver"):QStringLiteral("sendinput")},
         {"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},{"recoilMaster",true},{"rapidMaster",bool(config.rapid_master)},
         {"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries},
         {"sensitivity",config.sensitivity.valid()?QJsonValue(sensitivity::json(config.sensitivity)):QJsonValue(QJsonValue::Null)}}).toJson();

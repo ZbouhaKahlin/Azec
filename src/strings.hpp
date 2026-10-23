@@ -180,8 +180,12 @@ enum class UiText {
     LogitechScriptExported,
     LogitechScriptFailed,
     LogitechScriptStale,
+    DriverOutput,
+    DriverOutputHint,
+    DriverFound,
+    DriverMissing,
 };
-inline constexpr int UiTextCount=176;
+inline constexpr int UiTextCount=180;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

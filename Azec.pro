@@ -21,4 +21,4 @@ QMAKE_CXXFLAGS += /utf-8
 QMAKE_LFLAGS += /MANIFEST:EMBED
 
 HEADERS += src/ui_preferences.hpp src/desktop_layout.hpp src/app_paths.hpp
-HEADERS += src/onboarding_widgets.hpp src/sensitivity.hpp src/logitech_script.hpp
+HEADERS += src/onboarding_widgets.hpp src/sensitivity.hpp src/logitech_script.hpp src/driver_input.hpp

@@ -8,6 +8,7 @@
 #include "pairing_qr.hpp"
 #include "hotkeys.hpp"
 #include "logitech_script.hpp"
+#include "driver_input.hpp"
 #include "strings.hpp"
 #include "flags.hpp"
 #include "diagnostics.hpp"
@@ -98,6 +99,7 @@ class MainWindow final : public QWidget {
     PhoneServer* phone_=nullptr;
     QPointer<PairingQr> pairing_qr_;
     QPointer<Toggle> logitech_output_;
+    QPointer<Toggle> driver_output_;
     QPointer<QPushButton> logitech_export_;
     QPointer<QLabel> logitech_status_;
     QPointer<QLabel> phone_address_;
@@ -368,10 +370,17 @@ class MainWindow final : public QWidget {
     }
     void buildLogitechOutput(QVBoxLayout* column){
         auto* output=new Section(text(UiText::OutputMethod),false,true,kbtheme::blue);column->addWidget(output);
-        logitech_output_=toggle(settingRow(output,text(UiText::LogitechOutput),text(UiText::LogitechOutputHint)),"Logitech G HUB output",engine_.snapshot().output_method==1,[this](bool on){
-            // One pull, one owner: the workers stop injecting while G HUB moves the mouse.
+        const int method=engine_.snapshot().output_method;
+        logitech_output_=toggle(settingRow(output,text(UiText::LogitechOutput),text(UiText::LogitechOutputHint)),"Logitech G HUB output",method==1,[this](bool on){
+            // One pull, one owner: exactly one backend emits movement.
             engine_.edit([&](r6::Config& config){config.output_method=on?1:0;});
+            if(driver_output_)driver_output_->syncChecked(false);
             engine_.output_method=on?1:0;dirty();refreshLogitechStatus();
+        });
+        driver_output_=toggle(settingRow(output,text(UiText::DriverOutput),text(UiText::DriverOutputHint)),"Interception driver",method==2,[this](bool on){
+            engine_.edit([&](r6::Config& config){config.output_method=on?2:0;});
+            if(logitech_output_)logitech_output_->syncChecked(false);
+            engine_.output_method=on?2:0;dirty();refreshLogitechStatus();
         });
         auto* hint=label(text(UiText::LogitechScriptHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,4,12,4);output->body->addWidget(hint);
         logitech_status_=label(QString(),"rowHint");logitech_status_->setWordWrap(true);logitech_status_->setContentsMargins(14,0,12,4);output->body->addWidget(logitech_status_);
@@ -385,13 +394,17 @@ class MainWindow final : public QWidget {
     void refreshLogitechStatus(){
         if(!logitech_status_)return;
         const auto config=engine_.snapshot();
-        const auto path=logitech::scriptPath();
         QString state=text(logitech::installed()?UiText::LogitechHubFound:UiText::LogitechHubMissing);
-        // Profiles edited after the last export would otherwise silently disagree.
-        if(QFileInfo::exists(path)&&logitech::read(path)!=logitech::script(config,engine_.ads_only.load()))
-            state+=QStringLiteral(" · ")+text(UiText::LogitechScriptStale);
-        logitech_status_->setText(state);logitech_status_->setToolTip(path);
-        if(logitech_export_)logitech_export_->setEnabled(!save_blocked_);
+        state+=QStringLiteral(" · ")+text(driver_input::available()?UiText::DriverFound:UiText::DriverMissing);
+        if(config.output_method==1){
+            const auto path=logitech::scriptPath();
+            // Profiles edited after the last export would otherwise silently disagree.
+            if(QFileInfo::exists(path)&&logitech::read(path)!=logitech::script(config,engine_.ads_only.load()))
+                state+=QStringLiteral(" · ")+text(UiText::LogitechScriptStale);
+            logitech_status_->setToolTip(path);
+        }else logitech_status_->setToolTip(QString());
+        logitech_status_->setText(state);
+        if(logitech_export_)logitech_export_->setEnabled(!save_blocked_&&config.output_method==1);
     }
     void exportLogitechScript(){
         const auto bytes=logitech::script(engine_.snapshot(),engine_.ads_only.load());

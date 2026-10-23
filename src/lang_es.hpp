@@ -176,4 +176,8 @@ inline const char* const lang_es[]={
     "Script exportado. Asígnalo a Rainbow Six en G HUB.",
     "No se pudo escribir el script de G HUB.",
     "Los perfiles cambiaron desde la última exportación.",
+    "Controlador Interception",
+    "Enviar el movimiento mediante el controlador Interception instalado en lugar de SendInput de Windows. Instala el controlador y coloca interception.dll junto a Azec.",
+    "Controlador Interception detectado.",
+    "No se encontró el controlador Interception. Instálalo y coloca interception.dll junto a Azec.",
 };

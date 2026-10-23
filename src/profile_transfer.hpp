@@ -37,7 +37,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
             {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},
             {"colorTheme",colorTheme},{"sidebarCollapsed",sidebarCollapsed},
             {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",130.0},
-            {"outputMethod",config.output_method?QStringLiteral("logitech"):QStringLiteral("sendinput")},
+            {"outputMethod",config.output_method==1?QStringLiteral("logitech"):config.output_method==2?QStringLiteral("driver"):QStringLiteral("sendinput")},
             {"sensitivity",config.sensitivity.valid()?QJsonValue(setup):QJsonValue(QJsonValue::Null)},
             {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
 }
@@ -95,7 +95,11 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     next.language=settings["language"].toInt();next.selected=settings["selected"].toInt();next.radius=130;next.sound=settings["sound"].toBool();next.rapid_master=settings["rapidMaster"].toBool();next.phone_enabled=settings["phoneEnabled"].toBool();
     // Backups written before the Logitech backend carry no method and keep the
     // SendInput default.
-    if(settings.contains("outputMethod"))next.output_method=settings["outputMethod"].toString().compare(QStringLiteral("logitech"),Qt::CaseInsensitive)==0?1:0;
+    if(settings.contains("outputMethod")){
+        const auto method=settings["outputMethod"].toString();
+        next.output_method=method.compare(QStringLiteral("logitech"),Qt::CaseInsensitive)==0?1
+                          :method.compare(QStringLiteral("driver"),Qt::CaseInsensitive)==0?2:0;
+    }
     next.neon[0]=114.0f/255;next.neon[1]=72.0f/255;next.neon[2]=215.0f/255;
     options=BackupOptions{};
     // Backups without the per-profile marker predate independent weapon rapid

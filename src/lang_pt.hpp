@@ -176,4 +176,8 @@ inline const char* const lang_pt[]={
     "Script exportado. Atribua-o ao Rainbow Six no G HUB.",
     "Não foi possível gravar o script do G HUB.",
     "Os perfis mudaram desde a última exportação.",
+    "Driver Interception",
+    "Enviar o movimento pelo driver Interception instalado em vez do SendInput do Windows. Instale o driver e coloque interception.dll junto ao Azec.",
+    "Driver Interception detectado.",
+    "Driver Interception não encontrado. Instale-o e coloque interception.dll junto ao Azec.",
 };

@@ -176,4 +176,8 @@ inline const char* const lang_ar[]={
     "تم تصدير السكربت. أسنِده إلى Rainbow Six في G HUB.",
     "تعذر كتابة سكربت G HUB.",
     "تغيّرت الملفات منذ آخر تصدير.",
+    "تعريف Interception",
+    "إرسال الحركة عبر تعريف Interception المثبَّت بدل SendInput في Windows. ثبّت التعريف وضع interception.dll بجانب Azec.",
+    "تم العثور على تعريف Interception.",
+    "لم يتم العثور على تعريف Interception. ثبّته ثم ضع interception.dll بجانب Azec.",
 };

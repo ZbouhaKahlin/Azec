@@ -176,4 +176,8 @@ inline const char* const lang_de[]={
     "Skript exportiert. Weise es in G HUB Rainbow Six zu.",
     "Das G-HUB-Skript konnte nicht geschrieben werden.",
     "Profile haben sich seit dem letzten Export geändert.",
+    "Interception-Treiber",
+    "Bewegung über den installierten Interception-Treiber statt über Windows SendInput senden. Treiber installieren und interception.dll neben Azec ablegen.",
+    "Interception-Treiber erkannt.",
+    "Interception-Treiber nicht gefunden. Installieren und interception.dll neben Azec ablegen.",
 };

@@ -176,4 +176,8 @@ inline const char* const lang_zh[]={
     "脚本已导出。请在 G HUB 中将其分配给 Rainbow Six。",
     "无法写入 G HUB 脚本。",
     "上次导出后配置文件已更改。",
+    "Interception 驱动",
+    "通过已安装的 Interception 驱动发送移动，而不是 Windows SendInput。请安装驱动并把 interception.dll 放在 Azec 旁边。",
+    "已检测到 Interception 驱动。",
+    "未找到 Interception 驱动。请安装后把 interception.dll 放在 Azec 旁边。",
 };

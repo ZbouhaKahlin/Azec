@@ -176,4 +176,8 @@ inline const char* const lang_en[]={
     "Script exported. Assign it to Rainbow Six in G HUB.",
     "Could not write the G HUB script.",
     "Profiles changed since the last export.",
+    "Interception driver",
+    "Send movement through the installed Interception driver instead of Windows SendInput. Install the driver and place interception.dll next to Azec.",
+    "Interception driver detected.",
+    "Interception driver not found. Install it, then place interception.dll next to Azec.",
 };

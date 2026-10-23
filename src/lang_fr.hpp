@@ -176,4 +176,8 @@ inline const char* const lang_fr[]={
     "Script exporté. Affectez-le à Rainbow Six dans G HUB.",
     "Impossible d'écrire le script G HUB.",
     "Les profils ont changé depuis le dernier export.",
+    "Pilote Interception",
+    "Envoyer le mouvement via le pilote Interception installé au lieu de SendInput de Windows. Installez le pilote et placez interception.dll à côté d'Azec.",
+    "Pilote Interception détecté.",
+    "Pilote Interception introuvable. Installez-le, puis placez interception.dll à côté d'Azec.",
 };

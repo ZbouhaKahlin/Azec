@@ -176,4 +176,8 @@ inline const char* const lang_ja[]={
     "スクリプトを書き出しました。G HUB で Rainbow Six に割り当ててください。",
     "G HUB スクリプトを書き込めませんでした。",
     "前回の書き出し以降にプロファイルが変更されています。",
+    "Interception ドライバー",
+    "Windows の SendInput ではなく、インストール済みの Interception ドライバーで移動を送ります。ドライバーを導入し、interception.dll を Azec の隣に置いてください。",
+    "Interception ドライバーを検出しました。",
+    "Interception ドライバーが見つかりません。導入後、interception.dll を Azec の隣に置いてください。",
 };
