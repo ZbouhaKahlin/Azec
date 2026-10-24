@@ -25,8 +25,8 @@ int main(int argc,char** argv){
     const auto lock=[](const QString& path){return CreateFileW(reinterpret_cast<LPCWSTR>(path.utf16()),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);};
     check(r6::isGameProcessName("C:\\Games\\RainbowSix.exe")&&r6::isGameProcessName("RainbowSix_DX12.exe")&&
           r6::isGameProcessName("RainbowSix_Vulkan.exe")&&!r6::isGameProcessName("chrome.exe")&&
-          !r6::isGameProcessName("RainbowSix_browser.exe")&&!r6::isGameProcessName("RainbowSix_BE.exe"),
-          "only explicit game executable names authorize focus");
+          r6::isGameProcessName("RainbowSix_browser.exe")&&!r6::isGameProcessName("RainbowSix_BE.exe"),
+          "legacy game executable prefix matching excludes the BattlEye launcher");
     const lan::Adapter vpn{QHostAddress("10.1.0.2"),false,true,false,1};
     const lan::Adapter physical{QHostAddress("192.168.8.2"),true,false,false,100};
     check(lan::selectAddress({vpn,physical})=="192.168.8.2"&&lan::selectAddress({physical,vpn})=="192.168.8.2",

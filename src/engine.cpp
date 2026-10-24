@@ -3,7 +3,6 @@
 #include "profile_store.hpp"
 #include "diagnostics.hpp"
 #include "driver_input.hpp"
-#include "game_focus.hpp"
 #include <chrono>
 #include <cmath>
 #include <random>
@@ -88,7 +87,7 @@ void Engine::stop(){
 }
 void Engine::sleep(int ms){std::unique_lock lock(stop_mutex_);stop_condition_.wait_for(lock,std::chrono::milliseconds(ms),[this]{return !running.load();});}
 void Engine::input(unsigned long flags,int x,int y){
-    if(dry_run_||(game_focus_only&&!gameIsActive()))return;
+    if(dry_run_)return;
     // The Interception driver is the only output: it takes relative moves and
     // left-button strokes at the device level, below Windows' injected flag.
     const bool sent=flags==MOUSEEVENTF_MOVE?driver_input::move(x,y)

@@ -10,25 +10,23 @@ inline bool isGameProcessName(const QString& processPath) {
     const int slash = name.lastIndexOf('\\');
     if (slash >= 0) name = name.mid(slash + 1);
     name = name.toLower();
-    return name=="rainbowsix.exe"||name=="rainbowsix_vulkan.exe"||
-           name=="rainbowsix_dx11.exe"||name=="rainbowsix_dx12.exe";
+    // Rainbow Six Siege runs as RainbowSix.exe; some builds add a suffix.
+    // BattlEye's RainbowSix_BE.exe is not the game window.
+    return name.startsWith("rainbowsix") && !name.contains("_be");
 }
 
 inline bool gameIsActive() {
     const HWND window = GetForegroundWindow();
     if (!window) return false;
+    // Querying the process every 8 ms would be wasteful. The foreground window
+    // only changes on alt-tab/focus changes, so cache the last answer.
+    static HWND lastWindow = nullptr;
+    static bool lastAnswer = false;
+    if (window == lastWindow) return lastAnswer;
+    lastWindow = window;
+    lastAnswer = false;
     DWORD processId = 0;
     GetWindowThreadProcessId(window, &processId);
-    // Each input thread has its own cache; focus changes invalidate it immediately.
-    thread_local HWND lastWindow = nullptr;
-    thread_local DWORD lastProcess = 0;
-    thread_local ULONGLONG checkedAt = 0;
-    thread_local bool lastAnswer = false;
-    const auto now=GetTickCount64();
-    if (window==lastWindow&&processId==lastProcess&&now-checkedAt<200) return lastAnswer;
-    lastWindow = window;
-    lastProcess=processId;checkedAt=now;
-    lastAnswer = false;
     if (processId) {
         const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
         if (process) {
@@ -38,6 +36,11 @@ inline bool gameIsActive() {
                 lastAnswer = isGameProcessName(QString::fromWCharArray(path, int(size)));
             CloseHandle(process);
         }
+    }
+    if (!lastAnswer) {
+        wchar_t title[512]{};
+        if (GetWindowTextW(window, title, int(std::size(title))))
+            lastAnswer = QString::fromWCharArray(title).contains("Rainbow Six", Qt::CaseInsensitive);
     }
     return lastAnswer;
 }
