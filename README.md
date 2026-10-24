@@ -1,118 +1,149 @@
 # Azec
 
-A Windows desktop app with 78 operator profiles, independent primary and secondary weapon settings, and phone controls over your local network.
+A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 operators, independent primary and secondary weapon settings, and a companion phone interface on your local network.
 
-![Azec C6: pastel desktop and phone themes on a lilac grid background](docs/showcase-pastel.png)
+[Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec-releases/releases) · [Application reference](docs/reference.md)
 
-![Azec A6: original and dark desktop and phone themes on a lilac grid background](docs/showcase.png)
+![Azec desktop themes and companion phone interface, with phone captures shown in device mockups](docs/showcase.png)
 
 ## Get started
 
-1. Download **Azec.exe** from the [public releases](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest).
-2. Open **Azec.exe**. It installs for your Windows user, opens the app, and adds **Azec** to the Start menu. Qt and the Visual C++ runtime are bundled; no source code, command prompt, or administrator rights are needed. No runtime folder appears beside the download.
-3. Select an operator, adjust its settings, and click **Save**. Recoil and rapid fire start off.
+1. Download and open **Azec.exe**. It installs for your Windows user, adds Azec to Start, and opens the app. Qt and the Visual C++ runtime are included.
+2. Complete the one-time [driver setup](#driver-setup) before using mouse output. Installing Azec itself does not require administrator rights; the driver setup and driver access require elevation.
+3. Select an operator, adjust its primary profile, and click **Save**. Enable a separate secondary profile if you want different settings for the second weapon.
+4. Turn on **Recoil** when ready. Fresh profiles have Rapid fire off; saved Rapid fire choices belong to each weapon profile.
 
-The first-start tour points to the controls with an animated yellow arrow and a compact instruction box above the taskbar. Skip it at any time, or replay it from **Settings → General → Replay tour**. The separate **Settings → Mouse setup** tab saves your mouse DPI and game sensitivity, reads `GameSettings.ini`, and offers a preview before rescaling recoil profiles after a sensitivity change.
+The first-start tour introduces the controls. Skip it at any time or replay it from **Settings → General → Replay tour**. You can configure mouse sensitivity separately in **Settings → Mouse setup**.
 
-### Connect your phone
+Azec runs locally. Profile editing and phone control do not need a cloud account or internet connection. Driver downloads and update checks need internet access.
 
-Keep the PC and phone on the same local network. Open **Settings → Phone control** on the PC, then open the displayed address in your phone browser and enter the pairing code. The code is shown as a large selectable chip; **Copy code** copies just the six digits, **Copy link** copies a link that skips code entry, and **New code** rotates the code and disconnects phones that were already paired. You can also explicitly reveal and scan the QR code. Keep Azec running on the PC.
+## Driver setup
 
-Phone edits update the same profiles as the desktop. Tap **Save changes** to keep them after restarting. The top **Output** card has the live **Recoil active** switch and a **Rapid fire active** switch for the active weapon profile, so primary and secondary can differ. No external fonts, scripts, or cloud service are required. If Windows prompts, allow network access on your private network. Use the PC address shown in Settings, not `localhost` on your phone.
+Azec uses **Interception** for relative mouse movement and rapid-fire output. Setup is intentional and performed once per PC. The driver is downloaded separately from the app.
 
-## Make it yours
+Open **Settings → General → Interception driver** and follow the guide:
 
-- **Recoil and Rapid fire:** the header shows both pills. Recoil has an on/off switch; Rapid fire belongs to the active weapon profile, so primary and secondary can be set independently. The rapid-fire card holds the shot delay for each profile. The old “Master enable” gate is gone.
-- **Only in Rainbow Six:** this is on by default. Azec ignores application shortcuts and mouse output when another application is active; Alt-tab to the game and it resumes. Turn it off in **Settings → General** only if you deliberately want the old system-wide behavior. No software change can make a game macro immune to the game’s rules or anti-cheat; this reduces accidents, not account risk.
-- **Recoil output:** movement is sent only through the **Interception** driver — there is no SendInput or G HUB fallback. Setup is one time per PC (see [Driver output setup](#driver-output-setup)); the **Interception driver** card in **Settings → General** reports whether the driver is ready and shows four setup steps, with each action beside its instructions. Output still only happens while **Only in Rainbow Six** matches, and **Only while aiming** and the panic key apply as before.
-- **Goofy color themes:** **Charcoal & blush** is the default for fresh configurations. Choose it or Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Goofy (original) in **Settings → Appearance**. Choose the same ten themes on the phone in **Settings → Color theme**. Changes from either screen sync to both and save automatically; every theme keeps the same layout, with a spacious header matching the sidebar. [See all ten themes](docs/theme-gallery.md).
-- **Collapsible sidebar:** the **Collapse** button at the top of the Goofy sidebar switches between operator names and a compact icon rail. A star shortcut appears above the operator icons when you have favorites. Search stays at the bottom; click its compact icon to expand smoothly and start searching. The sidebar remembers your choice.
-- **Settings categories:** General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup keep related options together.
-- **Independent profiles:** enabling a secondary profile copies the primary once, then keeps edits separate. Disabling it preserves those edits.
-- **Favorites and search:** right-click an operator to favorite it. Favorites appear once and save automatically.
-- **Portable backups:** export or import profiles, favorites, the active color theme, the collapsed-sidebar choice, and the output and safety switches in **Settings → Profile backup**. Importing an older backup preserves profiles for operators missing from that backup. Imported profiles, favorites, theme, and sidebar choices remain unsaved until you click Save; closing with Discard keeps the previously saved values.
-- **Phone pairing:** sessions rotate on restart. **New code** rotates the code and disconnect paired phones; **Copy code** copies just the six-digit code. Phone access can be disabled in Settings.
-- **Safe saving:** failed saves show a persistent banner with the problem instead of only changing the icon. The old and new settings files are rolled back together if the second write fails.
+1. **Download and place** downloads the pinned official archive, verifies its SHA-256, and places the DLL in Azec's persistent data folder. **Manual download** opens the upstream release if you prefer to download it yourself.
+2. **Copy command** copies the installer command with the correct local path. Run it in an Administrator command prompt, then restart Windows.
+3. **Restart as administrator** relaunches Azec with the access required by the driver.
+4. **Check driver** refreshes its status. **Test driver** sends a short cursor movement to the right and back, allowing you to check output before opening the game.
 
-## Driver output setup
+The driver files remain under `%LOCALAPPDATA%\Azec\interception` across app updates. If setup fails, expand **If something fails** in the same guide.
 
-Interception is a one-time install per PC. It is not bundled with Azec (it is an LGPL kernel driver and needs administrator rights), but Azec can do the file work for you from **Settings → General → Interception driver**:
+## Profiles and output
 
-1. **Download and place** — fetches the official Interception build (SHA-256 verified), extracts it under `%LOCALAPPDATA%\Azec\interception`, and stores `interception.dll` in that persistent folder so updates retain it. Existing adjacent DLLs are migrated automatically.
-2. **Copy command** — puts the installer command on the clipboard with the real path. Run it in an Administrator command prompt, then **reboot**.
-3. **Restart as administrator** — the driver only answers elevated callers; the button keeps your arguments and relaunches.
-4. **Test driver** — the cursor should jump ~40 px right and back. That confirms the path before you open the game.
+Each operator has a primary profile and an optional secondary profile. Enabling the secondary copies the primary once; subsequent edits are independent. Disabling it keeps its settings for later. Selecting another operator starts on that operator's primary profile.
 
-The full walkthrough stays visible in the same card. **Manual download** offers the official release page as an alternative, **Copy command** appears once beside the command, and **If something fails** expands troubleshooting below the steps. Output stays limited to Rainbow Six while **Only in Rainbow Six** is enabled, which is the default.
+**Recoil** is a live switch shared by the desktop header, tray menu, and phone. It starts off when Azec opens. **Rapid fire** is saved per weapon profile, together with its shot delay. Switching weapons updates the displayed Rapid fire state. Shot delay ranges from 30 to 150 ms, with a slider and 5 ms adjustment buttons.
+
+**Only in Rainbow Six** is enabled by default. It limits mouse output and application shortcuts to when the game is focused. **Only while aiming** adds the aiming requirement to output. The panic shortcut is ignored while Azec is active.
+
+Profile edits apply in memory immediately. Click **Save**, press **Ctrl+S**, or tap **Save changes** on the phone to keep them after restarting. Browsing operators does not mark profiles as edited. If saving fails, a persistent message explains the problem and your edits stay unsaved. Ordinary closing offers **Save / Discard / Cancel** when needed.
+
+## Connect your phone
+
+Use a phone browser on the same local network as the PC. Keep Azec running on the PC.
+
+1. Open **Settings → Phone control** on the desktop.
+2. Open the displayed PC address in your phone browser and enter the six-digit pairing code. Alternatively, reveal and scan the QR code or open the link from **Copy link**.
+3. Select an operator and weapon profile on the phone, adjust settings, and tap **Save changes** to persist the edits.
+
+The first phone card, **Output**, controls live **Recoil active** and the active weapon profile's **Rapid fire active** setting. Desktop and phone edit the same profiles. Theme changes from either screen update both automatically.
+
+**Copy code** copies just the six digits. **Copy link** includes session access, so keep it private. **New code** rotates access and disconnects previously paired phones; restarting Azec also creates a new session. QR starts concealed and hides again when you leave Phone control or hide the app.
+
+If the page does not open:
+
+- Use the exact address displayed on the PC. `localhost` on a phone refers to the phone itself.
+- Check that both devices can reach one another on the local network, and allow Azec on the Windows private-network firewall prompt.
+- If the desktop reports that the server could not start, use **Retry**. The displayed address includes the actual selected port.
+
+Phone access can be disabled in Settings. The page bundles its fonts and assets and does not require a separate phone app. Browser Add to Home Screen may provide a convenient shortcut; installation behavior depends on the browser. Phone images in this README are browser captures placed in device mockups.
+
+## Personalize your workspace
+
+**Settings → Appearance** offers eleven palettes: Charcoal & blush, Goofy (original), Pistachio & coral, Ice blue & cobalt, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Cocoa & mint. Charcoal & blush is the default for fresh configurations.
+
+Select a preview to apply and save the palette immediately. The phone offers the same choices under **Settings → Color theme**. Themes change colors while keeping the controls and layout consistent. [Browse the theme gallery](docs/theme-gallery.md).
+
+The sidebar remembers whether it is expanded or collapsed. Right-click an operator to add or remove a favorite. Favorites appear once, above the remaining operators. Search works in either sidebar state; selecting the compact search icon expands and focuses it.
+
+Settings groups options into **General**, **Appearance**, **Shortcuts**, **Phone control**, **Profile backup**, and **Mouse setup**. Language and feedback sound are available in General.
+
+## Mouse setup and backups
+
+### Keep sensitivity changes manageable
+
+Open **Settings → Mouse setup** to record DPI and game sensitivity. Azec can read your local `GameSettings.ini` and preview a recoil-profile rescale when game sensitivity changes.
+
+DPI is reference information; rescaling uses the change in game sensitivity and multiplier on each axis. A rescale is rejected in full if any affected profile would exceed its allowed range. Accepted changes remain unsaved until you click **Save**.
+
+### Move or restore your profiles
+
+Use **Settings → Profile backup** to export or import profiles and supported preferences, including favorites, theme, sidebar state, and numeric mouse setup. Backups omit the machine-specific game-settings path.
+
+Older backups preserve operators that were not included in them. Imported settings remain pending until **Save**; closing with **Discard** keeps the previously saved configuration.
 
 ## Default shortcuts
 
 | Key | Action |
 | --- | --- |
-| Insert | Show / hide the window |
-| F6 | Toggle recoil activity |
-| 1 / 2 | Select primary / secondary when enabled |
-| Arrow keys | Adjust recoil by 0.1 while the window is active, outside text/number fields and lists |
-| End | Immediate exit; unsaved edits are discarded. Only while Rainbow Six is active and Azec is not the active window. |
-| Ctrl+S | Save the configuration |
-| Ctrl+F | Focus the operator search |
-| Esc | Leave Settings, or clear the search field |
+| Insert | Show or hide Azec |
+| F6 | Toggle Recoil |
+| 1 / 2 | Select primary or enabled secondary profile |
+| Arrow keys | Adjust recoil by 0.1 while Azec is active, outside lists, text/number fields, and sliders |
+| End | Panic exit, discarding unsaved edits |
+| Ctrl+S | Save |
+| Ctrl+F | Focus operator search |
+| Esc | Leave Settings or clear search |
 
-Weapon and action bindings are configurable in Settings. Show/hide, recoil-toggle, and weapon bindings accept any key you choose, including arrows, the numeric keypad, mouse side buttons, modifiers, and Windows keys; if a key is already assigned, the binding is rejected with an “already used” message. The panic shortcut keeps a stricter safe-key filter. Ordinary closing offers **Save / Discard / Cancel** when there are unsaved edits and plays a soft two-note “no” cue; it does not use the Windows error beep.
+With the default game-focus preference enabled, show/hide, Recoil, weapon selection, and panic shortcuts require Rainbow Six to be focused. Local editing shortcuts work in Azec. Panic is ignored while Azec is active.
 
-## Source versions
+Change bindings in **Settings → Shortcuts**. Show/hide, Recoil, and weapon bindings accept arrows, numpad, mouse side buttons, modifiers, and Windows keys. Duplicate bindings are rejected. Panic uses a more restricted key selection to avoid accidental exits.
 
-- **main** — Interception driver version; the default branch and current release.
-- **sendinput** — the previous Windows SendInput version, preserved from the old main branch.
-- **logitech** — the Logitech G HUB version.
+## Installation and updates
+
+The download is a single-file installer. Program files normally live in `%LOCALAPPDATA%\Programs\Azec`; profiles, preferences, logs, and driver files live separately in `%LOCALAPPDATA%\Azec`. Use Azec from Start after installation; the downloaded EXE can then be deleted.
+
+Open **Settings → General → Updates → Check for updates** to look for a newer release. Installation asks for confirmation, verifies the download's SHA-256, and preserves the data folder.
+
+For a first installation from a portable copy, put the new EXE beside the existing portable settings and run it after closing the old app. Settings are copied only when the installed store is empty; originals are retained. Use Profile backup for later transfers.
 
 ## Build from source
 
-Requires Windows x64, Visual Studio 2022 C++ tools, a Windows SDK, Python, and Qt **6.8.3 MSVC x64**.
+Requires **Windows x64**, Visual Studio 2022 C++ tools, a Windows SDK, Python, and **Qt 6.8.3 MSVC x64**.
 
 ```powershell
 .\setup-qt.ps1
 .\build.cmd
 ```
 
-`setup-qt.ps1` installs the pinned Qt kit. Set `NEON_QT_ROOT` to use another compatible installation. Build intermediates live in `.build/`; the launcher is `Azec.exe`, with deployed files in `runtime/`.
+The setup script installs the pinned Qt kit. Set `NEON_QT_ROOT` to select another compatible installation. The app uses qmake through `Azec.pro`. Build intermediates are written to `.build/`, with a root launcher and deployed files in `runtime/`.
 
-**Tests are optional and run only when explicitly requested or when investigating a reported bug.** Normal edits, builds, and releases do not require them. `.\build.cmd checks` builds the separate verifier without running it; `.\build.cmd test` explicitly requests behavior tests. Desktop-backed runners isolate windows on a noninteractive Windows station; a failed isolation setup aborts without opening the app. `build.cmd test --suite` runs console, desktop UI, HTTP/restart and headless phone-browser checks, with at most two groups at once. See [Testing](docs/testing.md) for the purpose of each test file and the available commands. Scale/language matrices are never automatic.
+**Do not run tests unless Azec explicitly requests them.** Ordinary changes, bug reports, builds, and releases do not grant that permission. `build.cmd checks` builds the separate verifier without executing it. Authorized diagnostic commands and isolation requirements are documented in [Testing](docs/testing.md); the permission rule in [AGENTS.md](AGENTS.md) takes precedence.
 
-## Share one file
-
-```powershell
-.\share.cmd
-```
-
-`share.cmd` stamps an automatic version, rebuilds the app, embeds the runtime and licenses, and writes **`dist\Azec.exe`** without running tests. Send that single file: your friend opens it once, then uses **Azec** in Start. Program files live in Windows' per-user application folder (normally `%LOCALAPPDATA%\Programs\Azec`). Character profiles, primary/secondary weapon settings, favorites, theme, and other preferences live separately in **`%LOCALAPPDATA%\Azec`**. The downloaded EXE can be deleted after installation.
+### Package and publish
 
 ```powershell
-.\share.cmd quick      # repackage the current build without recompiling
-.\share.cmd publish    # also upload the build to a public releases-only repository
+.\share.cmd          # Build dist\Azec.exe with its runtime and licenses
+.\share.cmd quick    # Repackage the existing share build
+.\share.cmd publish  # Build, publish, and verify the public EXE
 ```
 
-To explicitly request the installer smoke test, add `test`: `.\share.cmd test`, `.\share.cmd quick test`, or `.\share.cmd publish test`. It launches the app on a noninteractive Windows station and redirects installation paths into a disposable fixture. The existing `AZEC_SKIP_TESTS=1` override still skips it even when `test` is supplied.
+These commands do not run tests by default. The optional `test` argument requires an explicit request; `AZEC_SKIP_TESTS=1` still skips installer tests.
 
-`publish` uses the GitHub CLI and uploads to `github.com/Azec-Zuckerberg/Azec-releases`: the binaries are public while this source repository stays private. It then runs `verify-release.ps1` to match the tag and GitHub asset digest against the local EXE and fresh anonymous downloads, including the stable link. Missing digests or mismatches fail publication verification. The stable link is `https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe`.
+Publication uses the GitHub CLI, uploads only **Azec.exe** to [Azec-releases](https://github.com/Azec-Zuckerberg/Azec-releases), and runs `verify-release.ps1`. Verification matches the release version and GitHub asset digest with the local EXE and fresh anonymous downloads, including the stable download link. Source remains in the private Azec repository. Agents follow the complete [release workflow](AGENTS.md#releasing), including the source commit and push.
 
-**Settings → General → Updates** checks the public release and asks before installing a newer build. The download must match its SHA-256 before it can run. Updates wait for Azec to close, prepare a separate versioned runtime, and preserve the data folder. Existing portable profiles beside the EXE are copied on first installation if the installed settings store is empty; originals are preserved and existing installed profiles are never overwritten. For a first installation with existing portable profiles, place this new EXE in the portable folder and run it after closing the old app. Later transfers use Profile backup. The app remains usable offline.
+`package-release.ps1` creates the optional `dist/Azec-portable.zip` with an adjacent runtime. Both package formats exclude personal configuration, logs, pairing captures, stale executable backups, and verification executables.
 
-`package-release.ps1` still produces the folder-style `dist/Azec-portable.zip` for anyone who prefers an unzipped portable copy. It refuses to package a runtime that is missing Qt or the C++ runtime DLLs, and excludes `Azec-checks.exe`, stale `Azec.exe` backups, personal configuration and logs, and pairing captures.
+## Documentation and attribution
 
-## Documentation
+- [Application reference](docs/reference.md): detailed behavior, storage, and phone control.
+- [Agent instructions](AGENTS.md): project boundaries, compatibility, design, and delivery rules. [CLAUDE.md](CLAUDE.md) imports the same instructions.
+- [Testing](docs/testing.md): commands for explicitly authorized diagnostics.
+- [Theme gallery](docs/theme-gallery.md): palette previews.
+- Theme presentations: [pastel](docs/showcase-pastel.html) and [mixed palettes](docs/showcase.html), assembled from existing desktop and browser captures.
 
-- [Optional testing and verification](docs/testing.md) — what each test file does, explicit commands, visibility, and safe fixtures.
-- [Application reference](docs/reference.md) — detailed UI, phone pairing, persistence, and input behavior.
-- [Agent instructions](AGENTS.md) — architecture, compatibility contracts, and opt-in testing rules. [CLAUDE.md](CLAUDE.md) shares these instructions.
-- README screenshot presentations: [C6, pastel themes](docs/showcase-pastel.html), and [A6, original and dark themes](docs/showcase.html). Both use the lilac grid background, with cascading iPhone screens to the left of the desktop windows.
+The design reference is [GoofyUI for C++ / Qt](https://github.com/Azec-Zuckerberg/goofy-ui-cpp). Azec's application-specific controls live in this repository.
 
-Personal settings (`r6_config.bin`, `azec_weapons.json`, `azec_ui.json`), logs, pairing credentials, and generated binaries stay out of Git. `share.cmd` produces the single-file per-user installer; `package-release.ps1` produces the optional portable zip with its launcher, runtime, and licenses. Both exclude verification executables and personal data.
-
-## Attribution and limitations
-
-Fonts, operator icons, country flags, Qt, and bundled QR code generation retain their notices in [licenses](licenses/). Qt is dynamically linked; pinned upstream sources are [Qt Base](https://code.qt.io/cgit/qt/qtbase.git/tree/?h=v6.8.3) and [Qt SVG](https://code.qt.io/cgit/qt/qtsvg.git/tree/?h=v6.8.3). Goofy follows [GoofyUI](https://github.com/Azec-Zuckerberg/goofy-ui-library).
-
-README iPhone frames come from [weirdapps/mockups](https://github.com/weirdapps/mockups), under the [MIT license](licenses/iphone-mockup-MIT.txt). [Frame source and screen geometry](docs/showcase-assets/devices/SOURCE.md) document the presentation assets. Mobile screens are browser captures in a device mockup.
-
-Azec is a reconstruction. Browser emulation and automated checks do not establish physical iPhone compatibility or in-game behavior. Real mouse output, hardware behavior, and in-game latency have not been verified.
+Third-party notices for fonts, operator icons, flags, Qt, and QR generation are retained in [licenses](licenses/). Qt is dynamically linked; pinned source references are [Qt Base 6.8.3](https://code.qt.io/cgit/qt/qtbase.git/tree/?h=v6.8.3) and [Qt SVG 6.8.3](https://code.qt.io/cgit/qt/qtsvg.git/tree/?h=v6.8.3). Phone device frames come from [weirdapps/mockups](https://github.com/weirdapps/mockups) under its [MIT license](licenses/iphone-mockup-MIT.txt); [frame sources and geometry](docs/showcase-assets/devices/SOURCE.md) describe the presentation assets.

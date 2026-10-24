@@ -1,117 +1,143 @@
-# Project instructions
+# Azec
 
-## Scope and architecture
+Azec is a Windows x64 desktop application for Rainbow Six operator and weapon profiles, built with C++17 and Qt 6.8.3. It serves a companion phone interface over the local network. Desktop and phone control the same application state and save the same profiles.
 
-Azec is a Windows x64 C++17 / Qt 6.8.3 desktop application with an embedded local-network phone interface. Read `README.md` before changing behavior or packaging.
+Read [README.md](README.md) for setup and everyday use. This file is the shared working agreement for coding agents; `CLAUDE.md` imports it.
 
-- `src/app.cpp` / `src/startup.hpp`: startup, single-instance activation, configuration recovery, and verification dispatch.
-- `src/main_window.hpp`: desktop UI, settings, hotkeys, favorites, tray, and dialogs.
-- `src/onboarding.cpp` / `src/onboarding_widgets.hpp`: first-start tour, owned instruction pill, animated arrow, and mouse setup UI. `src/sensitivity.hpp` reads local game settings and validates explicit profile rescaling.
-- `src/app_style.hpp` / `src/strings.hpp`: styles and localized strings.
-- `src/phone_bridge.cpp`: mobile API callbacks and state building.
-- `src/profile_transfer.hpp` / `src/profile_transfer.cpp`: complete profile backup validation and import/export.
-- `src/ui_widgets.hpp`: custom controls, operator rows, title animation, popup, raised panel, page transitions, smooth wheel scrolling, and fading scrollbars.
-- `src/core.hpp` / `src/core.cpp`: primary binary configuration layout, weapon profiles, and movement arithmetic.
-- `src/engine.hpp` / `src/engine.cpp`: synchronized configuration, active weapon selection, and input worker threads.
-- `src/driver_input.hpp`: the output backend — Interception loaded from `interception.dll` at runtime (nothing shipped or linked); relative mouse moves and left-button strokes at device level.
-- `src/driver_setup.hpp`: one-click setup — pinned release download with SHA-256 verification, extraction, DLL placement and installer command.
-- `src/profile_store.hpp`: secondary weapon profiles and additional preferences in JSON.
-- `src/phone_server.hpp`: paired HTTP server and request validation.
-- `src/lan_address.hpp`: Windows adapter discovery and LAN pairing-address selection.
-- `assets/phone.html`: self-contained mobile UI, embedded by `assets/operators.qrc`.
-- `src/launcher.cpp` / `src/app_paths.hpp`: embedded single-file builds install under the Windows per-user Programs folder and use `%LOCALAPPDATA%\Azec` for configuration, logs, and the single-instance lock. Unembedded development/portable launchers keep the original adjacent-runtime/current-folder behavior.
-- `tests/phone_test.py`: HTTP integration checks against an isolated dry-run instance.
-- `tests/core_checks.cpp` / `tests/ui_checks.cpp`: separate verification code, excluded from the release executable.
+## Working agreements
 
-## Build and verification
+- Understand the current source before changing behavior. Keep changes within the request, follow existing patterns, and choose the smallest implementation that handles the real constraint.
+- **Do not run tests unless Azec explicitly asks.** A bug report, code change, build, or release request does not by itself authorize tests. This includes unit tests, UI self-checks, browser checks, installer smoke tests, and ad-hoc scripts that exercise behavior. Source review, diff review, and checking syntax, links, or file references are allowed.
+- Preserve unrelated work, including staged changes. Never reset, stash, revert, stage, or commit another task's edits. Do not stop the running app or modify personal settings to make a build succeed.
+- Interception is the intentional output backend. Preserve that architecture and its explicit setup flow; do not substitute another backend or turn setup into a silent installation.
+- Explain what changed and what was actually checked. A successful build does not establish runtime behavior. Do not claim physical-phone, driver, or in-game verification without performing it.
+- Use plain English. Keep routine updates short and report incomplete work directly. Do not create a pull request unless asked.
 
-Use PowerShell from the project root. Requires Visual Studio 2022 C++ tools, a Windows SDK, and Qt 6.8.3 MSVC x64. `setup-qt.ps1` installs the pinned Qt kit; `NEON_QT_ROOT` can override its location.
+## Build and inspect
 
-**Tests are opt-in.** Run tests only when Azec explicitly asks for tests or asks to investigate a bug. Ordinary edits, fonts, styling, layout, features, builds, and releases do not authorize tests, regardless of change size. This applies to unit tests, UI self-checks, browser checks, installer smoke tests, screenshot/animation verification runs, and ad-hoc scripts used as substitute tests. Reading source, reviewing diffs, and checking syntax, links, or file references are allowed without launching the app.
+Use PowerShell from the project root. The toolchain is Visual Studio 2022 C++ tools, a Windows SDK, Python, and Qt **6.8.3 MSVC x64**.
 
-When testing is authorized, choose checks relevant to the requested investigation. Do not broaden to 150% scaling, all languages, real-time expiry, or full matrices unless specifically requested. Never launch visible test windows, steal focus, move the cursor, or play sounds. If a check cannot run invisibly, leave it unrun and explain why. Do not fall back to a visible run. Repeat a check only after a relevant fix or new evidence; stop after it passes.
+```powershell
+.\setup-qt.ps1
+.\build.cmd
+```
 
-- Build app only: `.\build.cmd`.
-- Build app and verification executable without running tests: `.\build.cmd checks`.
-- Explicit behavior-test command: `.\build.cmd test` runs core, isolated HTTP, recovery, and restart checks. It skips the real 61-second expiry wait. Desktop-backed runners use `tests/hidden_process.py` to create a noninteractive Windows station and a job that cleans up the entire fixture process tree. Isolation failure must abort; never add a visible fallback. `build.cmd test --suite` adds default desktop UI and headless phone-browser coverage without opting into extended matrices.
-- `share.cmd`, `share.cmd quick`, and `share.cmd publish` package without tests. Add `test` only when the installer smoke test is explicitly authorized and can run without disturbing the user. `AZEC_SKIP_TESTS=1` still overrides that request.
-- Desktop/browser matrices, QR decoding, and real-time expiry remain available for explicitly requested diagnostics. See the command reference and its visibility notes before choosing them. The GitHub workflow is manual only; desktop and extended checks are separate opt-ins.
+`setup-qt.ps1` installs the pinned Qt kit; `NEON_QT_ROOT` can select another compatible installation. The project uses qmake through `Azec.pro`. Build intermediates belong in `.build/`, deployed files in `runtime/`, and distributable packages in `dist/`.
 
-See [docs/testing.md](docs/testing.md) for the complete command reference. Build intermediates belong in `.build/`; deployed binaries belong in `runtime/`. Exclude `runtime/Azec-checks.exe` from runnable releases.
+- `build.cmd` builds the application without running tests.
+- `build.cmd checks` also builds the separate verification executable without running it.
+- `share.cmd` builds the single-file installer without tests.
+- `share.cmd quick` repackages the existing share build without recompiling.
+- `share.cmd publish` builds and publishes the EXE, then verifies the published artifact. See [Releasing](#releasing).
 
-All fixture checks must use fresh isolated directories under `.build/verification`; the Python runners create these automatically. Never run fixture tests from the project root or against personal configuration. Use `--dry-run` for interactive inspection and browser checks so no mouse events or beeps are generated. Pairing info and revealed QR captures contain session credentials and must remain local. Stop test processes started by your work. Report exactly what was checked and what was skipped; browser emulation is not a physical-phone test.
+### When verification is requested
 
-## Data and behavior contracts
+Read [docs/testing.md](docs/testing.md) before choosing a command. Its command reference does not grant permission to run tests; the explicit-request rule above takes precedence. `build.cmd test`, `build.cmd test --suite`, and the `test` argument to `share.cmd` execute tests. `AZEC_SKIP_TESTS=1` overrides installer-test requests. Keep CI testing manual and its broader coverage separately opt-in.
 
-- Preserve the original 3,734-byte primary configuration layout in `r6_config.bin`. Keep backward compatibility when adding features.
-- The operator roster covers all 78 operators in id order: Ace, Alibi, Amaru, Aruni, Ash, Azami, Bandit, Blackbeard, Blitz, Brava, Buck, Capitao, Castle, Caveira, Clash, Deimos, Doc, Dokkaebi, Echo, Ela, Fenrir, Finka, Flores, Frost, Fuze, Glaz, Goyo, Gridlock, Grim, Hibana, Iana, IQ, Jackal, Jager, Kaid, Kali, Kapkan, Lesion, Lion, Maestro, Maverick, Melusi, Mira, Montagne, Mozzie, Mute, Nokk, Osa, Oryx, Pulse, Ram, Rook, Sens, Sentry, Skopos, Smoke, Solis, Striker, Sledge, Tachanka, Thatcher, Thermite, Thorn, Thunderbird, Tubarao, Twitch, Valkyrie, Vigil, Wamai, Warden, Ying, Noor, Nomad, Zofia, Zero, Rauora, Solid Snake, Denari. Keep this order: extend at the end only so existing records never shift.
-- `r6_config.bin` serializes only the original 71 records. Primary profiles for operators past the original list (Noor through Denari, ids 71-77) and the selected operator persist in `azec_weapons.json` (`primaryProfiles`, `selected`); the binary `selected` field still rejects indexes past the original list. Backups with 71 to 78 records import by name.
-- Store secondary profiles, per-weapon rapid-fire flags, weapon hotkeys, the phone-access preference, and the game-focus preference in `azec_weapons.json`. Favorites use `azec_ui.json`.
-- Mouse setup (`sensitivity`) also lives in `azec_weapons.json` and shares the profile save/rollback path. Save DPI as reference metadata; scale generated recoil by the old/new game sensitivity and multiplier per axis. Reject the whole rescale if any affected profile exceeds its range. Backups carry numeric setup values without the local INI path. Tour completion (`onboardingVersion`) lives in `azec_ui.json`, preserving its other preferences; dry-run instances skip automatic onboarding and game-settings discovery.
-- Fresh configurations and the unpaired phone page default to English. Preserve saved language IDs: Portuguese is 0 and English is 1; pairing follows the desktop's saved language.
-- Each operator has a primary profile and an optional independent secondary profile. First enable copies primary settings; disabling preserves secondary edits. Character selection starts on primary.
-- Default weapon keys are 1 and 2 and are configurable. Show/hide, recoil-toggle, and weapon bindings accept any key the user chooses, including arrows, numpad, mouse side buttons, modifiers, and Windows keys; duplicate bindings are rejected with a visible "key already used" message. The panic shortcut keeps the stricter safe-key filter. Weapon shortcuts must not interrupt text/number editing or Ctrl/Alt/Windows-key shortcuts.
-- Mouse output and application shortcuts are gated by the **Only in Rainbow Six** preference, on by default. When another application is active, no mouse or keyboard action is emitted. Panic is also ignored while Azec itself is active. This is an accident-prevention gate, not a claim of anti-cheat safety.
-- Preserve fractional accumulation, timing, and SendInput behavior unless the requested change concerns them. Reset fractional movement when the active operator/weapon changes.
-- Use Engine synchronization when accessing configuration from worker threads. Keep UI updates on the Qt GUI thread.
-- Never replace, commit, or package the user's personal configuration files as defaults.
+Choose checks relevant to the request. Do not expand into scale/language matrices, real-time expiry, or extra suites without authorization. Stop after a relevant check passes; repeat it only after a relevant fix or new evidence.
 
-## Presentation
+Desktop-backed checks must use the existing `tests/hidden_process.py` isolation on a noninteractive Windows station. Never open visible test windows, steal focus, move the cursor, or play sounds. If isolation fails, stop; there is no visible fallback. Hiding a console alone does not isolate a GUI.
 
-- Goofy is the only desktop and phone UI. Keep the single desktop layout in `src/desktop_layout.hpp`; do not add interface selectors or restart-to-change-design flows.
-- Store the named color theme (`colorTheme`) and collapsed-sidebar state (`sidebarCollapsed`) in `azec_ui.json` alongside favorites. Every preference change must preserve the others. Ignore obsolete `interface` preferences and remove that key only during a successful atomic UI-preference save.
-- Themes change materials only. MainWindow bindings, Engine, hotkeys, phone server, validation, persistence, and profile transfer remain shared. Preserve the 3,734-byte binary layout.
+Use a fresh fixture under `.build/verification`, never the project root or personal configuration. Use `--dry-run` to suppress mouse output and sounds. Installer fixtures also require `AZEC_INSTALL_TEST_ROOT` to redirect Programs, data, and shortcut paths. Stop the complete process trees started by your work.
 
-## UI contracts
+An explicit screenshot request authorizes the requested captures, not a test suite. Use isolated dry-run data and keep pairing codes, token-bearing links, and revealed QR images out of shared captures. Browser emulation is not a physical-phone test.
 
-- The interface follows GoofyUI (github.com/Azec-Zuckerberg/goofy-ui-library): chunky 2-3 px ink outlines, flat colour, hard offset ink shadows without blur, no gradients or glow. Retain the compact window, custom window controls, rounded corners, and raised right panel. The original palette uses a cream `#FFFAEE` canvas, white surfaces, a seamless 60 px header matching the sidebar canvas, and purple `#7248D7` accent. Yellow `#FFDD59` stays on numeric chips and stickers. Named palettes change colors only, sharing this layout. The sidebar animates between 200 px expanded and 76 px collapsed; its top **Collapse** button (icon-only when compact) is independent of the theme; a compact star shortcut appears above the operator icons when favorites exist; search stays at the bottom, and compact search expands and focuses the search field.
-- Use bundled Geist for controls, operator names, and body text, and bundled Fredoka for display headings. The top-left Azec wordmark uses the bundled Press Start 2P pixel font (white pixel lettering with a hard ink outline and shadow) inside the existing header.
-- Header icons share 34 px hit targets and centered 20 px vector artwork, with separate Recoil and Rapid fire status pills. Controls never react to mouse hover anywhere (header icons, rows, buttons, sliders, scrollbars, and the phone page stay flat until pressed, focused, or selected; only context-menu items still highlight on hover). Keep Save flat, without a glow, pulse, or checkmark swap; its tooltip confirms success and failed saves show a persistent banner. Keyboard focus draws a 2 px accent outline, not a background tile. Closing with unsaved edits shows the Save/Discard/Cancel prompt and plays a soft generated two-note “no” cue; a repeated close must re-surface that prompt rather than silently ignoring it, and Cancel keeps the app running. The Save/Discard/Cancel and Quick Guide dialogs use the same thick ink border and rounded corners as the hotkey dialog.
-- Save stays neutral ink while saved and uses the current accent while unsaved, including after a failed save; text on the accent is chosen by luminance so it stays readable. Keep unsaved data state independent of temporary feedback. Pairing QR starts obscured, reveals on explicit click/keyboard activation, and conceals on leaving Settings, hiding the window, or changing the link. The QR textures are rebuilt from the active palette while keeping the encoded link, a dark-on-light, scannable pattern, and the standard four-module white quiet zone on every side.
-- Use 24 px outer window corners, 24 px panel corners, and 10-18 px button/input/card corners. Numbers are yellow mono chips, sliders have lavender pill tracks with fully round white ink-rimmed handles (the slider keeps a 20 px minimum height so the handle is never clipped top or bottom), and switches are GoofyUI face toggles (lavender off, accent on, white knob showing `-` or `:)`). Preserve the existing layout and hit targets.
-- Sidebar groups and section headings render as GoofyUI stickers: slightly tilted colour chips (yellow, blue, pink, lime) with 2 px ink outlines.
-- Operator rows are 52 px tall with 44 px icons and 14 px Geist names; the selected row is a lavender pill with an ink outline. Keep long names readable within the existing sidebar width.
-- Favorites appear only when nonempty and matching search. Favorited operators are hidden from All operators, so each operator appears once. Removing a favorite returns it to All operators.
-- Right-click favorites use a compact context-menu action, without a nested push button; hover must not highlight the whole popup. Mouse clicks on switches must not add an outer focus ring. Preserve a keyboard focus indicator.
-- Operator changes fade only the identity for approximately 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid input must settle on the last selection.
-- Scrollbars reserve their width, start invisible, appear on scrolling, stay visible during dragging, and fade after three idle seconds. Wheel notches glide smoothly instead of jumping; precision-touchpad pixel deltas stay native. The operator page, sidebar, and Settings share the same top/bottom edge fades.
-- The mouse wheel over a slider, number field, or dropdown scrolls the surrounding page instead of changing a value, unless that control already has focus. Arrow keys must reach a focused operator list; the 0.1 recoil fine-tuning only applies when no list, text field, or slider owns the keyboard.
-- Feedback sounds are generated inside the app. Do not use the Windows error beep or the system console bell. Closing with unsaved changes plays a soft descending two-note cue, and the cue follows the Feedback sound preference.
-- Selecting an operator persists only the selection and must never mark the profile dirty. Browsing the roster is navigation, not an edit.
-- Keep Recoil as an output switch in the header, the tray, and the phone Output card. Rapid fire is stored per weapon profile: primary and secondary are toggled independently, and the header pill, tray item, phone Output card, and Rapid fire settings toggle all act on the active weapon profile. Shot delay also stays per profile. Older `azec_weapons.json` files that carry a single `rapidActive` value migrate that value onto every primary and secondary profile; each save writes `perProfileRapid` and no longer writes a single shared rapid switch.
-- Keep appearance choices limited to the ten named Goofy palettes in `theme.hpp`: original, Pistachio, Ice blue, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Charcoal & blush. Appearance exposes all ten as visible preview cards in a three-column grid, not a dropdown; each card previews its palette and the active card carries the accent outline and a check. Apply and save palette changes immediately without editing binary profile values or changing layout. No free accent-color picker or reactive-radius slider; saved custom binary values are still normalized on load and the next save. The output model is one Recoil switch plus a per-weapon-profile Rapid fire toggle; do not reintroduce the removed Master enable gate. Settings categories are General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup; conceal pairing QR when leaving its category.
-- Nine language entries ship in the picker with bundled flag SVG assets: English (US), Portuguese (Brasil), French, Spanish, German, Arabic, Hebrew, Simplified Chinese, Japanese; ids 0-8 are validated in `core.cpp`, `profile_transfer.hpp`, and `phone_bridge.cpp`. The Hebrew entry is intentionally a "Free Palestine" prank (Israel flag in the picker, then a Free Palestine popup with the Palestine flag and Arabic prank strings in `src/lang_he.hpp` and the phone dictionary) and must stay that way. Translators: every language table in `src/lang_*.hpp` must cover `UiTextCount` from `src/strings.hpp` in enum order; the `static_assert`s enforce the desktop count. Every `phoneTexts` map in `assets/phone.html` must cover the same phone UI keys, including the phone's Output card.
-- Localized text must never widen the fixed 200 px sidebar: sticker chips elide (`StickerLabel`), setting hints word-wrap, and `tests/ui_checks.cpp` asserts the sidebar fits for every language in the extended checks.
+## Where code lives
 
-## Phone interface
+- **Startup and installation:** `src/app.cpp`, `src/startup.hpp`, `src/app_paths.hpp`, and `src/launcher.cpp` own startup, single-instance activation, recovery, storage locations, and the embedded installer. `src/update_check.hpp` owns update handling.
+- **Desktop:** `src/main_window.hpp` owns bindings, settings, tray actions, and dialogs. `src/desktop_layout.hpp` owns the single desktop layout. `src/ui_widgets.hpp`, `src/app_style.hpp`, and `src/theme.hpp` own controls and presentation.
+- **Profiles and output:** `src/core.hpp` / `src/core.cpp` own binary compatibility and movement arithmetic. `src/engine.hpp` / `src/engine.cpp` synchronize configuration and run input workers. `src/profile_store.hpp`, `src/ui_preferences.hpp`, and `src/profile_transfer.*` own JSON preferences and backups.
+- **Driver:** `src/driver_input.hpp` dynamically loads Interception. `src/driver_setup.hpp` and `src/driver_download.hpp` own download, verification, and file placement.
+- **Phone:** `src/phone_bridge.cpp` maps requests to application state. `src/phone_server.hpp` validates and serves requests; `src/lan_address.hpp` selects the PC address. `assets/phone.html` is the self-contained client, embedded through `assets/operators.qrc`.
+- **Tour and mouse setup:** `src/onboarding.cpp`, `src/onboarding_widgets.hpp`, and `src/sensitivity.hpp` own onboarding, game-settings discovery, and sensitivity rescaling.
+- **Language and assets:** `src/strings.hpp`, `src/lang_*.hpp`, and `src/flags.hpp` own localization. Fonts, icons, flags, and phone assets are bundled; notices live in `licenses/`.
+- **Verification:** `tests/` contains separate checks and isolation helpers. Verification executables and fixture DLLs never belong in a release.
 
-- Serve the self-contained phone page from the desktop app; keep it usable without external fonts, scripts, or internet access.
-- The phone page uses the same ten palettes as the PC, sourced from the desktop theme tokens in the state API. A theme change on either screen saves the same UI preference and updates both, without changing profile edits. Preserve GoofyUI materials: 3 px ink outlines and hard offset shadows, tilted sticker section chips, yellow number chips, embedded Fredoka, and face toggles. It has no hover effects either.
-- The first phone card is **Output** with the live **Recoil active** switch and the active weapon profile's **Rapid fire active** switch. Do not reintroduce the Master enable gate. Rapid fire is intentionally per weapon profile, so switching between primary and secondary updates the switch.
-- The phone uses the PC's LAN address, not its own localhost. Show the actual address, a selectable six-digit pairing code, Copy code, Copy link, New code, and a Retry action when the server cannot start in desktop Settings.
-- Rebuild the QR textures from the active palette while keeping the encoded link, a dark-on-light, scannable pattern, and the standard four-module white quiet zone. Copy link may include the session token; New code must rotate the token and disconnect paired phones.
-- Preserve session-token authorization, pairing rate limits, host/origin checks, request-size limits, and server disable behavior.
-- Validate values before applying them. Profile edits must carry explicit operator and weapon identifiers to avoid updating a different profile after concurrent selection changes.
-- Save through the same persistence path as the desktop. Preserve primary/secondary isolation and persistence after reopening; run checks only under the opt-in testing policy above. Pause polling while the page is hidden.
-- Do not add router port forwarding, public hosting, or external telemetry as part of local phone support.
+## Profiles and persistence
 
-## Repository and delivery
+Compatibility is a product requirement. Preserve the existing **3,734-byte** `r6_config.bin` layout and the meaning of every saved operator ID.
 
-Keep source, embedded assets, tests, build/setup scripts, documentation, and third-party license files in Git. Generated executables, deployed Qt DLLs, `.build/`, personal configurations, credentials, and pairing info are excluded by `.gitignore`.
+- There are 78 operators. The binary holds the original 71 records; extension operators (Noor through Denari, IDs 71–77) use `primaryProfiles` in `azec_weapons.json`. Selection also persists in that JSON file; the binary selection field accepts only original-roster indexes. Append roster additions; never reorder existing records.
+- `azec_weapons.json` also holds secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, game-focus/aiming preferences, and mouse setup. `azec_ui.json` holds favorites, `colorTheme`, `sidebarCollapsed`, and `onboardingVersion`.
+- UI-preference writes must preserve other preferences. Ignore the obsolete `interface` key and remove it only on a successful atomic save. Normalize legacy binary appearance values on load and the next save; named themes do not change profile values.
+- Keep save staging, atomic replacement, and rollback across configuration files. A failure must retain unsaved edits and show a persistent error. Never replace, commit, or package personal configuration as defaults.
+- A secondary profile copies primary settings only on first enable. Disabling preserves its edits. Selecting an operator starts on primary and persists only the selection, without marking profiles dirty or saving unrelated edits.
+- Accept backups containing 71–78 operators, matching records by name and preserving operators absent from an older backup. Imported profiles and UI preferences remain pending until Save; Discard retains the previously saved files.
+- Mouse DPI is reference metadata. Rescale recoil using old/new game sensitivity and multiplier per axis, preview the change, and reject the entire operation if any affected profile exceeds its range. Backups include numeric setup values, not the local INI path. Dry-run instances skip automatic onboarding and game-settings discovery.
 
-Preserve third-party attribution and licenses. The friend-facing `share.cmd` build embeds a clean runtime and licenses in `dist\Azec.exe`, installs per user (normally `%LOCALAPPDATA%\Programs\Azec`), and creates a Start menu shortcut. Profiles/settings live separately in `%LOCALAPPDATA%\Azec`; updates must preserve them. Copy existing portable profiles only into an empty installed settings store and retain their originals. Prepare versioned runtimes before switching the launcher, never downgrade an existing newer installation, and verify the release SHA-256 before executing an update. `package-release.ps1` still creates the optional adjacent-runtime portable zip. Exclude personal settings, logs, pairing captures, stale backups, and all verification executables from both packages. Installer checks must use `AZEC_INSTALL_TEST_ROOT` with `--dry-run` to isolate Programs, data, and shortcut paths under a fresh `.build/verification` fixture. Report actual checks and limitations; never claim physical-phone or in-game tests without performing them.
+## Output and shortcuts
 
-### Release workflow for AI agents
+Recoil is a live output switch and starts off on launch. Rapid fire and shot delay belong to the active weapon profile; primary and secondary are independent. Keep the header, tray, desktop controls, and phone Output card synchronized. Do not restore the removed Master enable gate.
 
-When Azec asks to **build and push**, **ship a release**, **publish an update**, or **release a new version**, complete both the source delivery and the friend-facing EXE publication. That request authorizes the commit, push, and public binary release; do not ask for the same confirmation again. Honor any explicit restriction such as build-only, source-only, no push, or no publishing. A request just to edit code or documentation does not trigger a release.
+Preserve migration from legacy `rapidActive` onto every primary and secondary profile. New saves write `perProfileRapid` and per-profile flags, not a shared rapid-fire switch.
 
-1. Review the working tree and finish the requested changes. Preserve unrelated work, including already-staged changes; do not use blanket staging or include another task's edits in the release commit. Verify the source remote is `Azec-Zuckerberg/Azec` and the public binary destination is `Azec-Zuckerberg/Azec-releases`. Keep the source repository private.
-2. Follow the opt-in testing policy above. A release request alone does not authorize tests. Report tests as skipped unless separately requested; resolve any failures from authorized checks before publishing. Do not stop the user's running app or touch personal configuration to make a build pass. The release tag, asset, digest, and source-push verification below remain required delivery checks.
-3. Run `.\share.cmd publish` from the project root. This stamps `src/version.hpp`, rebuilds, packages `dist\Azec.exe` without running tests, and uploads **only `Azec.exe`** to a versioned release in `Azec-Zuckerberg/Azec-releases`. Add `test` only for a separately authorized installer smoke test that can run invisibly. Do not upload a separate checksum file; the updater uses GitHub's asset `digest` (`sha256:...`). Do not substitute a source push, a build-only command, or `share.cmd quick` for this publication step.
-4. Verify the exact published tag matches `src/version.hpp`. Download that release's EXE into a fresh `.build/verification` directory and verify its SHA-256 matches both GitHub's asset `digest` and the local `dist\Azec.exe`. A missing digest is a verification failure; never bypass checksum verification. Confirm the stable latest-download URL serves the new release anonymously. Do not claim publication succeeded merely because the command returned success.
-5. Commit and push this task's source changes to the source repository, including the version generated during publication and any relevant build scripts, embedded assets, documentation, and tests. Use the intended branch (normally `main`); never force-push or overwrite unrelated work. Publication changes the version file, so the final source commit must include that generated version. Verify the push reached the remote.
-6. Report the released version, source commit, checks performed/skipped, and the stable download link: https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe. Existing users receive this release through **Settings → General → Updates → Check for updates**, with their AppData profiles preserved.
+- Interception sends relative mouse movement and left-button strokes. Load `interception.dll` at runtime; do not link or bundle the driver. Keep its files in the persistent data folder, preserve migration from adjacent DLLs, and verify the pinned setup archive's SHA-256 before extraction.
+- **Only in Rainbow Six** is on by default and gates output and application shortcuts by the foreground game. Panic is also ignored while Azec is active. Preserve **Only while aiming**. These are focus/interaction rules; do not make anti-cheat guarantees.
+- Preserve fractional accumulation, recoil/fire timing, and stop behavior unless the request concerns them. Reset fractional movement when the active operator or weapon changes. Access worker configuration through Engine synchronization; keep widgets on the Qt GUI thread.
+- Default weapon bindings are `1` and `2`. Show/hide, recoil-toggle, and weapon bindings accept the user's chosen keys, including arrows, numpad, mouse side buttons, modifiers, and Windows keys. Reject duplicates with the visible “key already used” message. Panic keeps its stricter safe-key filter.
+- Weapon shortcuts must not interrupt text/number editing or Ctrl/Alt/Windows shortcuts. Focused lists keep arrow-key navigation; recoil fine-tuning applies only when no list, text/number field, or slider owns the keyboard.
 
-Only the clean EXE belongs in the public release's uploaded assets. Never upload private source, personal profiles, logs, credentials, pairing data, checksum files, or verification executables. GitHub automatically displays `Source code (zip)` and `Source code (tar.gz)` links; these cannot be removed through the release-assets API. They archive the separate public releases repository, which must contain only its release README/scaffolding, never the private app source. If authentication, permissions, checks, publication, verification, or the source push fail, report the exact incomplete step and any steps already completed; do not describe a partial delivery as fully released.
+## Desktop and phone design
 
-The local working folder keeps its historical `KingBoss2004` name because the in-use checkout cannot be renamed; the GitHub repository is `Azec-Zuckerberg/Azec`, and every application name, window, written file, package, and document uses `Azec`. Do not reintroduce the old name in code, files, or compatibility fallbacks.
+The design reference is [GoofyUI for C++ / Qt](https://github.com/Azec-Zuckerberg/goofy-ui-cpp). Use that repository for design guidance instead of the former Luau library. Azec currently owns its Qt controls locally; a documentation or styling request does not authorize replacing them or changing the build system.
+
+Keep one desktop layout in `src/desktop_layout.hpp` and the corresponding phone presentation. Themes change colors and materials, not behavior or layout. The eleven palettes in `src/theme.hpp` are authoritative, including Cocoa & mint; **Charcoal & blush** is the fresh-install default. Appearance shows all palettes as previews in a three-column grid and saves choices immediately. Do not add an interface selector, free accent picker, or radius slider.
+
+### Preserve the interaction model
+
+- Use flat color, chunky ink outlines, hard offset shadows, rounded panels, sticker headings, yellow numeric chips, and face toggles. No gradients, glow, or blurred shadows. Keep bundled Geist for body/controls, Fredoka for display headings, and Press Start 2P for the outlined Azec wordmark.
+- Retain the compact window, custom window controls, raised right panel, and seamless header. The sidebar expands to 200 px and collapses to 76 px; its Collapse control is independent of the theme. Search stays at the bottom and compact search expands and focuses it. Favorites appear once, only when nonempty and matching search, with a compact star shortcut in the collapsed sidebar.
+- Preserve existing hit targets and legibility: 52 px operator rows with 44 px icons, 34 px header targets with 20 px artwork, 24 px window/panel corners, and at least 20 px slider height. Long names and translations must fit without widening the sidebar.
+- Controls stay flat on hover; only context-menu items highlight. Keyboard focus uses an accent outline. Mouse clicks on switches must not add that keyboard ring. Keep favorite actions in a compact context menu without a nested button.
+- Save stays flat with unchanged artwork: neutral ink when saved, accent when dirty, with readable foreground text. Success uses the tooltip; failures use a persistent banner. Temporary feedback must not clear the dirty state. Closing unsaved edits shows Save/Discard/Cancel; another close re-surfaces the prompt, and Cancel keeps the app running. Keep the close-confirmation and Quick Guide dialogs visually consistent with the hotkey dialog.
+- Generate feedback sounds inside the app and honor the sound preference. The unsaved-close cue is a soft descending two-note sound; do not use a Windows error beep or console bell.
+- Operator changes fade only the identity for about 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid changes settle on the last selection. Avoid continuous repainting and unbounded image caches.
+- Reserve scrollbar lanes. Show bars during scrolling/dragging and fade them after three idle seconds. Keep smooth wheel notches, native precision-touchpad deltas, and shared edge fades. An unfocused slider, number field, or dropdown forwards wheel scrolling to its page.
+
+Settings categories remain General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup.
+
+### Keep both screens consistent
+
+A change to profiles, output switches, themes, language, or saving needs a decision for the desktop, tray where applicable, and phone. Keep shared behavior in the existing Engine/persistence paths rather than creating a separate phone implementation.
+
+- Serve the phone page locally with embedded assets and no external fonts, scripts, or internet requirement. Keep its palettes sourced from desktop theme tokens. A theme change on either screen saves the same preference and updates both without saving profile edits.
+- The first card is **Output**, with live **Recoil active** and active-profile **Rapid fire active** switches. Phone profile edits carry explicit operator and weapon IDs so concurrent selection cannot redirect a write. Validate values before applying them and save through the desktop path.
+- Use the PC's actual LAN address, never phone localhost. Preserve the selectable six-digit code, Copy code, Copy link, New code, and startup-error Retry action. New code rotates both code and token and disconnects existing phones.
+- QR starts concealed and reveals only on explicit click/keyboard activation. Conceal it when leaving Phone control, hiding the window, or changing the link. Palette changes rebuild its textures without changing the encoded link. Keep the complete unbranded pattern, dark-on-light contrast, and four-module white quiet zone.
+- Preserve session-token authorization, pairing rate limits, host/origin checks, request-size limits, and server-disable behavior. Pause polling while the phone page is hidden. Do not add public hosting, router forwarding, or telemetry to local phone support.
+- Pairing codes, token-bearing links, and revealed QR captures are credentials. Keep them local and out of logs, Git, documentation images, and release assets.
+
+## Localization
+
+Fresh configurations and the unpaired phone page start in English; pairing follows the desktop language. Preserve language IDs 0–8, including Portuguese `0` and English `1`.
+
+The nine picker entries are English, Portuguese, French, Spanish, German, Arabic, Hebrew, Simplified Chinese, and Japanese. The Hebrew entry intentionally opens the Free Palestine popup and uses the existing Arabic prank strings and flags; preserve that behavior unless asked to change it.
+
+Every `src/lang_*.hpp` table must cover `UiTextCount` in enum order. Keep the compile-time checks. Every phone dictionary must cover the same phone keys, including Output controls. Preserve RTL handling, bundled flags, elided sidebar stickers, and wrapped settings hints.
+
+## Installation and updates
+
+The embedded `dist/Azec.exe` installs per user under `%LOCALAPPDATA%\Programs\Azec`, creates a Start menu shortcut, and stores profiles, logs, and the single-instance lock separately under `%LOCALAPPDATA%\Azec`. Development/portable launchers retain adjacent-runtime/current-folder behavior.
+
+Preserve settings across updates. Copy portable settings only into an empty installed store and retain their originals. Prepare a versioned runtime before switching the launcher; never downgrade a newer installation. Verify an update's SHA-256 before executing it.
+
+Keep sources, embedded assets, build scripts, documentation, tests, and third-party notices in Git. Keep generated executables, deployed Qt DLLs, `.build/`, personal settings, logs, credentials, pairing captures, and stale backups out of Git. Packages must also exclude personal data, stale executable backups, and all verification executables and fixture DLLs. `package-release.ps1` remains the optional folder-style portable ZIP packager. Preserve attribution and licenses.
+
+## Releasing
+
+“Build and push,” “ship a release,” “publish an update,” and “release a new version” authorize both the source commit/push and public EXE publication. Complete both without asking again. Honor restrictions such as build-only, source-only, no push, or no publishing. An ordinary code or documentation edit is not a release request.
+
+1. Review the working tree and include only this task's changes. Confirm the source destination is private `Azec-Zuckerberg/Azec` and the binary destination is public `Azec-Zuckerberg/Azec-releases`. Do not stop the user's app or alter personal settings.
+2. Follow the test rule: releases do not authorize tests. Resolve failures from any separately authorized checks. Artifact/version/hash verification below is required delivery verification and does not run application behavior tests.
+3. Run `.\share.cmd publish`. It stamps `src/version.hpp`, rebuilds, packages, publishes **only `Azec.exe`**, and invokes `verify-release.ps1`. Do not substitute `quick`, a local build, or a source push. Add `test` only when the isolated installer smoke test was explicitly requested.
+4. Confirm the published tag matches `src/version.hpp`. Download that exact release into a fresh `.build/verification` directory. Its SHA-256 must match both GitHub's asset `digest` and local `dist/Azec.exe`; a missing digest or mismatch is a failure. Confirm the stable latest-download URL serves the new release anonymously.
+5. Commit and push this task's source changes, including the generated version, to the intended branch (normally `main`). Preserve unrelated/staged work; never blanket-stage or force-push. Verify the remote contains the source commit.
+6. Report the version, source commit, checks performed/skipped, and [stable EXE download](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe). Existing users update through **Settings → General → Updates → Check for updates**, with AppData profiles preserved.
+
+Only the clean EXE belongs in uploaded public assets: no checksum file, private source, profiles, logs, credentials, or verifier. The updater uses GitHub's asset digest. GitHub's automatic source archives cannot be removed through the release-assets API; the separate public release repository must contain only its release README/scaffolding. If publication, digest verification, authentication, or source push fails, report the exact incomplete step rather than calling the release complete.
+
+## Documentation and naming
+
+Keep the README focused on installation and user tasks. Put agent working rules here, detailed application behavior in [docs/reference.md](docs/reference.md), and diagnostic commands in [docs/testing.md](docs/testing.md). Update affected guidance rather than appending a second explanation. Do not add documentation for every small code change or commit temporary plans and research notes.
+
+Use **Azec** for the app, windows, packages, and documentation. The checkout's historical `KingBoss2004` folder name remains only because the in-use checkout cannot be renamed. Do not introduce that name into application files or compatibility fallbacks.
