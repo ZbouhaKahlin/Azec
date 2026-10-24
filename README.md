@@ -1,10 +1,12 @@
 # Azec
 
+This is the **MonoCode** branch: the transparent desktop redesign. The original Goofy interface remains on main; the download below is the published release.
+
 A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 operators, independent primary and secondary weapon settings, and a companion phone interface on your local network.
 
 [Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec-releases/releases) · [Application reference](docs/reference.md)
 
-![Current Azec desktop and connected phone browser in Charcoal & blush, using the same Ash profile](docs/showcase-latest.png)
+![Published Goofy desktop and connected phone browser](docs/showcase-latest.png)
 
 ## Get started
 
@@ -48,7 +50,7 @@ Use a phone browser on the same local network as the PC. Keep Azec running on th
 2. Open the displayed PC address in your phone browser and enter the six-digit pairing code. Alternatively, reveal and scan the QR code or open the link from **Copy link**.
 3. Select an operator and weapon profile on the phone, adjust settings, and tap **Save changes** to persist the edits.
 
-The first phone card, **Output**, controls live **Recoil active** and the active weapon profile's **Rapid fire active** setting. Desktop and phone edit the same profiles. Theme changes from either screen update both automatically.
+The first phone card, **Output**, controls live **Recoil active** and the active weapon profile's **Rapid fire active** setting. Desktop and phone edit the same profiles.
 
 **Copy code** copies just the six digits. **Copy link** includes session access, so keep it private. **New code** rotates access and disconnects previously paired phones; restarting Azec also creates a new session. QR starts concealed and hides again when you leave Phone control or hide the app.
 
@@ -62,13 +64,11 @@ Phone access can be disabled in Settings. The page bundles its fonts and assets 
 
 ## Personalize your workspace
 
-**Settings → Appearance** offers eleven palettes: Charcoal & blush, Goofy (original), Pistachio & coral, Ice blue & cobalt, Lilac, Butter & ocean, Rose, Midnight violet, Forest & tangerine, Deep sea & citron, and Cocoa & mint. Charcoal & blush is the default for fresh configurations.
-
-Select a preview to apply and save the palette immediately. The phone offers the same choices under **Settings → Color theme**. Themes change colors while keeping the controls and layout consistent. [Browse the theme gallery](docs/theme-gallery.md).
+Azec has one dark look, shared by the desktop window and the phone page: a translucent window over the system's blur, quiet hairlines, and a single blue accent, following the [monocode](https://github.com/hardbeat920/monocode) design language. There is no theme picker; the look is the product.
 
 The sidebar remembers whether it is expanded or collapsed. Right-click an operator to add or remove a favorite. Favorites appear once, above the remaining operators. Search works in either sidebar state; selecting the compact search icon expands and focuses it.
 
-Settings groups options into **General**, **Appearance**, **Shortcuts**, **Phone control**, **Profile backup**, and **Converter & profiles**. Language and feedback sound are available in General.
+Settings groups options into **General**, **Shortcuts**, **Phone control**, **Profile backup**, and **Converter & profiles**. Language and feedback sound are available in General.
 
 ## Converter, profile sets, and backups
 
@@ -82,7 +82,7 @@ DPI is reference information; rescaling uses the change in game sensitivity and 
 
 ### Move or restore your profiles
 
-Open **Settings → Profile backup**. **Export backup** saves your profiles and supported settings to one file. Under **Import backup**, choose a backup file, review the summary, and confirm the import. Backups include favorites, theme, sidebar state, the named profile library, and numeric sensitivity settings, and omit the machine-specific game-settings path.
+Open **Settings → Profile backup**. **Export backup** saves your profiles and supported settings to one file. Under **Import backup**, choose a backup file, review the summary, and confirm the import. Backups include favorites, sidebar state, the named profile library, and numeric sensitivity settings, and omit the machine-specific game-settings path.
 
 Older backups preserve operators that were not included in them. Imported settings remain pending until **Save changes**; closing with **Discard** keeps the previously saved configuration.
 
@@ -143,9 +143,7 @@ Publication uses the GitHub CLI, uploads only **Azec.exe** to [Azec-releases](ht
 - [Application reference](docs/reference.md): detailed behavior, storage, and phone control.
 - [Agent instructions](AGENTS.md): project boundaries, compatibility, design, and delivery rules. [CLAUDE.md](CLAUDE.md) imports the same instructions.
 - [Testing](docs/testing.md): commands for explicitly authorized diagnostics.
-- [Theme gallery](docs/theme-gallery.md): palette previews.
-- [Current desktop and phone presentation](docs/showcase-latest.html), captured from the working-tree build with isolated sample settings. Additional palette presentations: [pastel](docs/showcase-pastel.html) and [mixed palettes](docs/showcase.html).
 
-The design reference is [GoofyUI for C++ / Qt](https://github.com/Azec-Zuckerberg/goofy-ui-cpp). Azec's application-specific controls live in this repository.
+The design reference is [monocode](https://github.com/hardbeat920/monocode), adapted from its web interface into Azec's native Qt controls. Azec's application-specific controls live in this repository.
 
-Third-party notices for fonts, operator icons, flags, Qt, and QR generation are retained in [licenses](licenses/). Qt is dynamically linked; pinned source references are [Qt Base 6.8.3](https://code.qt.io/cgit/qt/qtbase.git/tree/?h=v6.8.3) and [Qt SVG 6.8.3](https://code.qt.io/cgit/qt/qtsvg.git/tree/?h=v6.8.3). Phone device frames come from [weirdapps/mockups](https://github.com/weirdapps/mockups) under its [MIT license](licenses/iphone-mockup-MIT.txt); [frame sources and geometry](docs/showcase-assets/devices/SOURCE.md) describe the presentation assets.
+Third-party notices for the design and sound references, operator icons, flags, Qt, and QR generation are retained in [licenses](licenses/). Qt is dynamically linked; pinned source references are [Qt Base 6.8.3](https://code.qt.io/cgit/qt/qtbase.git/tree/?h=v6.8.3) and [Qt SVG 6.8.3](https://code.qt.io/cgit/qt/qtsvg.git/tree/?h=v6.8.3). Phone device frames come from [weirdapps/mockups](https://github.com/weirdapps/mockups) under its [MIT license](licenses/iphone-mockup-MIT.txt); [frame sources and geometry](docs/showcase-assets/devices/SOURCE.md) describe the presentation assets.

@@ -22,14 +22,10 @@ page_html=urllib.request.urlopen(base+'/',timeout=5).read()
 checks['page_removed_controls_and_has_quick_strip']=b'id="recoilMaster"' not in page_html and b'id="rapidMaster"' not in page_html and b'id="rapid"' not in page_html and b'id="radius"' not in page_html and b'id="accent"' not in page_html and b'id="recoilActive"' in page_html and b'id="rapidActive"' in page_html and b'id="quickStrip"' in page_html
 checks['fresh_default_language_is_english']=json.loads(call('/api/state')[1])['globals']['language']==1
 initial=json.loads(call('/api/state')[1])
-checks['all_ten_phone_themes_available']=len(initial['appearance']['themes'])==10 and initial['appearance']['id']=='charcoal'
-checks['theme_updates_require_pairing']=call('/api/update',{'action':'setTheme','theme':'midnight'},auth=False)[0]==401
-checks['invalid_theme_is_rejected']=all(call('/api/update',{'action':'setTheme','theme':value})[0]==400 for value in ['unknown','',12,None])
-night=json.loads(call('/api/update',{'action':'setTheme','theme':'midnight'})[1])
-checks['phone_theme_applies_matching_materials']=night['appearance']['colors']['paper']=='#171522' and night['appearance']['colors']['ink']=='#f2eafb' and night['appearance']['scheme']=='dark'
-checks['theme_change_preserves_profiles_and_dirty_state']=night['profile']==initial['profile'] and night['operatorId']==initial['operatorId'] and night['dirty']==initial['dirty']
-checks['theme_is_saved_without_profile_save']=json.loads((folder/'azec_ui.json').read_text())['colorTheme']=='midnight'
-call('/api/update',{'action':'setTheme','theme':'goofy'})
+appearance=initial['appearance']
+checks['phone_publishes_single_dark_look']=appearance.get('scheme')=='dark' and 'themes' not in appearance and 'id' not in appearance and appearance['colors']['paper']=='#171717' and appearance['colors']['accent']=='#459BF7'
+checks['theme_updates_are_rejected']=call('/api/update',{'action':'setTheme','theme':'midnight'},auth=False)[0]==401 and call('/api/update',{'action':'setTheme','theme':'midnight'})[0]==400
+checks['appearance_change_preserves_profiles_and_dirty_state']=appearance['colors']['paper']==json.loads(call('/api/state')[1])['appearance']['colors']['paper'] and initial['operatorId']==json.loads(call('/api/state')[1])['operatorId']
 with urllib.request.urlopen(info['address']+'/',timeout=5) as response:
  checks['advertised_lan_page_available']=response.status==200 and b'pairForm' in response.read()
 checks['requires_pairing']=call('/api/state',auth=False)[0]==401
@@ -69,10 +65,8 @@ checks['rejects_icon_traversal']=call('/icons/../phone_server.hpp',auth=False)[0
 checks['rejects_wrong_host']=call('/api/state',extra={'Host':'unrelated.example:'+str(info['port'])})[0]==403
 checks['unknown_authenticated_route']=call('/missing')[0]==404
 checks['manifest_available']=call('/manifest.webmanifest',auth=False)[0]==200
-midnight=json.loads(call('/api/update',{'action':'setTheme','theme':'midnight'})[1])['appearance']['colors']
 manifest=json.loads(call('/manifest.webmanifest',auth=False)[1])
-checks['manifest_colors_follow_theme']=manifest['theme_color']==midnight['accent'] and manifest['background_color']==midnight['paper']
-call('/api/update',{'action':'setTheme','theme':'goofy'})
+checks['manifest_uses_single_look_colors']=manifest['theme_color']=='#459BF7' and manifest['background_color']=='#171717'
 checks['home_screen_icon_available']=call('/app-icon.svg',auth=False)[0]==200
 checks['rejects_wrong_value_type']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'vertical':'12'}})[0]==400
 checks['rejects_fractional_delay']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'delay':50.5}})[0]==400
@@ -83,7 +77,7 @@ checks['rejects_removed_settings']=call('/api/update',{'action':'setGlobal','val
 global_values={'key0':45,'key1':119,'key2':120,'key3':51,'key4':52,'language':0}
 status,body=call('/api/update',{'action':'setGlobal','values':global_values})
 state=json.loads(body)
-checks['global_settings_roundtrip']=status==200 and state['globals']['language']==0 and state['globals']['accent']=='#7248d7' and 'radius' not in state['globals'] and 'rapidMaster' not in state['globals'] and 'recoilMaster' not in state['globals'] and 'rapidActive' in state['globals'] and len(state['keys'])==5 and state['keys'][1]['value']==119 and state['keys'][4]['value']==52
+checks['global_settings_roundtrip']=status==200 and state['globals']['language']==0 and state['globals']['accent']=='#459bf7' and 'radius' not in state['globals'] and 'rapidMaster' not in state['globals'] and 'recoilMaster' not in state['globals'] and 'rapidActive' in state['globals'] and len(state['keys'])==5 and state['keys'][1]['value']==119 and state['keys'][4]['value']==52
 checks['rejects_wrong_global_type']=call('/api/update',{'action':'setGlobal','values':{'sound':'yes'}})[0]==400
 checks['rejects_fractional_key']=call('/api/update',{'action':'setGlobal','values':{'key3':51.5}})[0]==400
 checks['invalid_global_update_is_atomic']=json.loads(call('/api/state')[1])['keys'][2]['value']==120 and call('/api/update',{'action':'setGlobal','values':{'key2':121,'sound':'yes'}})[0]==400 and json.loads(call('/api/state')[1])['keys'][2]['value']==120

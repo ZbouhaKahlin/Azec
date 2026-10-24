@@ -11,7 +11,6 @@ struct BackupOptions {
     std::optional<bool> gameFocusOnly;
     std::optional<bool> adsOnly;
     std::optional<bool> sidebarCollapsed;
-    QString colorTheme;
 };
 
 inline QJsonObject backupProfile(const r6::Operator& op){
@@ -24,7 +23,7 @@ inline QJsonObject backupProfile(const r6::Operator& op){
 // (rapid key/master).
 inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favorites,
                               bool gameFocusOnly,
-                              const QString& colorTheme,bool sidebarCollapsed,bool adsOnly=false){
+                              bool sidebarCollapsed,bool adsOnly=false){
     QJsonArray operators;
     for(int i=0;i<r6::operator_count;++i)operators.append(QJsonObject{{"name",QString::fromUtf8(config.operators[i].name)},
         {"primary",backupProfile(config.operators[i])},{"secondary",backupProfile(config.secondary[i])},
@@ -37,7 +36,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
         {"profileSets",profilesets::json(config)},{"activeProfileSet",QString::fromStdString(config.active_profile_set)},
         {"settings",QJsonObject{{"keys",keyArray},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
             {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},
-            {"colorTheme",colorTheme},{"sidebarCollapsed",sidebarCollapsed},
+            {"sidebarCollapsed",sidebarCollapsed},
             {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",130.0},
             {"sensitivity",config.sensitivity.valid()?QJsonValue(setup):QJsonValue(QJsonValue::Null)},
             {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
@@ -71,7 +70,8 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     if(settings.contains("gameFocusOnly")&&!settings["gameFocusOnly"].isBool())return false;
     if(settings.contains("adsOnly")&&!settings["adsOnly"].isBool())return false;
     if(settings.contains("sidebarCollapsed")&&!settings["sidebarCollapsed"].isBool())return false;
-    if(settings.contains("colorTheme")&&!settings["colorTheme"].isString())return false;
+    // Older backups may carry a color theme; the app has one look now, so the
+    // key stays permitted but ignored.
     if(settings.contains("sensitivity")&&!settings["sensitivity"].isNull()){
         if(!settings["sensitivity"].isObject())return false;
         auto setup=settings["sensitivity"].toObject();setup.remove("source");
@@ -104,7 +104,6 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
     if(settings.contains("gameFocusOnly"))options.gameFocusOnly=settings["gameFocusOnly"].toBool();
     if(settings.contains("adsOnly"))options.adsOnly=settings["adsOnly"].toBool();
     if(settings.contains("sidebarCollapsed"))options.sidebarCollapsed=settings["sidebarCollapsed"].toBool();
-    if(settings.contains("colorTheme"))options.colorTheme=settings["colorTheme"].toString();
     QSet<QString> nextFavorites;
     for(const auto& name:root["favorites"].toArray()){if(!name.isString()||!seen.contains(name.toString()))return false;nextFavorites.insert(name.toString());}
     // Older backups cannot describe newer operators. Preserve both weapon

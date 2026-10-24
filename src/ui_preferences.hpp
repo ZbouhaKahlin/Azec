@@ -23,7 +23,7 @@ inline bool sidebarCollapsed(const std::filesystem::path& configuration){QJsonOb
 inline bool update(const std::filesystem::path& configuration,const std::function<void(QJsonObject&)>& change){
     QJsonObject root;const auto path=filePath(configuration);
     if(!readDocument(path,root)){diagnostic("save UI preferences","Unreadable or invalid file; existing preferences retained");return false;}
-    change(root);root.remove("interface");root["version"]=1;const auto bytes=QJsonDocument(root).toJson();QSaveFile file(path);
+    change(root);root.remove("interface");root.remove("colorTheme");root["version"]=1;const auto bytes=QJsonDocument(root).toJson();QSaveFile file(path);
     const bool ok=file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();
     if(!ok)diagnostic("save UI preferences",file.errorString());return ok;
 }

@@ -93,8 +93,9 @@ class MainWindow final : public QWidget {
     QVector<SettingsNavButton*> settings_nav_buttons_;bool settings_sidebar_=false;
     IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;StickerStarButton* sidebar_favorites_=nullptr;
     QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false,sidebar_animating_=false,favorites_shown_=false;
-    QVector<ThemeCard*> theme_cards_;QVector<QWidget*> preference_categories_;int preference_category_=0;
-    static constexpr int mouse_setup_category_=5;
+    QVector<QWidget*> preference_categories_;int preference_category_=0;
+    static constexpr int mouse_setup_category_=4;
+    bool glass_active_=false,glass_applied_=false;
     QVariantAnimation operator_transition_;
     FadeLabel *name_opacity_=nullptr,*icon_opacity_=nullptr;
     QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr,*subtitle_=nullptr;
@@ -135,7 +136,10 @@ class MainWindow final : public QWidget {
     bool was_menu_=false,was_recoil_=false,was_primary_=false,was_secondary_=false,refreshing_=false,native_ready_=false;
     int binding_=0,release_key_=0,paint_count_=0,cursor_repaints_=0;qint64 blocked_until_=0,last_tune_=0;
     QStringList icon_failures_;
-    void trackCursor(const QPoint& current){if(current!=last_cursor_){last_cursor_=current;++cursor_repaints_;update();}}
+    // Counts cursor moves without repainting: through the acrylic glass every
+    // full-window repaint forces the system to recompose the blur, so motion
+    // must stay paint-free (hover feedback is handled by the controls themselves).
+    void trackCursor(const QPoint& current){if(current!=last_cursor_){last_cursor_=current;++cursor_repaints_;}}
     QColor accent() const {return kbtheme::defaultAccent;}
     QString text(UiText id) const{return uiText(id,engine_.snapshot().language);}
     QString bindingName(int key) const{
@@ -252,7 +256,7 @@ class MainWindow final : public QWidget {
     Toggle* toggle(QHBoxLayout* row,const QString& title,bool checked,const std::function<void(bool)>& callback){
         auto* result=new Toggle([this]{return accent();});const auto* rowLabel=row->parentWidget()->findChild<QLabel*>();result->setAccessibleName(rowLabel?rowLabel->text():title);result->setChecked(checked);row->addWidget(result,0,Qt::AlignVCenter);
         auto* surface=row->parentWidget();surface->setProperty("enabledSetting",checked);connect(result,&QAbstractButton::toggled,surface,[surface](bool on){surface->setProperty("enabledSetting",on);surface->style()->unpolish(surface);surface->style()->polish(surface);});
-        connect(result,&QAbstractButton::toggled,this,[this,callback](bool on){if(!refreshing_)callback(on);});return result;
+        connect(result,&QAbstractButton::toggled,this,[this,callback](bool on){if(!refreshing_){if(engine_.snapshot().sound)sound::playToggle();callback(on);}});return result;
     }
     ResetSlider* makeSlider(){return new ResetSlider(Qt::Horizontal);}
     void amount(Section* section,const QString& title,bool vertical){
@@ -275,14 +279,15 @@ class MainWindow final : public QWidget {
     void styleNotice(){
         if(!notice_bar_)return;
         const bool error=notice_bar_->property("error").toBool();
-        const QColor badge=error?kbtheme::pink:kbtheme::lavender;
+        const QColor badge=error?QColor(244,63,94,38):QColor(69,155,247,32);
+        const QColor badgeInk=error?kbtheme::danger:kbtheme::purple;
         notice_title_->setText(text(error?UiText::NoticeErrorTitle:UiText::NoticeTitle));notice_close_->setText(text(UiText::Understood));
         notice_badge_->setText(error?QStringLiteral("!"):QStringLiteral("i"));
-        notice_bar_->setStyleSheet(QString("QWidget#noticeBar{background:%1;border:3px solid %2;border-radius:24px;}"
-            "QLabel#noticeBadge{background:%3;color:%4;border:2px solid %2;border-radius:16px;font-size:18px;font-weight:700;}"
-            "QLabel#startupNotice{color:%5;font-size:14px;font-weight:400;}")
-            .arg(kbtheme::paper.name(),kbtheme::outline.name(),badge.name(),kbtheme::readableOn(badge).name(),kbtheme::ink.name()));
-        if(auto* shadow=qobject_cast<QGraphicsDropShadowEffect*>(notice_bar_->graphicsEffect()))shadow->setColor(kbtheme::outline);
+        notice_bar_->setStyleSheet(QString("QWidget#noticeBar{background:%1;border:1px solid %2;border-radius:14px;}"
+            "QLabel#noticeBadge{background:%3;color:%4;border:0;border-radius:17px;font-size:17px;font-weight:600;}"
+            "QLabel#startupNotice{color:%5;font-size:13px;font-weight:400;}")
+            .arg(kbtheme::css(QColor(30,30,30,236)),kbtheme::css(kbtheme::outline),kbtheme::css(badge),badgeInk.name(),kbtheme::ink.name()));
+        if(auto* shadow=qobject_cast<QGraphicsDropShadowEffect*>(notice_bar_->graphicsEffect())){shadow->setBlurRadius(28);shadow->setOffset(0,6);shadow->setColor(QColor(0,0,0,110));}
     }
     void applyStyle(){
         pages_->settle();qApp->setPalette(kbtheme::palette());setStyleSheet(applicationStyle(accent()));setPalette(kbtheme::palette());
@@ -290,28 +295,13 @@ class MainWindow final : public QWidget {
         layoutNotice();
         for(auto* child:findChildren<QWidget*>())child->update();update();
     }
-    void syncThemeCards(){
-        for(auto* card:theme_cards_)if(card->themeId()==kbtheme::activeColorTheme)card->setChecked(true);
-        for(auto* card:theme_cards_){if(card->themeId()!=kbtheme::activeColorTheme&&card->isChecked())card->setChecked(false);card->update();}
-    }
-    QString selectedThemeId() const{
-        for(auto* card:theme_cards_)if(card&&card->isChecked())return card->themeId();
-        return {};
-    }
-    bool chooseColorTheme(const QString& id){
-        if(!imported_ui_pending_&&!kbtheme::writeColorTheme(config_path_,id)){
-            syncThemeCards();showNotice(text(UiText::ThemeSaveFailed),true,true);return false;
-        }
-        kbtheme::initialize(id);
-        if(pairing_qr_)pairing_qr_->refreshTheme();
-        applyStyle();syncThemeCards();return true;
-    }
     void chooseSettingsCategory(int index){
         if(index<0||index>=preference_categories_.size())return;
-        if(pairing_qr_&&index!=3)pairing_qr_->conceal();preference_category_=index;
+        pages_->settle();
+        if(pairing_qr_&&index!=2)pairing_qr_->conceal();preference_category_=index;
         for(int i=0;i<preference_categories_.size();++i)preference_categories_[i]->setVisible(i==index);
         for(int i=0;i<settings_nav_buttons_.size();++i)settings_nav_buttons_[i]->setChecked(i==index);
-        if(profile_save_dock_)profile_save_dock_->setVisible(index==4||index==mouse_setup_category_);
+        if(profile_save_dock_)profile_save_dock_->setVisible(index==3||index==mouse_setup_category_);
         preferences_scroll_->verticalScrollBar()->setValue(0);
     }
     static void setWidgetOpacity(QWidget* widget,qreal opacity){
@@ -328,8 +318,8 @@ class MainWindow final : public QWidget {
         setWidgetOpacity(sidebar_favorites_,1.0-expanded);
     }
     void updateSettingsNavLabels(){
-        const QString names[]={text(UiText::General),text(UiText::Appearance),text(UiText::Shortcuts),text(UiText::PhoneControl),text(UiText::ProfileBackup),text(UiText::MouseSetup)};
-        const QString hints[]={text(UiText::SettingsGeneralHint),text(UiText::SettingsAppearanceHint),text(UiText::SettingsShortcutsHint),text(UiText::SettingsPhoneHint),text(UiText::SettingsBackupHint),text(UiText::MouseSetupTabHint)};
+        const QString names[]={text(UiText::General),text(UiText::Shortcuts),text(UiText::PhoneControl),text(UiText::ProfileBackup),text(UiText::MouseSetup)};
+        const QString hints[]={text(UiText::SettingsGeneralHint),text(UiText::SettingsShortcutsHint),text(UiText::SettingsPhoneHint),text(UiText::SettingsBackupHint),text(UiText::MouseSetupTabHint)};
         for(int i=0;i<settings_nav_buttons_.size()&&i<int(std::size(names));++i){settings_nav_buttons_[i]->setText(names[i]);settings_nav_buttons_[i]->setDescription(hints[i]);settings_nav_buttons_[i]->setToolTip(names[i]+QStringLiteral(" — ")+hints[i]);settings_nav_buttons_[i]->setAccessibleName(names[i]+QStringLiteral(". ")+hints[i]);}
     }
     void updateSidebarControls(){
@@ -402,11 +392,11 @@ class MainWindow final : public QWidget {
 
         // One visible walkthrough: every action belongs to the step it explains.
         auto* guide=new QFrame;guide->setObjectName("driverGuide");
-        auto* steps=new QVBoxLayout(guide);steps->setContentsMargins(16,16,16,16);steps->setSpacing(22);
+        auto* steps=new QVBoxLayout(guide);steps->setContentsMargins(2,10,2,4);steps->setSpacing(24);
         const auto step=[&](int number,UiText title,UiText description){
             auto* row=new QHBoxLayout;row->setContentsMargins(0,0,0,0);row->setSpacing(12);
             auto* chip=new QLabel(QString::number(number));chip->setObjectName("driverStepNumber");
-            chip->setAlignment(Qt::AlignCenter);chip->setFixedSize(30,30);row->addWidget(chip,0,Qt::AlignTop);
+            chip->setAlignment(Qt::AlignCenter);chip->setFixedSize(26,26);row->addWidget(chip,0,Qt::AlignTop);
             auto* content=new QVBoxLayout;content->setContentsMargins(0,0,0,0);content->setSpacing(9);
             auto* heading=label(text(title),"driverStepTitle");heading->setWordWrap(true);content->addWidget(heading);
             auto* explanation=label(text(description),"rowHint");explanation->setWordWrap(true);content->addWidget(explanation);
@@ -414,7 +404,7 @@ class MainWindow final : public QWidget {
         };
         const auto button=[&](UiText title,const char* objectName="secondary"){
             auto* result=new QPushButton(text(title));result->setObjectName(objectName);
-            result->setAccessibleName(text(title));return result;
+            result->setAccessibleName(text(title));result->setCursor(Qt::PointingHandCursor);return result;
         };
 
         auto* files=step(1,UiText::DriverStepFiles,UiText::DriverStepFilesBody);
@@ -558,22 +548,10 @@ class MainWindow final : public QWidget {
     void buildPreferences(){
         if(!preferences_)return;
         refreshing_=true;const auto c=engine_.snapshot();
-        theme_cards_.clear();delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;
+        delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;
         auto* outer=new QVBoxLayout(content);outer->setContentsMargins(2,0,10,0);outer->setSpacing(14);
         const auto categoryLayout=[&]{auto* page=new QWidget;page->setMinimumWidth(0);auto* layout=new QVBoxLayout(page);layout->setContentsMargins(0,0,0,0);layout->setSpacing(14);outer->addWidget(page);preference_categories_.append(page);return layout;};
-        auto* generalLayout=categoryLayout();auto* preferencesLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();auto* mouseLayout=categoryLayout();
-        auto* colorTitle=new StickerLabel(text(UiText::ColorTheme),kbtheme::blue);preferencesLayout->addWidget(colorTitle,0,Qt::AlignLeft);
-        auto* themeGrid=new QWidget;themeGrid->setObjectName("themeGrid");auto* grid=new QGridLayout(themeGrid);
-        themeGrid->setToolTip(text(UiText::ColorThemeHint));
-        grid->setContentsMargins(0,0,0,0);grid->setHorizontalSpacing(14);grid->setVerticalSpacing(10);
-        for(int i=0;i<kbtheme::colorThemes.size();++i){
-            const auto& theme=kbtheme::colorThemes[i];auto* card=new ThemeCard(QLatin1String(theme.id));
-            theme_cards_.append(card);grid->addWidget(card,i/3,i%3);
-            const QString id=QLatin1String(theme.id);
-            connect(card,&QAbstractButton::clicked,this,[this,id]{if(id!=kbtheme::activeColorTheme)chooseColorTheme(id);else syncThemeCards();});
-        }
-        for(int column=0;column<3;++column)grid->setColumnStretch(column,1);
-        preferencesLayout->addWidget(themeGrid);syncThemeCards();
+        auto* generalLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();auto* mouseLayout=categoryLayout();
         auto* system=new Section(text(UiText::SystemSettings),false,true,kbtheme::lime);system_=system;generalLayout->addWidget(system);
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::SoundWhenClosingUnsaved)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         game_focus_only_=toggle(settingRow(system,text(UiText::OnlyWhileGameIsActive),text(UiText::OnlyWhileGameIsActiveHint)),"Only in Rainbow Six",engine_.game_focus_only,[this](bool on){engine_.game_focus_only=on;dirty();});
@@ -609,9 +587,9 @@ class MainWindow final : public QWidget {
             auto* pair=new QHBoxLayout;pair->setSpacing(7);pair->addWidget(label(text(UiText::PairingCode),"hint"));
             phone_code_=new QLabel(phone_->code());phone_code_->setObjectName("pairingCode");phone_code_->setTextInteractionFlags(Qt::TextSelectableByMouse);pair->addWidget(phone_code_);pair->addStretch();
             copy_code_=new QPushButton(text(UiText::CopyCode));copy_code_->setObjectName("secondary");pair->addWidget(copy_code_);
-            connect(copy_code_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(phone_->code());copy_code_->setText(text(UiText::Copied));QTimer::singleShot(1400,copy_code_.data(),[this]{if(copy_code_)copy_code_->setText(text(UiText::CopyCode));});});
+            connect(copy_code_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(phone_->code());if(engine_.snapshot().sound)sound::playCopy();copy_code_->setText(text(UiText::Copied));QTimer::singleShot(1400,copy_code_.data(),[this]{if(copy_code_)copy_code_->setText(text(UiText::CopyCode));});});
             copy_link_=new QPushButton(text(UiText::CopyLink));copy_link_->setObjectName("secondary");pair->addWidget(copy_link_);
-            connect(copy_link_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(phone_->pairingLink());copy_link_->setText(text(UiText::Copied));QTimer::singleShot(1400,copy_link_.data(),[this]{if(copy_link_)copy_link_->setText(text(UiText::CopyLink));});});
+            connect(copy_link_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(phone_->pairingLink());if(engine_.snapshot().sound)sound::playCopy();copy_link_->setText(text(UiText::Copied));QTimer::singleShot(1400,copy_link_.data(),[this]{if(copy_link_)copy_link_->setText(text(UiText::CopyLink));});});
             phone_new_code_=new QPushButton(text(UiText::NewCode));phone_new_code_->setObjectName("secondary");pair->addWidget(phone_new_code_);
             connect(phone_new_code_,&QPushButton::clicked,this,[this]{phone_->rotate();if(pairing_qr_)pairing_qr_->conceal();updatePhoneDetails();showNotice(text(UiText::NewCodeCreated));});
             connectionLayout->addLayout(pair);
@@ -657,6 +635,7 @@ class MainWindow final : public QWidget {
             if(latest.isEmpty()){showNotice(text(UiText::UpdateCheckFailed),true,true);return;}
             const QString current=QCoreApplication::applicationVersion();
             if(!azec_update::newer(latest,current)){QMessageBox::information(this,"Azec",text(UiText::UpToDate)+"\n\nAzec "+current);return;}
+            if(engine_.snapshot().sound)sound::playArrival();
             QString asset,checksums;QByteArray digest;
             for(const auto& entry:root["assets"].toArray()){
                 const auto object=entry.toObject();const auto name=object["name"].toString();
@@ -749,8 +728,8 @@ class MainWindow final : public QWidget {
     void updateStatus(){const bool active=engine_.recoil_active;status_->setText(active?text(UiText::RecoilOn):text(UiText::RecoilOff));status_->setProperty("active",active);status_->style()->unpolish(status_);status_->style()->polish(status_);
         const bool rapid=engine_.rapid_active();rapid_status_->setText(rapid?text(UiText::RapidFireOn):text(UiText::RapidFireOff));rapid_status_->setProperty("active",rapid);rapid_status_->style()->unpolish(rapid_status_);rapid_status_->style()->polish(rapid_status_);
         if(rapid_active_){rapid_active_->syncChecked(rapid);auto* surface=rapid_active_->parentWidget();surface->setProperty("enabledSetting",rapid_active_->isChecked());surface->style()->unpolish(surface);surface->style()->polish(surface);}if(game_focus_only_)game_focus_only_->syncChecked(engine_.game_focus_only);if(ads_only_)ads_only_->syncChecked(engine_.ads_only);syncDelayControls();if(tray_rapid_)tray_rapid_->setChecked(rapid);}
-    void toggleRecoil(){engine_.recoil_active=!engine_.recoil_active;updateStatus();}
-    void toggleRapid(){const bool on=!engine_.rapid_active();engine_.set_rapid_active(on);dirty();updateStatus();}
+    void toggleRecoil(){engine_.recoil_active=!engine_.recoil_active;if(engine_.snapshot().sound)sound::playToggle();updateStatus();}
+    void toggleRapid(){const bool on=!engine_.rapid_active();engine_.set_rapid_active(on);dirty();if(engine_.snapshot().sound)sound::playToggle();updateStatus();}
     bool textEditingActive() const {auto* focused=QApplication::focusWidget();return focused&&(qobject_cast<QLineEdit*>(focused)||qobject_cast<QAbstractSpinBox*>(focused)||qobject_cast<QComboBox*>(focused));}
     void pollKeys(){
         const bool editing=isActiveWindow()&&textEditingActive();
@@ -775,7 +754,7 @@ class MainWindow final : public QWidget {
         handleWeaponKeys(keyDown(k.primary),keyDown(k.secondary),editing,modified);
         if(isVisible()&&isActiveWindow()&&pages_->currentWidget()==operator_page_&&!editing&&!qobject_cast<QSlider*>(focused)&&!qobject_cast<QAbstractItemView*>(focused)&&clock_.elapsed()-last_tune_>80){const float y=(keyDown(VK_UP)? .1f:0)-(keyDown(VK_DOWN)? .1f:0),x=(keyDown(VK_RIGHT)? .1f:0)-(keyDown(VK_LEFT)? .1f:0);if(x||y){editOperator([=](r6::Operator& op){op.vertical=std::clamp(op.vertical+y,0.f,100.f);op.horizontal=std::clamp(op.horizontal+x,-50.f,50.f);});syncSelection();last_tune_=clock_.elapsed();}}
     }
-    bool save(){
+    bool save(bool celebrate=false){
         QByteArray uiBytes;
         if(imported_ui_pending_){
             QJsonObject root;
@@ -783,19 +762,18 @@ class MainWindow final : public QWidget {
                 updateSavePresentation("error");save_feedback_.stop();showNotice(text(UiText::CouldNotSaveConfiguration),true,true);notice_bar_->setProperty("saveError",true);return false;
             }
             QStringList names(favorites_.begin(),favorites_.end());names.sort(Qt::CaseInsensitive);
-            root["favorites"]=QJsonArray::fromStringList(names);root["colorTheme"]=kbtheme::activeColorTheme;
-            root["sidebarCollapsed"]=sidebar_collapsed_;root["version"]=1;root.remove("interface");
+            root["favorites"]=QJsonArray::fromStringList(names);
+            root["sidebarCollapsed"]=sidebar_collapsed_;root["version"]=1;root.remove("interface");root.remove("colorTheme");
             uiBytes=QJsonDocument(root).toJson();
         }
         const bool saved=!save_blocked_&&engine_.save(config_path_,uiBytes);
         if(saved){
             mouse_setup_dirty_=false;
-            const bool themeSaved=imported_ui_pending_||kbtheme::writeColorTheme(config_path_,kbtheme::activeColorTheme);
             imported_ui_pending_=false;
             updateSavePresentation("saved");save_feedback_.start();
+            if(celebrate&&engine_.snapshot().sound)sound::playSuccess();
             refreshOutputStatus();
             if(notice_bar_&&notice_bar_->property("saveError").toBool()){notice_bar_->setProperty("saveError",false);notice_timer_.stop();notice_bar_->hide();}
-            if(!themeSaved)showNotice(text(UiText::ThemeSaveFailed),true,true);
         }else{
             updateSavePresentation("error");save_feedback_.stop();
             showNotice(text(UiText::CouldNotSaveConfiguration),true,true);
@@ -853,12 +831,32 @@ class MainWindow final : public QWidget {
 protected:
     void paintEvent(QPaintEvent*) override {
 
-        ++paint_count_;QPainter p(this);p.fillRect(rect(),kbtheme::paper);QColor color=accent();p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);
-        color.setAlpha(8);p.setBrush(color);
-        for(int x=18;x<width();x+=45)for(int y=90;y<height()-12;y+=45)p.drawEllipse(QPointF(x,y),1.1,1.1);
+        ++paint_count_;QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
+        // The window shape is painted, not clipped: an antialiased rounded fill
+        // gives real smooth corners, and the acrylic blur shows through the
+        // rounded notches. Square corners while maximized.
+        const qreal radius=isMaximized()?0:16;
+        QPainterPath shape;shape.addRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),radius,radius);
+        p.fillPath(shape,glass_active_?kbtheme::windowGlass:kbtheme::paper);
+    }
+    // Acrylic blur behind a translucent window — the monocode glass look. The
+    // system tint stays empty so the widget paints its own 40% wash; if the
+    // system refuses the effect the window simply stays opaque.
+    void enableWindowGlass(){
+        if(glass_applied_)return;glass_applied_=true;
+        struct AccentPolicy{DWORD state;DWORD flags;DWORD color;DWORD animationId;};
+        struct AttributeData{DWORD attribute;PVOID data;SIZE_T size;};
+        const auto setComposition=reinterpret_cast<BOOL(WINAPI*)(HWND,AttributeData*)>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
+        if(!setComposition)return;
+        AccentPolicy policy{4,0,0x01000000,0}; // ACCENT_ENABLE_ACRYLICBLURBEHIND; tint alpha 1, exactly window-vibrancy's convention
+        AttributeData helper{19,reinterpret_cast<PVOID>(&policy),sizeof(policy)}; // WCA_ACCENT_POLICY
+        if(setComposition(HWND(winId()),&helper)){glass_active_=true;update();}
     }
     void showEvent(QShowEvent* event) override {
-        QWidget::showEvent(event);engine_.menu_visible=true;if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);roundWindow(this);const BOOL dark=FALSE;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));}
+        QWidget::showEvent(event);engine_.menu_visible=true;
+        if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);const BOOL dark=TRUE;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));
+            // The blur attaches after the first paint, like the reference.
+            QTimer::singleShot(0,this,[this]{enableWindowGlass();});}
     }
     void hideEvent(QHideEvent* event) override {if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);}
     void closeEvent(QCloseEvent* event) override {
@@ -875,11 +873,11 @@ protected:
             for(int i=0;i<3;++i){const QString titles[]={text(UiText::Cancel),text(UiText::Discard),text(UiText::Save)};auto* button=new QPushButton(titles[i]);button->setObjectName(i==2?"save":i==1?"discardChanges":"cancelClose");row->addWidget(button);connect(button,&QPushButton::clicked,&dialog,[&,i]{choice=i;dialog.accept();});}
             layout->addLayout(row);dialog.adjustSize();roundWindow(&dialog);close_alert_=&dialog;dialog.exec();close_alert_=nullptr;
             engine_.recoil_active=recoil;close_prompt_=false;
-            if(choice==0||(choice==2&&!save())){event->ignore();return;}
+            if(choice==0||(choice==2&&!save(true))){event->ignore();return;}
         }
         if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
-    void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);if(native_ready_)roundWindow(this);layoutNotice();}
+    void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);layoutNotice();}
     bool eventFilter(QObject* object,QEvent* event) override {
         if(event->type()==QEvent::FocusIn||event->type()==QEvent::FocusOut||event->type()==QEvent::MouseButtonPress){
             if(auto* button=qobject_cast<QPushButton*>(object);button&&(isAncestorOf(button)||button->window()->parentWidget()==this)){
@@ -921,14 +919,14 @@ protected:
     }
 public:
     explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path):engine_(engine),config_path_(std::move(config_path)){
-        kbtheme::initialize(kbtheme::readColorTheme(config_path_));
-        setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setWindowIcon(QIcon(":/ui/app-icon.svg"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(664,area.height()-48));move(area.center()-rect().center());
-        auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(60);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,20,0);top->setSpacing(5);
+        kbtheme::initialize();
+        setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setAttribute(Qt::WA_TranslucentBackground);setWindowIcon(QIcon(":/ui/app-icon.svg"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(664,area.height()-48));move(area.center()-rect().center());
+        auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(52);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,20,0);top->setSpacing(5);
         auto* logo=new QLabel;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));top->addWidget(logo);top->addSpacing(5);
         top->addWidget(new BrandLabel);
-        top->addStretch();status_=new QPushButton;status_->setObjectName("status");status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
-        rapid_status_=new QPushButton;rapid_status_->setObjectName("statusRapid");rapid_status_->setToolTip(text(UiText::RapidFire));top->addWidget(rapid_status_);connect(rapid_status_,&QPushButton::clicked,this,[this]{toggleRapid();});
-        save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addSpacing(7);top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save();});
+        top->addStretch();status_=new QPushButton;status_->setObjectName("status");status_->setFixedHeight(32);status_->setCursor(Qt::PointingHandCursor);status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
+        rapid_status_=new QPushButton;rapid_status_->setObjectName("statusRapid");rapid_status_->setFixedHeight(32);rapid_status_->setCursor(Qt::PointingHandCursor);rapid_status_->setToolTip(text(UiText::RapidFire));top->addWidget(rapid_status_);connect(rapid_status_,&QPushButton::clicked,this,[this]{toggleRapid();});
+        save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addSpacing(7);top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save(true);});
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
         gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});top->addSpacing(7);auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
@@ -955,7 +953,7 @@ public:
         buildPreferences();
         if(c.phone_enabled&&!phone_->listening()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}
         buildSettings();updateLanguage();applyStyle();buildTray();qApp->installEventFilter(this);
-        auto* saveShortcut=new QShortcut(QKeySequence::Save,this);connect(saveShortcut,&QShortcut::activated,this,[this]{save();});
+        auto* saveShortcut=new QShortcut(QKeySequence::Save,this);connect(saveShortcut,&QShortcut::activated,this,[this]{save(true);});
         auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{if(sidebar_collapsed_)setSidebarCollapsed(false,true,true);else{search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();}});
         auto* escapeShortcut=new QShortcut(QKeySequence(Qt::Key_Escape),this);connect(escapeShortcut,&QShortcut::activated,this,[this]{if(notice_bar_->isVisible()){notice_timer_.stop();notice_bar_->hide();}else if(pages_->currentWidget()==preferences_)showOperators();else if(!search_->text().isEmpty())search_->clear();});
         clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});paint_.start();
@@ -963,7 +961,7 @@ public:
     }
 
     void capture(const QString& file){grab().save(file);}
-    void writePhoneInfo(const QString& path) const {if(!engine_.dry_run())return;QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"port",int(phone_->port())},{"address",phone_->address()},{"token",phone_->token()},{"code",phone_->code()},{"pid",int(QCoreApplication::applicationPid())},{"dryRun",true},{"interface",QStringLiteral("goofy")}}).toJson());}
+    void writePhoneInfo(const QString& path) const {if(!engine_.dry_run())return;QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"port",int(phone_->port())},{"address",phone_->address()},{"token",phone_->token()},{"code",phone_->code()},{"pid",int(QCoreApplication::applicationPid())},{"dryRun",true},{"interface",QStringLiteral("monocode")}}).toJson());}
     void closeUsingControl(){close_->click();}
     void showNotice(const QString& message,bool error=false,bool persistent=false){
         if(!notice_bar_||!notice_)return;

@@ -62,7 +62,7 @@ int main(int argc,char** argv){
     r6::Engine restored(true);check(restored.load(path)&&restored.snapshot().sensitivity.dpi==1600&&restored.snapshot().operators[0].horizontal==-2.3f&&restored.snapshot().secondary[0].vertical==24,"Engine restart retains scaled profiles and reference together");
     check(QFileInfo(QString::fromStdWString(path.wstring())).size()==3734,"reference never extends binary configuration");
     check(uiprefs::update(path,[](QJsonObject& root){root["favorites"]=QJsonArray{"Ace"};root["colorTheme"]="rose";root["sidebarCollapsed"]=true;}),"create isolated UI preferences");
-    check(uiprefs::update(path,[](QJsonObject& root){root["colorTheme"]="charcoal";}),"update isolated appearance preferences");
-    QJsonObject prefs;check(uiprefs::readDocument(uiprefs::filePath(path),prefs)&&prefs["favorites"].toArray().contains("Ace")&&prefs["colorTheme"]=="charcoal"&&prefs["sidebarCollapsed"].toBool(),"appearance changes preserve favorites and sidebar preference");
+    check(uiprefs::update(path,[](QJsonObject& root){root["sidebarCollapsed"]=false;}),"update isolated sidebar preference");
+    QJsonObject prefs;check(uiprefs::readDocument(uiprefs::filePath(path),prefs)&&prefs["favorites"].toArray().contains("Ace")&&!prefs.contains("colorTheme")&&!prefs["sidebarCollapsed"].toBool(),"sidebar changes preserve favorites and drop the obsolete theme key");
     std::cout<<checks<<" console checks: "<<(ok?"PASS":"FAIL")<<'\n';return ok?0:1;
 }

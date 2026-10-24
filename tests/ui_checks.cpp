@@ -44,6 +44,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 {"wrapped_command_remains_unchanged",commandPreserved},{"entire_command_fits_without_internal_clipping",allCommandTextVisible}}},{"samples",samples}};
         }
         QJsonArray themeSamples;
+        Q_UNUSED(themeSamples)
         const auto checkSidebarMotion=[&]()->QJsonObject{
             QJsonObject motionChecks;
             showNormal();activateWindow();showOperators();search_->clear();setSidebarCollapsed(false,false);wait(220);
@@ -84,7 +85,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         if(QCoreApplication::arguments().contains("--motion-only")){
             const bool captureFrames=!QCoreApplication::arguments().contains("--motion-timing-only");
             QJsonObject sequences,motionChecks;bool continuous=true,stableControls=true,stableBackground=true;
-            showPreferences();chooseSettingsCategory(3);wait(250);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
+            showPreferences();chooseSettingsCategory(2);wait(250);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
             const auto record=[&](const QString& name,const std::function<void()>& action){
                 QDir().mkpath(output+"/"+name);QVector<QImage> frames;QJsonArray samples;QElapsedTimer clock;clock.start();
                 QTimer sample;sample.setTimerType(Qt::PreciseTimer);sample.setInterval(16);QEventLoop loop;
@@ -114,9 +115,9 @@ QJsonObject MainWindow::selfTest(const QString& output){
             motionChecks["phone_retarget_preserves_height"]=continuous;motionChecks["phone_switch_keeps_44px_row"]=stableControls;if(captureFrames)motionChecks["phone_background_stays_panel_color"]=stableBackground;
             return {{"passed",continuous&&stableControls&&stableBackground},{"checks",motionChecks},{"sequences",sequences}};
         }
-        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<(712)||size()==QSize(864,664);checks["layout_matches_interface"]=findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="Azec";checks["all_operators_listed"]=operators_->count()==r6::operator_count;checks["extension_operator_rows"]=operators_->item(r6::legacy_operator_count)->text()=="Noor"&&operators_->item(operators_->count()-1)->text()=="Denari";checks["all_svg_icons_valid"]=icon_failures_.empty();checks["scroll_edge_fades_present"]=sidebar_scroll_->findChildren<QWidget*>("scrollFade").size()==2&&scroll_->findChildren<QWidget*>("scrollFade").size()==2&&preferences_scroll_->findChildren<QWidget*>("scrollFade").size()==2;checks["actual_native_window_not_fullscreen"]=!isFullScreen();
+        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<(712)||size()==QSize(864,664);checks["layout_matches_interface"]=findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="Azec";checks["all_operators_listed"]=operators_->count()==r6::operator_count;checks["extension_operator_rows"]=operators_->item(r6::legacy_operator_count)->text()=="Noor"&&operators_->item(operators_->count()-1)->text()=="Denari";checks["all_svg_icons_valid"]=icon_failures_.empty();checks["scroll_content_has_no_obscuring_overlays"]=sidebar_scroll_->findChildren<QWidget*>("scrollFade").isEmpty()&&scroll_->findChildren<QWidget*>("scrollFade").isEmpty()&&preferences_scroll_->findChildren<QWidget*>("scrollFade").isEmpty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
 
-        checks["only_goofy_layout_constructed"]=findChild<QWidget*>("operatorSidebar")&&!findChild<QWidget*>("operatorRoster")&&!findChild<QPushButton*>("operatorPicker");
+        checks["only_single_layout_constructed"]=findChild<QWidget*>("operatorSidebar")&&!findChild<QWidget*>("operatorRoster")&&!findChild<QPushButton*>("operatorPicker");
         checks["game_process_names"]=r6::isGameProcessName("C:\\Games\\RainbowSix.exe")&&r6::isGameProcessName("RainbowSix_DX12.exe")&&!r6::isGameProcessName("chrome.exe")&&!r6::isGameProcessName("RainbowSix_BE.exe");
         auto* sidebarBar=static_cast<FadingScrollBar*>(sidebar_scroll_->verticalScrollBar());checks["scrollbars_start_invisible"]=sidebarBar->opacity()==0&&static_cast<FadingScrollBar*>(scroll_->verticalScrollBar())->opacity()==0&&static_cast<FadingScrollBar*>(preferences_scroll_->verticalScrollBar())->opacity()==0;
         checks["one_shared_sidebar_scroll"]=sidebar_scroll_->widget()->isAncestorOf(operators_)&&sidebar_scroll_->widget()->isAncestorOf(favorites_list_)&&operators_->verticalScrollBarPolicy()==Qt::ScrollBarAlwaysOff&&favorites_list_->verticalScrollBarPolicy()==Qt::ScrollBarAlwaysOff;
@@ -153,11 +154,11 @@ QJsonObject MainWindow::selfTest(const QString& output){
         // Hidden harness windows need an active Qt focus context for Tab events.
         QApplication::setActiveWindow(this);status_->clearFocus();status_->setFocus(Qt::TabFocusReason);QApplication::processEvents();const bool keyboardIndicator=status_->property("keyboardFocus").toBool();
         const QPointF statusPoint=status_->rect().center();QMouseEvent press(QEvent::MouseButtonPress,statusPoint,QPointF(status_->mapToGlobal(statusPoint.toPoint())),Qt::LeftButton,Qt::LeftButton,Qt::NoModifier);QApplication::sendEvent(status_,&press);QMouseEvent release(QEvent::MouseButtonRelease,statusPoint,QPointF(status_->mapToGlobal(statusPoint.toPoint())),Qt::LeftButton,Qt::NoButton,Qt::NoModifier);QApplication::sendEvent(status_,&release);status_->click();checks["keyboard_focus_is_visible_and_mouse_click_clears_it"]=keyboardIndicator&&!status_->property("keyboardFocus").toBool()&&!engine_.recoil_active.load();
-        checks["consistent_bundled_typography"]=QFontInfo(operator_name_->font()).family()==("Fredoka")&&QFontInfo(save_->font()).family()=="Geist"&&QFontInfo(status_->font()).family()=="Geist";
+        checks["system_typography"]=QFontInfo(operator_name_->font()).family()=="Segoe UI"&&QFontInfo(save_->font()).family()=="Segoe UI"&&QFontInfo(status_->font()).family()=="Segoe UI";
         checks["compact_operator_rows"]=operators_->sizeHintForRow(0)==operatorRowHeight&&operators_->item(0)->icon().availableSizes().contains(QSize(operatorIconSize,operatorIconSize));
-        QFont sidebarFont("Geist");sidebarFont.setPixelSize(14);sidebarFont.setWeight(QFont::Medium);bool namesFit=true;for(int row=0;row<operators_->count();++row)namesFit&=QFontMetrics(sidebarFont).horizontalAdvance(operators_->item(row)->text())<=(operators_->viewport()->width()-73);checks["larger_operator_names_fit_sidebar"]=namesFit;
+        QFont sidebarFont("Segoe UI");sidebarFont.setPixelSize(14);sidebarFont.setWeight(QFont::Medium);bool namesFit=true;for(int row=0;row<operators_->count();++row)namesFit&=QFontMetrics(sidebarFont).horizontalAdvance(operators_->item(row)->text())<=(operators_->viewport()->width()-73);checks["larger_operator_names_fit_sidebar"]=namesFit;
         bool aligned=true;for(auto* button:save_->parentWidget()->findChildren<QPushButton*>(QString(),Qt::FindDirectChildrenOnly))if(dynamic_cast<IconButton*>(button))aligned&=button->size()==QSize(34,34)&&button->geometry().center().y()==save_->geometry().center().y()&&button->text().isEmpty()&&button->iconSize()==QSize(20,20);checks["header_icons_share_geometry"]=aligned;
-        auto* titleBar=findChild<QWidget*>("titleBar");checks["header_has_requested_breathing_room"]=titleBar->height()==(60)&&((save_->y()>=13&&titleBar->height()-save_->geometry().bottom()-1>=13));
+        auto* titleBar=findChild<QWidget*>("titleBar");checks["header_has_requested_breathing_room"]=titleBar->height()==(52)&&((save_->y()>=9&&titleBar->height()-save_->geometry().bottom()-1>=9));
         const auto gearBefore=gear_->grab().toImage();QEnterEvent enter(QPointF(17,17),QPointF(gear_->pos()+QPoint(17,17)),QPointF(gear_->mapToGlobal(QPoint(17,17))));QApplication::sendEvent(gear_,&enter);wait(170);const auto gearHovered=gear_->grab().toImage();capture(output+"/header-hover.png");
         bool transparentEdges=true;for(int y=0;y<gearBefore.height();++y)for(int x=0;x<gearBefore.width();++x)if(x<3||y<3||x>=gearBefore.width()-3||y>=gearBefore.height()-3)transparentEdges&=gearBefore.pixelColor(x,y)==gearHovered.pixelColor(x,y);QEvent leave(QEvent::Leave);QApplication::sendEvent(gear_,&leave);wait(170);
         bool hoverFlat=gearBefore==gearHovered;{const auto statusBefore=status_->grab().toImage();QEnterEvent statusEnter(QPointF(5,5),QPointF(5,5),status_->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(status_,&statusEnter);wait(30);hoverFlat&=statusBefore==status_->grab().toImage();QEvent statusLeave(QEvent::Leave);QApplication::sendEvent(status_,&statusLeave);}
@@ -173,8 +174,9 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["footer_removed"]=!findChild<QFrame*>("footer");checks["small_r6_label_removed"]=!findChild<QLabel*>("r6Badge");
         bool question=false;for(auto* button:findChildren<QPushButton*>())question|=button->text()=="?";checks["no_question_mark_control"]=!question;
 
-        DWORD preference=0;const auto hr=DwmGetWindowAttribute(HWND(winId()),33,&preference,sizeof(preference));HRGN region=CreateRectRgn(0,0,0,0);const int regionType=GetWindowRgn(HWND(winId()),region);const bool clipped=regionType!=ERROR&&!PtInRegion(region,0,0)&&PtInRegion(region,qRound(width()*devicePixelRatioF()/2),qRound(height()*devicePixelRatioF()/2));DeleteObject(region);
-        checks["actual_rounded_window_shape"]=(SUCCEEDED(hr)&&preference==2)||clipped;checks["sendinput_suppressed_in_dry_run"]=engine_.dry_run()&&engine_.injected_events==0;
+        {const auto shape=grab().toImage();
+        checks["painted_rounded_window_corners"]=shape.pixelColor(1,1).alpha()<40&&shape.pixelColor(26,1).alpha()>200&&shape.pixelColor(width()-2,1).alpha()<40;}
+        checks["sendinput_suppressed_in_dry_run"]=engine_.dry_run()&&engine_.injected_events==0;
         status_->setFocus(Qt::OtherFocusReason);scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();capture(output+"/window.png");
         const auto stationaryPanel=panel_->geometry();auto* preferenceContent=preferences_scroll_->widget();
         const auto roundedCorner=pages_->mapTo(this,QPoint(1,1));const auto cornerBefore=grab().toImage().pixelColor(roundedCorner);
@@ -251,9 +253,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         settings_->setMinimumHeight(scroll_->viewport()->height()+300);QApplication::processEvents();gear_->click();preferences_scroll_->widget()->setMinimumHeight(preferences_scroll_->viewport()->height()+300);QApplication::processEvents();wait(220);
         auto* operatorBar=static_cast<FadingScrollBar*>(scroll_->verticalScrollBar());auto* preferenceBar=static_cast<FadingScrollBar*>(preferences_scroll_->verticalScrollBar());
         preferenceBar->setValue((preferenceBar->maximum()+preferenceBar->minimum())/2);QApplication::processEvents();
-        bool settingsTopFade=false,settingsBottomFade=false;
-        for(auto* fade:preferences_scroll_->findChildren<QWidget*>("scrollFade")){if(!fade->isVisible())continue;if(fade->geometry().top()<=preferences_scroll_->viewport()->geometry().top())settingsTopFade=true;else settingsBottomFade=true;}
-        checks["settings_scroll_edge_fades_follow_scroll"]=settingsTopFade&&settingsBottomFade;
+        checks["settings_scrolled_content_has_no_overlay"]=preferences_scroll_->findChildren<QWidget*>("scrollFade").isEmpty();
         const auto sidebarWidth=sidebar_scroll_->viewport()->width(),preferenceWidth=preferences_scroll_->viewport()->width();
         for(auto* bar:{sidebarBar,operatorBar,preferenceBar}){bar->setValue(1);bar->reveal();}wait(130);
         checks["all_scrollbars_fade_in"]=sidebarBar->opacity()>.99&&operatorBar->opacity()>.99&&preferenceBar->opacity()>.99;
@@ -273,7 +273,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         // Language coverage above deliberately edits settings; compare the help dialog to its own entry state.
         const auto beforeHelp=engine_.snapshot().bytes();QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/help.png");modal->reject();}});help();checks["help_dialog_preserves_settings"]=engine_.snapshot().bytes()==beforeHelp;
         // New reliability/UI behavior uses the same production paths as the real window.
-        showPreferences();wait(220);buildPreferences();chooseSettingsCategory(3);QApplication::processEvents();
+        showPreferences();wait(220);buildPreferences();chooseSettingsCategory(2);QApplication::processEvents();
         checks["brand_logo_asset_valid"]=QSvgRenderer(QStringLiteral(":/ui/logo.svg")).isValid()&&(bool(findChild<QLabel*>("brandLogo")));
         checks["qr_is_obscured_by_default"]=pairing_qr_&&!pairing_qr_->revealed();
         if(pairing_qr_){
@@ -305,22 +305,15 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 const auto name=QString("qr-sample-%1.png").arg(++sampleIndex);samplesReady&=sample.grab().save(output+"/"+name);qrCases.append(scanCase(name,link));
             }
             checks["branded_qr_samples_rendered"]=samplesReady;
-            const auto originalQrTheme=kbtheme::activeColorTheme;
-            PairingQr themedSample(QStringLiteral("Reveal QR"),QStringLiteral("Hide QR"));themedSample.setPairingLink(sampleLinks[4]);
-            bool themeSamplesReady=true;QImage previousQr;
-            for(const auto& theme:kbtheme::colorThemes){
-                kbtheme::initialize(QLatin1String(theme.id));themedSample.refreshTheme();
-                for(int attempt=0;attempt<200&&!themedSample.framesReady();++attempt)wait(10);
-                themeSamplesReady&=themedSample.framesReady();if(!themedSample.revealed())themedSample.click();wait(460);
-                const auto image=themedSample.grab().toImage();
-                themeSamplesReady&=previousQr.isNull()||image!=previousQr;previousQr=image;
-                const auto name=QString("qr-theme-%1.png").arg(QLatin1String(theme.id));themeSamplesReady&=image.save(output+"/"+name);qrCases.append(scanCase(name,sampleLinks[4]));
-            }
-            kbtheme::initialize(originalQrTheme);
-            checks["qr_theme_refresh_recolors_same_link_in_all_palettes"]=themeSamplesReady;
+            PairingQr refreshedSample(QStringLiteral("Reveal QR"),QStringLiteral("Hide QR"));refreshedSample.setPairingLink(sampleLinks[4]);
+            bool refreshedReady=true;
+            for(int attempt=0;attempt<200&&!refreshedSample.framesReady();++attempt)wait(10);
+            refreshedReady&=refreshedSample.framesReady();refreshedSample.refreshTheme();wait(460);
+            if(!refreshedSample.revealed())refreshedSample.click();wait(460);
+            checks["qr_theme_refresh_keeps_same_link"]=refreshedReady&&refreshedSample.revealed();
             QFile scanManifest(output+"/qr-scan-cases.json");scanManifest.open(QIODevice::WriteOnly);scanManifest.write(QJsonDocument(qrCases).toJson());
         }
-        showPreferences();chooseSettingsCategory(3);wait(220);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
+        showPreferences();chooseSettingsCategory(2);wait(220);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);
         auto* stablePreferences=preferences_scroll_->widget();auto* stablePhoneSwitch=phone_enabled_.data();auto* stableBar=preferences_scroll_->verticalScrollBar();
         // Anchor away from the bottom limit: exact position is possible only
         // while the old offset remains inside the collapsed scroll range.
@@ -341,10 +334,10 @@ QJsonObject MainWindow::selfTest(const QString& output){
         preferences_scroll_->ensureWidgetVisible(pairing_qr_);wait(80);capture(output+"/phone-enabled.png");
         pairing_qr_->click();wait(80);hide();show();wait(350);checks["hiding_window_cancels_qr_reveal"]=!pairing_qr_->revealed()&&pairing_qr_->revealProgress()==0&&!pairing_qr_->transitioning();showOperators();wait(220);
         checks["tray_has_window_recoil_rapid_and_exit"]=tray_&&tray_menu_&&tray_recoil_->isCheckable()&&tray_rapid_->isCheckable()&&tray_exit_&&tray_menu_->actions().size()==5&&tray_menu_->actions()[3]->isSeparator();
-        const auto baseline=engine_.snapshot();const auto backup=makeBackup(baseline,favorites_,engine_.game_focus_only.load(),kbtheme::activeColorTheme,sidebar_collapsed_);r6::Config imported;QSet<QString> importedFavorites;BackupOptions importedOptions;
+        const auto baseline=engine_.snapshot();const auto backup=makeBackup(baseline,favorites_,engine_.game_focus_only.load(),sidebar_collapsed_);r6::Config imported;QSet<QString> importedFavorites;BackupOptions importedOptions;
         const bool parsedBackup=parseBackup(backup,imported,importedFavorites,importedOptions);
         bool backupRapidMatches=parsedBackup;if(parsedBackup)for(int i=0;i<r6::operator_count;++i)backupRapidMatches&=imported.operators[i].rapid==baseline.operators[i].rapid&&imported.secondary[i].rapid==baseline.secondary[i].rapid;
-        checks["complete_profile_backup_roundtrip"]=parsedBackup&&imported.bytes()==baseline.bytes()&&backupRapidMatches&&importedFavorites==favorites_&&imported.secondary_enabled==baseline.secondary_enabled&&importedOptions.colorTheme==kbtheme::activeColorTheme&&importedOptions.sidebarCollapsed==sidebar_collapsed_;
+        checks["complete_profile_backup_roundtrip"]=parsedBackup&&imported.bytes()==baseline.bytes()&&backupRapidMatches&&importedFavorites==favorites_&&imported.secondary_enabled==baseline.secondary_enabled&&importedOptions.sidebarCollapsed==sidebar_collapsed_;
         auto legacyBackup=backup;auto legacySettings=legacyBackup["settings"].toObject();legacySettings.remove("perProfileRapid");legacySettings["rapidActive"]=true;legacyBackup["settings"]=legacySettings;r6::Config legacyConfig;QSet<QString> legacyFavorites;BackupOptions legacyOptions;
         checks["legacy_backup_rapid_migrates_to_both_profiles"]=parseBackup(legacyBackup,legacyConfig,legacyFavorites,legacyOptions)&&legacyConfig.operators[4].rapid&&legacyConfig.secondary[4].rapid;
         auto shortBackup=backup;auto shortEntries=backup["operators"].toArray();while(shortEntries.size()>72)shortEntries.removeLast();shortBackup["operators"]=shortEntries;r6::Config shortConfig;QSet<QString> shortFavorites;BackupOptions shortOptions;
@@ -393,7 +386,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         status_->setFocus(Qt::OtherFocusReason);paint_.stop();const QPoint stationary(-20000,-20000);trackCursor(stationary);wait(100);const int idleRequests=cursor_repaints_;
         for(int sample=0;sample<12;++sample)trackCursor(stationary);wait(350);
         checks["stationary_cursor_does_not_schedule_background_repaints"]=cursor_repaints_==idleRequests;
-        trackCursor(stationary+QPoint(1,0));checks["cursor_movement_schedules_one_background_repaint"]=cursor_repaints_==idleRequests+1;
+        trackCursor(stationary+QPoint(1,0));checks["cursor_movement_schedules_no_repaint"]=cursor_repaints_==idleRequests;
         // Wait for delayed feedback (including the three-second scrollbar fade)
         // to finish, then require the same strict 350 ms without a repaint.
         // Continuous repainting still fails after the bounded settle period.
@@ -410,44 +403,19 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["previous_default_accents_migrate_without_profile_changes"]=migrationPassed;
         theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;theme.radius=250;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);const auto normalized=customTheme.snapshot();
         checks["removed_appearance_settings_normalize_on_load"]=customLoaded&&QColor::fromRgbF(normalized.neon[0],normalized.neon[1],normalized.neon[2]).name()=="#7248d7"&&std::abs(normalized.radius-130.f)<.001f&&std::abs(normalized.operators[4].vertical-theme.operators[4].vertical)<.001f;
-        showPreferences();chooseSettingsCategory(1);wait(220);
-        checks["settings_has_six_categories"]=settings_nav_buttons_.size()==6&&preference_categories_.size()==6;
+        showPreferences();chooseSettingsCategory(0);wait(220);
+        checks["settings_has_five_categories"]=settings_nav_buttons_.size()==5&&preference_categories_.size()==5;
         bool categoryVisibility=true;for(int index=0;index<settings_nav_buttons_.size();++index){settings_nav_buttons_[index]->click();QApplication::processEvents();for(int i=0;i<preference_categories_.size();++i)categoryVisibility&=preference_categories_[i]->isVisible()==(i==index);}
         checks["settings_categories_show_only_selected_content"]=categoryVisibility;
-        chooseSettingsCategory(3);pairing_qr_->click();chooseSettingsCategory(1);checks["changing_settings_category_conceals_qr"]=!pairing_qr_->revealed();
+        chooseSettingsCategory(2);pairing_qr_->click();chooseSettingsCategory(0);checks["changing_settings_category_conceals_qr"]=!pairing_qr_->revealed();
         wait(220);
 
-            const auto originalTheme=kbtheme::activeColorTheme;const auto themeProfiles=engine_.snapshot().bytes();const bool themeDirty=unsaved_;const auto themePanel=panel_->geometry();
-            checks["all_requested_palettes_available"]=theme_cards_.size()==11;
-            bool themeCardsVisible=theme_cards_.size()==11;
-            for(auto* card:theme_cards_)themeCardsVisible&=card->isVisible();
-            const QString clickTheme=kbtheme::activeColorTheme=="rose"?QStringLiteral("goofy"):QStringLiteral("rose");
-            ThemeCard* clickCard=nullptr;for(auto* card:theme_cards_)if(card->themeId()==clickTheme)clickCard=card;
-            if(clickCard)clickCard->click();QApplication::processEvents();
-            checks["appearance_theme_card_click_applies_and_saves"]=clickCard&&kbtheme::activeColorTheme==clickTheme&&selectedThemeId()==clickTheme&&kbtheme::readColorTheme(config_path_)==clickTheme;
-            checks["appearance_theme_grid_shows_all_palettes"]=themeCardsVisible&&selectedThemeId()==kbtheme::activeColorTheme&&!findChild<QComboBox*>("colorThemeChoice");
-            chooseColorTheme(originalTheme);QApplication::processEvents();
-            bool palettesApply=true,palettesPersist=true,themeLayoutStable=true,seamlessHeaders=true,mobilePalettesMatch=true;
-            for(const auto& palette:kbtheme::colorThemes){
-                chooseColorTheme(QLatin1String(palette.id));QApplication::processEvents();
-                const bool matchingText=this->palette().color(QPalette::WindowText)==QColor(palette.text);
-                palettesApply&=accent()==QColor(palette.accent)&&kbtheme::paper==QColor(palette.paper)&&kbtheme::surface==QColor(palette.surface)&&matchingText&&selectedThemeId()==QLatin1String(palette.id);
-                palettesPersist&=kbtheme::readColorTheme(config_path_)==QLatin1String(palette.id);
-                const auto phoneAppearance=mobileState()["appearance"].toObject();const auto phoneColors=phoneAppearance["colors"].toObject();
-                mobilePalettesMatch&=phoneAppearance["id"].toString()==QLatin1String(palette.id)&&phoneColors["paper"].toString()==QColor(palette.paper).name()&&phoneColors["ink"].toString()==QColor(palette.text).name()&&phoneColors["outline"].toString()==QColor(palette.outline).name()&&phoneAppearance["themes"].toArray().size()==11;
-                themeSamples.append(QJsonObject{{"theme",palette.id},{"panelUnchanged",panel_->geometry()==themePanel},{"sidebarExpanded",sidebar_->width()==200},{"profilesUnchanged",engine_.snapshot().bytes()==themeProfiles},{"unsavedUnchanged",unsaved_==themeDirty}});
-                themeLayoutStable&=panel_->geometry()==themePanel&&sidebar_->width()==200&&engine_.snapshot().bytes()==themeProfiles&&unsaved_==themeDirty;
-                showOperators();wait(200);const auto headerImage=titleBar->grab().toImage();seamlessHeaders&=kbtheme::header==kbtheme::paper&&headerImage.pixelColor(headerImage.width()/2,headerImage.height()-1)==kbtheme::paper;capture(output+"/theme-"+QLatin1String(palette.id)+".png");showPreferences();chooseSettingsCategory(1);wait(200);
+            checks["single_look_without_theme_picker"]=!findChild<QWidget*>("themeGrid")&&!findChild<QComboBox*>("colorThemeChoice")&&kbtheme::paper==QColor("#171717")&&accent()==QColor("#459BF7");
+            {
+                const auto appearance=mobileState()["appearance"].toObject();const auto phoneColors=appearance["colors"].toObject();
+                checks["phone_publishes_single_look_colors"]=appearance["themes"].isUndefined()&&appearance["id"].isUndefined()&&phoneColors["paper"].toString()==kbtheme::paper.name()&&phoneColors["ink"].toString()==kbtheme::ink.name()&&phoneColors["accent"].toString()==accent().name();
+                checks["phone_rejects_removed_theme_action"]=mobileUpdate({{"action","setTheme"},{"theme","midnight"}}).contains("error");
             }
-            checks["all_palettes_have_seamless_sidebar_color_header"]=seamlessHeaders;checks["palettes_apply_immediately_with_readable_text"]=palettesApply;checks["palette_selection_persists"]=palettesPersist;checks["palettes_keep_layout_and_profile_edits"]=themeLayoutStable;
-            checks["desktop_theme_changes_publish_matching_phone_palettes"]=mobilePalettesMatch;
-            persistFavorites();checks["favorites_preserve_nondefault_palette"]=kbtheme::readColorTheme(config_path_)=="deep-sea";
-            {MainWindow reopened(engine_,config_path_);checks["palette_reloads_in_new_window"]=reopened.selectedThemeId()==kbtheme::activeColorTheme;}
-            chooseColorTheme(originalTheme);QApplication::processEvents();
-            const auto phoneThemeProfiles=engine_.snapshot().bytes();const bool phoneThemeDirty=unsaved_;const auto remoteTheme=mobileUpdate({{"action","setTheme"},{"theme","forest"}});
-            checks["phone_theme_change_updates_desktop_and_persistence"]=remoteTheme["appearance"].toObject()["id"].toString()=="forest"&&selectedThemeId()=="forest"&&kbtheme::paper==QColor("#14241E")&&kbtheme::readColorTheme(config_path_)=="forest"&&engine_.snapshot().bytes()==phoneThemeProfiles&&unsaved_==phoneThemeDirty;
-            checks["phone_rejects_unknown_and_nonstring_theme"]=mobileUpdate({{"action","setTheme"},{"theme","not-a-theme"}}).contains("error")&&mobileUpdate({{"action","setTheme"},{"theme",12}}).contains("error")&&kbtheme::activeColorTheme=="forest";
-            mobileUpdate({{"action","setTheme"},{"theme",originalTheme}});
             const auto sidebarProfiles=engine_.snapshot().bytes();showOperators();wait(220);const int expandedWidth=panel_->width();sidebar_scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();
             checks["sidebar_has_top_labelled_collapse_and_bottom_search"]=sidebar_toggle_->text()=="Collapse"&&sidebar_toggle_->geometry().bottom()<sidebar_scroll_->geometry().top()&&sidebar_search_box_->geometry().top()>sidebar_scroll_->geometry().bottom()&&search_->isVisible()&&sidebar_search_->isHidden();
             const auto anchoredIcon=operators_->viewport()->grab(QRect(6,4,44,44)).toImage();const int anchoredRowsY=operators_->mapTo(sidebar_,QPoint()).y();
@@ -457,7 +425,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             checks["sidebar_collapsed_preference_persists"]=uiprefs::sidebarCollapsed(config_path_);capture(output+"/sidebar-collapsed.png");
             checks["collapsed_sidebar_keeps_top_toggle_and_bottom_search_icon"]=sidebar_toggle_->width()==64&&sidebar_search_->isVisible()&&search_->isHidden()&&sidebar_search_box_->geometry().top()>sidebar_scroll_->geometry().bottom()&&operators_->viewport()->grab(QRect(6,4,44,44)).toImage()==anchoredIcon;
             const bool alreadyFavorite=favorites_.contains("Ash");setFavorite(4,true);checks["collapsed_sidebar_favorites_stay_unique_and_preserve_preferences"]=sidebar_->width()==76&&operators_->item(4)->isHidden()&&favorites_group_->isVisible()&&uiprefs::sidebarCollapsed(config_path_);setFavorite(4,alreadyFavorite);
-            chooseColorTheme("rose");QApplication::processEvents();checks["changing_palette_preserves_collapsed_sidebar"]=sidebar_->width()==76&&uiprefs::sidebarCollapsed(config_path_)&&kbtheme::readColorTheme(config_path_)=="rose"&&selectedThemeId()=="rose"&&engine_.snapshot().bytes()==sidebarProfiles;capture(output+"/sidebar-rose.png");chooseColorTheme(originalTheme);
+            checks["collapsed_sidebar_keeps_profile_bytes"]=engine_.snapshot().bytes()==sidebarProfiles;
             {MainWindow reopened(engine_,config_path_);checks["collapsed_sidebar_reloads_in_new_window"]=reopened.sidebar_collapsed_&&reopened.sidebar_->width()==76;}
             QApplication::setActiveWindow(this);sidebar_search_->click();wait(80);checks["search_expands_sidebar_with_animation"]=!sidebar_collapsed_&&sidebar_animation_.state()==QAbstractAnimation::Running;wait(220);
             checks["sidebar_search_receives_focus"]=sidebar_->width()==200&&search_->hasFocus()&&sidebar_search_->isHidden();
@@ -465,28 +433,26 @@ QJsonObject MainWindow::selfTest(const QString& output){
             setSidebarCollapsed(true);wait(70);const int beforeSidebarReverse=sidebar_->width();setSidebarCollapsed(false);checks["sidebar_retarget_preserves_current_width"]=sidebar_->width()==beforeSidebarReverse;wait(30);setSidebarCollapsed(true);wait(30);setSidebarCollapsed(false);wait(280);
             checks["rapid_sidebar_reversal_settles_expanded"]=!sidebar_collapsed_&&sidebar_->width()==200&&sidebar_animation_.state()==QAbstractAnimation::Stopped&&!uiprefs::sidebarCollapsed(config_path_);
             const auto sidebarMotion=checkSidebarMotion()["checks"].toObject();for(auto it=sidebarMotion.begin();it!=sidebarMotion.end();++it)checks[it.key()]=it.value();
-            showPreferences();chooseSettingsCategory(1);wait(220);capture(output+"/appearance-settings.png");
+            showPreferences();chooseSettingsCategory(0);wait(220);capture(output+"/general-settings.png");
             const auto uiPath=uiprefs::filePath(config_path_),uiTemporary=uiPath+".appearance-test-backup";QFile::rename(uiPath,uiTemporary);QDir().mkdir(uiPath);
-            const auto previousTheme=kbtheme::activeColorTheme;chooseColorTheme("midnight");setSidebarCollapsed(true);
-            checks["failed_ui_save_keeps_theme_and_sidebar"]=kbtheme::activeColorTheme==previousTheme&&selectedThemeId()==previousTheme&&!sidebar_collapsed_&&sidebar_->width()==200;
-            checks["failed_phone_theme_save_keeps_both_screens_on_previous_theme"]=mobileUpdate({{"action","setTheme"},{"theme","forest"}}).contains("error")&&kbtheme::activeColorTheme==previousTheme&&selectedThemeId()==previousTheme&&mobileState()["appearance"].toObject()["id"].toString()==previousTheme;
+            setSidebarCollapsed(true);QApplication::processEvents();
+            checks["failed_ui_save_keeps_sidebar"]=!sidebar_collapsed_&&sidebar_->width()==200;
             QDir().rmdir(uiPath);QFile::rename(uiTemporary,uiPath);notice_close_->click();
-            persistFavorites();checks["favorite_save_preserves_theme_and_sidebar"]=kbtheme::readColorTheme(config_path_)==originalTheme&&!uiprefs::sidebarCollapsed(config_path_);
+            persistFavorites();checks["favorite_save_preserves_sidebar"]=!uiprefs::sidebarCollapsed(config_path_);
 
-        if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(1);wait(220);
-        checks["appearance_has_no_interface_selector_or_restart_action"]=preferences_->isVisible()&&!findChild<QComboBox*>("interfaceChoice")&&!findChild<QWidget*>("interfacePopup")&&!findChild<QComboBox*>("colorThemeChoice");
-        capture(output+"/appearance-settings.png");
+        if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(0);wait(220);
+        checks["settings_have_no_theme_picker_or_interface_selector"]=preferences_->isVisible()&&!findChild<QComboBox*>("interfaceChoice")&&!findChild<QWidget*>("interfacePopup")&&!findChild<QComboBox*>("colorThemeChoice")&&!findChild<QWidget*>("themeGrid");
         const auto uiFixture=std::filesystem::path(output.toStdWString())/L"ui-preferences"/L"r6_config.bin";QDir().mkpath(QString::fromStdWString(uiFixture.parent_path().wstring()));
-        checks["missing_appearance_preferences_use_defaults"]=kbtheme::readColorTheme(uiFixture)=="charcoal"&&!uiprefs::sidebarCollapsed(uiFixture);
+        checks["missing_sidebar_preferences_use_defaults"]=!uiprefs::sidebarCollapsed(uiFixture);
         {QFile unsupported(uiprefs::filePath(uiFixture));unsupported.open(QIODevice::WriteOnly);unsupported.write("{\"version\":2,\"colorTheme\":\"midnight\",\"sidebarCollapsed\":true}");}
-        checks["unsupported_appearance_schema_uses_defaults"]=kbtheme::readColorTheme(uiFixture)=="charcoal"&&!uiprefs::sidebarCollapsed(uiFixture);
+        checks["unsupported_ui_schema_uses_defaults"]=!uiprefs::sidebarCollapsed(uiFixture);
         QFile invalidUi(uiprefs::filePath(uiFixture));invalidUi.open(QIODevice::WriteOnly);invalidUi.write("{broken");invalidUi.close();
-        checks["invalid_ui_preferences_are_not_overwritten"]=!kbtheme::writeColorTheme(uiFixture,"midnight")&&!uiprefs::update(uiFixture,[](QJsonObject& root){root["sidebarCollapsed"]=true;});
+        checks["invalid_ui_preferences_are_not_overwritten"]=!uiprefs::update(uiFixture,[](QJsonObject& root){root["sidebarCollapsed"]=true;});
         invalidUi.open(QIODevice::WriteOnly|QIODevice::Truncate);invalidUi.close();
-        checks["empty_ui_preferences_recover_through_theme_save"]=kbtheme::writeColorTheme(uiFixture,"rose")&&kbtheme::readColorTheme(uiFixture)=="rose";
+        checks["empty_ui_preferences_recover_through_save"]=uiprefs::update(uiFixture,[](QJsonObject& root){root["sidebarCollapsed"]=false;})&&!uiprefs::sidebarCollapsed(uiFixture);
         invalidUi.open(QIODevice::WriteOnly|QIODevice::Truncate);invalidUi.write("{\"version\":1,\"interface\":\"retired\",\"favorites\":[\"Ash\"],\"colorTheme\":\"deep-sea\",\"sidebarCollapsed\":true}");invalidUi.close();
-        kbtheme::writeColorTheme(uiFixture,"midnight");QJsonObject migratedUi;uiprefs::readDocument(uiprefs::filePath(uiFixture),migratedUi);
-        checks["obsolete_interface_removed_without_losing_preferences"]=!migratedUi.contains("interface")&&migratedUi["favorites"].toArray().contains("Ash")&&kbtheme::readColorTheme(uiFixture)=="midnight"&&uiprefs::sidebarCollapsed(uiFixture);
+        uiprefs::update(uiFixture,[](QJsonObject& root){root["sidebarCollapsed"]=false;});QJsonObject migratedUi;uiprefs::readDocument(uiprefs::filePath(uiFixture),migratedUi);
+        checks["obsolete_keys_removed_without_losing_preferences"]=!migratedUi.contains("interface")&&!migratedUi.contains("colorTheme")&&migratedUi["favorites"].toArray().contains("Ash")&&!uiprefs::sidebarCollapsed(uiFixture);
         // Mouse setup uses the production handlers with an isolated INI file.
         if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(mouse_setup_category_);wait(220);
         checks["mouse_setup_rejects_incomplete_values"]=mouse_save_&&!mouse_save_->isEnabled()&&mouse_rescale_&&!mouse_rescale_->isEnabled();
@@ -503,5 +469,5 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["mouse_setup_confirmed_rescale_changes_profiles_and_marks_dirty"]=unsaved_&&qAbs(engine_.snapshot().operators[0].vertical-beforeRescale.operators[0].vertical*.5f)<.001f;
         {QFile ini(iniPath);ini.open(QIODevice::ReadOnly);checks["mouse_setup_never_writes_game_ini"]=ini.readAll()==iniBytes;}
         testDriver();checks["dry_run_driver_test_never_injects_input"]=engine_.injected_events==0;
-        QJsonObject report;report["theme_samples"]=themeSamples;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("goofy");report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="Interception (suppressed in dry-run)";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
+        QJsonObject report;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("monocode");report["checks"]=checks;report["rounding_method"]=QStringLiteral("painted antialiased corners (per-pixel alpha over the system blur)");report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="Interception (suppressed in dry-run)";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }

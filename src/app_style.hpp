@@ -2,123 +2,129 @@
 #include <QtWidgets>
 #include "theme.hpp"
 
-// GoofyUI materials (github.com/Azec-Zuckerberg/goofy-ui-library): named
-// palettes, chunky 2-3 px outlines, rounded controls and hard offset shadows.
-// Placeholders: %1 accent hex, %2 text on accent; material tokens follow below.
+// Monocode materials (github.com/hardbeat920/monocode, MIT): hairline
+// separators, translucent content fills, small radii, one blue accent and a
+// quiet motion language. Placeholders: %1 accent hex, %2 text on accent;
+// material tokens follow below and carry their alpha.
 inline QString applicationStyle(const QColor& accent){
 
     const QString accentHex=accent.name();
     const QString onAccent=kbtheme::readableOn(accent).name();
     QString style=QString::fromUtf8(R"CSS(
-        QWidget { color:$ink; font-family:'Geist'; font-size:13px; font-weight:400; }
-        QWidget#mainWindow { background:$paper; }
-        QFrame#titleBar { background:$header; border:0; }
+        QWidget { color:$ink; font-family:'Segoe UI'; font-size:13px; font-weight:400; }
+        QWidget#mainWindow { background:transparent; }
+        QFrame#titleBar { background:transparent; border:0; }
 
-        QLabel#brand { font-family:'Press Start 2P'; color:#FFFFFF; }
-        QLabel#pageTitle,QLabel#preferencesTitle { font-family:'Fredoka'; font-size:24px; font-weight:600; color:$ink; }
-        QLabel#sidebarTitle { font-family:'Fredoka'; font-size:16px; font-weight:600; color:$ink; }
+        QLabel#brand { color:$ink; font-size:15px; font-weight:600; letter-spacing:0.2px; }
+        QLabel#pageTitle,QLabel#preferencesTitle { font-size:20px; font-weight:600; color:$ink; }
+        QLabel#sidebarTitle { font-size:15px; font-weight:600; color:$ink; }
         QLabel#subtitle,QLabel#hint { color:$muted; font-size:12px; }
-        QLabel#phoneAddress { background:$surface; color:$ink; border:2px solid $outline; border-radius:8px; padding:6px 8px; font-family:'Consolas'; font-size:12px; }
-        QLabel#pairingCode { background:$yellow; color:$chipInk; border:2px solid $outline; border-radius:8px; padding:4px 9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
-        QLabel#rowTitle { color:$ink; font-size:14px; font-weight:600; }
-        QLabel#rowHint { color:$muted; font-size:12px; }
+        QLabel#phoneAddress { background:$card; color:$ink; border:1px solid $outline; border-radius:6px; padding:6px 8px; font-family:'Consolas'; font-size:12px; }
+        QLabel#pairingCode { background:$soft; color:$ink; border:1px solid $outline; border-radius:6px; padding:4px 9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
+        QLabel#rowTitle { color:$ink; font-size:13px; font-weight:600; }
+        QLabel#rowHint { color:$muted; font-size:12px; font-weight:400; }
         QTextEdit#codeText { background:transparent; color:$ink; border:0; padding:0; font-family:'Consolas'; font-size:12px; }
-        QWidget#codeBlock { background:$soft; border:2px solid $outline; border-radius:10px; }
-        QFrame#driverGuide { background:$surface; border:2px solid $outline; border-radius:18px; }
-        QLabel#driverStepNumber { background:$yellow; color:$chipInk; border:2px solid $outline; border-radius:9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
-        QLabel#driverStepTitle { color:$ink; font-family:'Fredoka'; font-size:18px; font-weight:500; }
-        QPushButton#driverDownload { background:%1; color:%2; border:2px solid $outline; border-radius:12px; padding:7px 12px; font-size:13px; font-weight:600; }
-        QPushButton#driverDownload:pressed { background:$soft; color:$ink; }
-        QPushButton#driverDownload:disabled { background:$soft; color:$muted; }
-        QPushButton#driverManualDownload,QPushButton#driverTroubleshooting { background:transparent; color:$muted; border:2px solid transparent; border-radius:8px; padding:7px 4px; font-size:12px; text-align:$sectionAlign; }
-        QPushButton#driverManualDownload { text-decoration:underline; }
+        QWidget#codeBlock { background:$card; border:1px solid $outline; border-radius:8px; }
+        QFrame#driverGuide { background:transparent; border:0; }
+        QLabel#driverStepNumber { background:$card; color:$muted; border:0; border-radius:8px; font-size:12px; font-weight:600; }
+        QLabel#driverStepTitle { color:$ink; font-size:14px; font-weight:600; }
+        QPushButton#driverDownload { background:%1; color:%2; border:0; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:600; }
+        QPushButton#driverDownload:hover { background:$accentHover; }
+        QPushButton#driverDownload:pressed { background:$accentPressed; }
+        QPushButton#driverDownload:disabled { background:$card; color:$muted; }
+        QPushButton#driverManualDownload,QPushButton#driverTroubleshooting { background:transparent; color:$muted; border:0; border-radius:6px; padding:7px 4px; font-size:12px; text-align:$sectionAlign; }
+        QPushButton#driverManualDownload:hover,QPushButton#driverTroubleshooting:hover { background:$card; color:$ink; }
         QPushButton#driverTroubleshooting:checked { color:$ink; }
-        QPushButton#driverDownload[keyboardFocus="true"],QPushButton#driverManualDownload[keyboardFocus="true"],QPushButton#driverTroubleshooting[keyboardFocus="true"] { border-color:%1; }
-        QLabel#driverState { border:2px solid $outline; border-radius:10px; padding:6px 12px; background:$surface; color:$ink; font-size:12px; font-weight:700; }
-        QLabel#driverState[state="ready"] { background:$lime; color:$chipInk; }
-        QLabel#driverState[state="blocked"] { background:$yellow; color:$chipInk; }
-        QLabel#driverState[state="missing"] { background:$soft; color:$ink; }
-        QFrame#driverDivider { background:$outline; border:0; min-height:2px; max-height:2px; }
-        QLabel#panelTitle { font-family:'Fredoka'; color:$ink; font-size:17px; font-weight:600; }
-        QLabel#cardTitle { font-family:'Fredoka'; color:$ink; font-size:18px; font-weight:600; }
-        QLabel#sectionArrow { color:$muted; font-size:18px; }
+        QPushButton#driverDownload[keyboardFocus="true"],QPushButton#driverManualDownload[keyboardFocus="true"],QPushButton#driverTroubleshooting[keyboardFocus="true"] { border:1px solid %1; }
+        QLabel#driverState { border:0; padding:4px 0; background:transparent; color:$muted; font-size:12px; font-weight:400; }
+        QLabel#driverState[state="ready"] { color:#6DD5AD; }
+        QLabel#driverState[state="blocked"] { color:$yellow; }
+        QFrame#driverDivider { background:$outline; border:0; min-height:1px; max-height:1px; }
+        QLabel#panelTitle { color:$ink; font-size:15px; font-weight:600; }
+        QLabel#cardTitle { color:$ink; font-size:16px; font-weight:600; }
+        QLabel#sectionArrow { color:$muted; font-size:16px; }
 
-        QFrame#favoritesDivider,QFrame#operatorsDivider { background:$soft; border:0; max-height:2px; }
+        QFrame#favoritesDivider,QFrame#operatorsDivider { background:$outline; border:0; max-height:1px; }
 
-        /* Sections are cream cards outlined in ink; rows stay flat inside. */
-        QFrame#settingCard { background:$card; border:2px solid $outline; border-radius:16px; }
-        QWidget#settingRow { background:transparent; border:0; border-radius:10px; }
+        /* Cards are a 5% content wash over the glass with one hairline. */
+        QFrame#settingCard { background:$card; border:1px solid $outline; border-radius:10px; }
+        QWidget#settingRow { background:transparent; border:0; border-radius:8px; }
 
-        QLineEdit#search { background:$surface; color:$ink; border:2px solid $outline; border-radius:10px; padding:8px 10px; font-size:13px; }
-        QLineEdit#search:focus { border-color:%1; }
+        QLineEdit#search { background:$card; color:$ink; border:1px solid $outline; border-radius:8px; padding:8px 10px; font-size:13px; }
+        QLineEdit#search:focus { border-color:%1; background:$soft; }
 
-        QMenu { background:$surface; color:$ink; border:2px solid $outline; border-radius:12px; padding:4px; font-size:13px; }
-        QMenu::item { padding:5px 10px 5px 7px; border-radius:8px; background:transparent; }
+        QMenu { background:$surface; color:$ink; border:1px solid $outline; border-radius:10px; padding:5px; font-size:13px; }
+        QMenu::item { padding:6px 10px 6px 7px; border-radius:6px; background:transparent; }
         QMenu::item:selected { background:$soft; color:$ink; }
         QMenu::icon { padding-left:4px; }
-        QMenu::separator { height:2px; background:$soft; margin:4px 6px; }
+        QMenu::separator { height:1px; background:$outline; margin:5px 8px; }
 
-        QPushButton#weaponChoice { background:transparent; color:$muted; border:0; border-radius:12px; padding:5px 14px; font-size:13px; font-weight:600; }
+        QPushButton#weaponChoice { background:transparent; color:$muted; border:0; border-radius:8px; padding:5px 14px; font-size:13px; font-weight:600; }
 
         QListWidget { background:transparent; border:0; outline:0; }
 
-        QPushButton#sectionHeading { text-align:$sectionAlign; padding:6px 0; border:0; background:transparent; color:$ink; font-size:16px; font-weight:600; }
+        QPushButton#sectionHeading { text-align:$sectionAlign; padding:6px 0; border:0; background:transparent; color:$ink; font-size:15px; font-weight:600; }
         QPushButton#windowControl,QPushButton#saveControl,QPushButton#closeControl { background:transparent; border:0; padding:0; }
 
-        QPushButton#status, QPushButton#statusRapid { background:$soft; border:2px solid $outline; border-radius:10px; padding:6px 12px; color:$ink; font-size:12px; font-weight:700; }
-        QPushButton#status[active="true"], QPushButton#statusRapid[active="true"] { background:$lime; border-color:$outline; color:$chipInk; }
+        QPushButton#status, QPushButton#statusRapid { background:$card; border:0; border-radius:16px; padding:0 13px; color:$ink; font-size:12px; font-weight:400; }
+        QPushButton#status:hover, QPushButton#statusRapid:hover { background:$soft; }
+        QPushButton#status[active="true"], QPushButton#statusRapid[active="true"] { background:rgba(69,155,247,0.18); color:#A4CEFF; }
+        QPushButton#status[active="true"]:hover, QPushButton#statusRapid[active="true"]:hover { background:rgba(69,155,247,0.26); }
 
-        QPushButton#preferencesSave,QPushButton#save { background:%1; color:%2; border:2px solid $outline; border-radius:12px; padding:8px 16px; font-weight:700; }
-        QPushButton#preferencesSave:disabled,QPushButton#save:disabled { background:$soft; color:$muted; }
+        QPushButton#preferencesSave,QPushButton#save { background:%1; color:%2; border:0; border-radius:10px; padding:8px 16px; font-weight:600; }
+        QPushButton#preferencesSave:hover,QPushButton#save:hover { background:$accentHover; }
+        QPushButton#preferencesSave:pressed,QPushButton#save:pressed { background:$accentPressed; }
+        QPushButton#preferencesSave:disabled,QPushButton#save:disabled { background:$card; color:$muted; }
 
-        QPushButton#keyButton,QPushButton#secondary,QPushButton#cancelClose,QPushButton#discardChanges { background:$surface; border:2px solid $outline; border-radius:12px; padding:6px 12px; color:$ink; font-size:13px; font-weight:600; }
-        QPushButton#keyButton:pressed,QPushButton#secondary:pressed,QPushButton#cancelClose:pressed,QPushButton#discardChanges:pressed { background:$soft; }
-        QPushButton#cancelClose[keyboardFocus="true"],QPushButton#discardChanges[keyboardFocus="true"] { border-color:%1; }
-        QPushButton#keyButton[keyboardFocus="true"],QPushButton#secondary[keyboardFocus="true"],QPushButton#weaponChoice[keyboardFocus="true"],QPushButton#status[keyboardFocus="true"],QPushButton#statusRapid[keyboardFocus="true"],QPushButton#save[keyboardFocus="true"],QPushButton#preferencesSave[keyboardFocus="true"] { border-color:%1; }
+        QPushButton#keyButton,QPushButton#secondary,QPushButton#cancelClose,QPushButton#discardChanges { background:$card; border:0; border-radius:10px; padding:8px 13px; color:$ink; font-size:13px; font-weight:400; }
+        QPushButton#keyButton:hover,QPushButton#secondary:hover,QPushButton#cancelClose:hover,QPushButton#discardChanges:hover,QPushButton#keyButton:pressed,QPushButton#secondary:pressed,QPushButton#cancelClose:pressed,QPushButton#discardChanges:pressed { background:$soft; }
+        QPushButton#secondary:disabled { color:$muted; background:transparent; border-color:$outline; }
+        QPushButton#cancelClose[keyboardFocus="true"],QPushButton#discardChanges[keyboardFocus="true"] { border:1px solid %1; }
+        QPushButton#keyButton[keyboardFocus="true"],QPushButton#secondary[keyboardFocus="true"],QPushButton#weaponChoice[keyboardFocus="true"],QPushButton#status[keyboardFocus="true"],QPushButton#statusRapid[keyboardFocus="true"],QPushButton#save[keyboardFocus="true"],QPushButton#preferencesSave[keyboardFocus="true"] { border:1px solid %1; }
 
-        QDoubleSpinBox,QSpinBox { background:$yellow; border:2px solid $outline; border-radius:9px; padding:5px 7px; color:$chipInk; font-family:'Consolas'; font-weight:700; font-size:13px; }
-        QDoubleSpinBox:focus,QSpinBox:focus { border-color:%1; }
-        QDoubleSpinBox:disabled,QSpinBox:disabled { background:$soft; color:$muted; }
+        QDoubleSpinBox,QSpinBox { background:$card; border:1px solid transparent; border-radius:8px; padding:5px 7px; color:$ink; font-family:'Consolas'; font-weight:400; font-size:13px; selection-background-color:%1; }
+        QDoubleSpinBox:focus,QSpinBox:focus { border-color:%1; background:$soft; }
+        QDoubleSpinBox:disabled,QSpinBox:disabled { background:transparent; color:$muted; }
 
         /* Slider precision chips sit above each track and stay flat until pressed. */
-        QPushButton#stepButton { background:$surface; border:2px solid $outline; border-radius:8px; color:$ink; font-size:15px; font-weight:800; padding:0; }
-        QPushButton#stepButton:pressed { background:$soft; }
-        QPushButton#stepButton:disabled { background:$surface; color:$muted; border-color:$soft; }
-        QPushButton#stepButton[keyboardFocus="true"] { border-color:%1; }
+        QPushButton#stepButton { background:$card; border:0; border-radius:12px; color:$ink; font-size:14px; font-weight:400; padding:0; }
+        QPushButton#stepButton:hover,QPushButton#stepButton:pressed { background:$soft; }
+        QPushButton#stepButton:disabled { background:transparent; color:$muted; border-color:$outline; }
+        QPushButton#stepButton[keyboardFocus="true"] { border:1px solid %1; }
 
-        /* The 20 px minimum keeps the round handle inside the widget bounds. */
+        /* A quiet 4 px lane, an accent fill and a plain white thumb. */
         QSlider { min-height:20px; }
-        QSlider::groove:horizontal { height:10px; border-radius:5px; background:$soft; }
-        QSlider::sub-page:horizontal { background:%1; border-radius:5px; }
-        QSlider::handle:horizontal { width:14px; margin:-4px 0; border:2px solid $outline; border-radius:9px; background:#FFFFFF; }
+        QSlider::groove:horizontal { height:4px; border-radius:2px; background:$soft; }
+        QSlider::sub-page:horizontal { background:%1; border-radius:2px; }
+        QSlider::handle:horizontal { width:14px; margin:-5px 0; border:0; border-radius:7px; background:#FFFFFF; }
+        QSlider::handle:horizontal:hover { background:#FFFFFF; }
 
-        QComboBox { background:$surface; color:$ink; border:2px solid $outline; border-radius:10px; padding:6px 10px; min-width:120px; font-size:13px; font-weight:600; }
+        QComboBox { background:$card; color:$ink; border:1px solid transparent; border-radius:8px; padding:6px 10px; min-width:120px; font-size:13px; font-weight:400; }
         QComboBox:focus { border-color:%1; }
         QComboBox::drop-down { border:0; width:22px; }
-        QComboBox::down-arrow { image:none; width:12px; height:12px; }
-        QComboBox QAbstractItemView { background:$surface; border:2px solid $outline; border-radius:10px; padding:4px; selection-background-color:$soft; selection-color:$ink; }
+        QComboBox::down-arrow { width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid $muted; margin-right:6px; }
+        QComboBox QAbstractItemView { background:$surface; color:$ink; border:1px solid $outline; border-radius:8px; padding:4px; selection-background-color:$soft; selection-color:$ink; }
 
         QScrollArea { background:transparent; border:0; }
         QScrollArea>QWidget>QWidget { background:transparent; }
-        QScrollBar:vertical { background:transparent; width:8px; margin:2px 0; }
-        QScrollBar::handle:vertical { background:$muted; min-height:36px; border-radius:4px; margin:0 2px; }
+        QScrollBar:vertical { background:transparent; width:7px; margin:2px 0; }
+        QScrollBar::handle:vertical { background:rgba(235,235,235,56); min-height:36px; border-radius:3px; margin:0 2px; }
+        QScrollBar::handle:vertical:hover { background:rgba(235,235,235,92); }
         QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical { height:0; }
         QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical { background:transparent; }
 
-        QDialog { background:$paper; }
-        QDialog#hotkeyDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
-        QLabel#bindingHint { color:$ink; font-size:16px; font-weight:600; }
+        QDialog { background:#1B1B1B; border:1px solid $outline; border-radius:12px; }
+        QDialog#hotkeyDialog,QDialog#helpDialog,QDialog#unsavedDialog,QDialog#driverDialog,QDialog#palestinePopup { background:#1B1B1B; border:1px solid $outline; border-radius:14px; }
+        QLabel#bindingHint { color:$ink; font-size:15px; font-weight:600; }
         QLabel#bindingHint[invalid="true"] { color:$danger; }
-        QDialog#helpDialog, QDialog#unsavedDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
-        QDialog#driverDialog { background:$paper; border:3px solid $outline; border-radius:24px; }
-        QDialog#palestinePopup { background:$paper; border:3px solid $outline; border-radius:24px; }
-        QLabel#palestineArabic { color:$ink; font-size:24px; font-weight:900; }
-        QToolTip { background:$surface; color:$ink; border:2px solid $outline; border-radius:10px; padding:6px 8px; font-size:12px; }
-        QPushButton#secondary:disabled { color:$muted; border-color:$soft; }
+        QLabel#palestineArabic { color:$ink; font-size:24px; font-weight:600; }
+        QToolTip { background:$surface; color:$ink; border:1px solid $outline; border-radius:6px; padding:6px 8px; font-size:12px; }
         QPushButton:focus { outline:0; }
     )CSS").arg(accentHex,onAccent);
-    const std::pair<const char*,QColor> tokens[]={{"$ink",kbtheme::ink},{"$paper",kbtheme::paper},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$lime",kbtheme::lime},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$header",kbtheme::header},{"$chipInk",kbtheme::chipInk},{"$danger",kbtheme::danger}};
-    for(const auto& token:tokens)style.replace(QLatin1String(token.first),token.second.name());
+    style.replace(QLatin1String("$accentHover"),accent.lighter(110).name());
+    style.replace(QLatin1String("$accentPressed"),accent.darker(112).name());
+    const std::pair<const char*,QColor> tokens[]={{"$ink",kbtheme::ink},{"$paper",kbtheme::paper},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$lime",kbtheme::lime},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$chipInk",kbtheme::chipInk},{"$danger",kbtheme::danger}};
+    for(const auto& token:tokens)style.replace(QLatin1String(token.first),kbtheme::css(token.second));
     // Qt mirrors layouts but not explicit alignments, so headings follow the
     // reading direction of the selected language.
     style.replace(QLatin1String("$sectionAlign"),QApplication::layoutDirection()==Qt::RightToLeft?"right":"left");

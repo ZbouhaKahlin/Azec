@@ -1,4 +1,4 @@
-"""Keep profiles and appearance preferences across a Goofy-only upgrade and restart."""
+"""Keep profiles and UI preferences across an upgrade and restart."""
 import hashlib
 import json
 from pathlib import Path
@@ -30,7 +30,7 @@ def run(parent):
         api({'action': 'selectOperator', 'operator': 71})
         api({'action': 'setProfile', 'operator': 71, 'slot': 0, 'values': {'vertical': 31.5}})
         api({'action': 'save'})
-        checks['fresh_app_uses_goofy'] = info['interface'] == 'goofy'
+        checks['fresh_app_uses_monocode'] = info['interface'] == 'monocode'
         previous_token = info['token']
         stop(process)
         process = None
@@ -43,17 +43,17 @@ def run(parent):
         ui_path.write_text(json.dumps(ui))
         for phase in ('upgrade', 'restart'):
             process, info = start(folder)
-            checks[phase + '_uses_goofy_in_dry_run'] = info['interface'] == 'goofy' and info['dryRun']
+            checks[phase + '_uses_monocode_in_dry_run'] = info['interface'] == 'monocode' and info['dryRun']
             checks[phase + '_rotates_pairing_session'] = info['token'] != previous_token
             previous_token = info['token']
             checks[phase + '_preserves_binary_profiles'] = hashlib.sha256((folder / 'r6_config.bin').read_bytes()).hexdigest() == binary_hash
             checks[phase + '_preserves_secondary_and_extension_profiles'] = (folder / 'azec_weapons.json').read_bytes() == weapon_bytes
             state = api({'action': 'setFavorite', 'operator': 4, 'enabled': True})
             checks[phase + '_restores_extension_selection'] = state['operatorId'] == 71 and state['profile']['vertical'] == 31.5
-            checks[phase + '_restores_phone_theme_materials'] = state['appearance']['id'] == 'deep-sea' and state['appearance']['colors']['paper'] == '#14242c' and state['appearance']['scheme'] == 'dark'
+            checks[phase + '_keeps_single_dark_look'] = state['appearance']['scheme'] == 'dark' and 'id' not in state['appearance'] and state['appearance']['colors']['paper'] == '#171717'
             restored_ui = json.loads(ui_path.read_text())
-            checks[phase + '_preserves_preferences'] = restored_ui['favorites'] == ['Ash'] and restored_ui['colorTheme'] == 'deep-sea' and restored_ui['sidebarCollapsed'] is True
-            checks[phase + '_drops_obsolete_interface_choice'] = 'interface' not in restored_ui
+            checks[phase + '_preserves_preferences'] = restored_ui['favorites'] == ['Ash'] and restored_ui['sidebarCollapsed'] is True
+            checks[phase + '_drops_obsolete_choices'] = 'interface' not in restored_ui and 'colorTheme' not in restored_ui
             stop(process)
             process = None
         report = {'passed': all(checks.values()), 'checks': checks}

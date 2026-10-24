@@ -5,16 +5,14 @@
 
 int main(int argc,char** argv){
     QApplication app(argc,argv);QApplication::setApplicationName("Azec");QApplication::setOrganizationName("Azec");QCoreApplication::setApplicationVersion(AZEC_VERSION);QApplication::setStyle("Fusion");app.setWindowIcon(QIcon(":/ui/app-icon.svg"));
-    for(const auto* weight:{"Regular","Medium","SemiBold","Bold"})QFontDatabase::addApplicationFont(QString(":/fonts/Geist-%1.ttf").arg(weight));
-    QFontDatabase::addApplicationFont(":/fonts/Fredoka.ttf");
-    QFontDatabase::addApplicationFont(":/fonts/PressStart2P-Regular.ttf");
-    QFont font("Geist");font.setPixelSize(13);font.setWeight(QFont::Normal);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
+    // The system UI face, exactly as the reference renders on Windows.
+    QFont font("Segoe UI");font.setPixelSize(13);font.setWeight(QFont::Normal);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
     if(!azec_paths::initializeStorage()){
         QMessageBox::critical(nullptr,"Azec","Azec could not open its settings folder. Check the folder permissions and try again.");
         return 3;
     }
     const auto configPath=std::filesystem::current_path()/L"r6_config.bin";
-    kbtheme::initialize(kbtheme::readColorTheme(configPath));
+    kbtheme::initialize();
     app.setPalette(kbtheme::palette());
     const auto arguments=app.arguments();const bool selftest=arguments.contains("--ui-self-test"),dryrun=selftest||arguments.contains("--dry-run");QString output,phoneInfo;int duration=0;for(const auto& argument:arguments){if(argument.startsWith("--phone-info="))phoneInfo=argument.mid(13);if(argument.startsWith("--output="))output=argument.mid(9);if(argument.startsWith("--exit-after-ms="))duration=argument.mid(16).toInt();}if(output.isEmpty())output=QDir::currentPath();QDir().mkpath(output);
 #ifndef AZEC_UI_TESTS

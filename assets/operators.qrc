@@ -77,13 +77,6 @@
 <file alias="zero.svg">operators/zero.svg</file>
 <file alias="zofia.svg">operators/zofia.svg</file>
     <file alias="ace.svg">operators/ace.svg</file>
-</qresource><qresource prefix="/fonts">
-    <file alias="Geist-Regular.ttf">fonts/Geist-Regular.ttf</file>
-    <file alias="Geist-Medium.ttf">fonts/Geist-Medium.ttf</file>
-    <file alias="Geist-SemiBold.ttf">fonts/Geist-SemiBold.ttf</file>
-    <file alias="Geist-Bold.ttf">fonts/Geist-Bold.ttf</file>
-    <file alias="Fredoka.ttf">fonts/Fredoka.ttf</file>
-<file alias="PressStart2P-Regular.ttf">fonts/PressStart2P-Regular.ttf</file>
 </qresource>
 <qresource prefix="/ui"><file alias="star.svg">star.svg</file><file alias="back.svg">back.svg</file><file alias="sidebar-toggle.svg">sidebar-toggle.svg</file><file alias="search.svg">search.svg</file><file alias="settings.svg">settings.svg</file><file alias="save.svg">save.svg</file><file alias="close.svg">close.svg</file><file alias="minimize.svg">minimize.svg</file><file alias="chevron.svg">chevron.svg</file></qresource>
 <qresource prefix="/ui"><file alias="phone.html">phone.html</file>

@@ -14,7 +14,7 @@ The files in `tests/` are development tools. They do not run when a user opens A
 | `run_checks.py` | Creates isolated fixtures and coordinates HTTP, recovery, restart, and optional UI checks | Yes |
 | `phone_test.py` | Checks the local HTTP API, authorization, validation, and profile isolation against a running fixture | Its fixture does |
 | `recovery_test.py` | Checks damaged/unreadable settings and preservation of existing data | Yes |
-| `preferences_restart_test.py` | Checks profiles, theme, favorites, and old preference migration across restarts | Yes |
+| `preferences_restart_test.py` | Checks profiles, favorites, obsolete-key cleanup, and old preference migration across restarts | Yes |
 | `ui_checks.cpp` | Desktop layout, controls, focus, motion, dialogs, QR rendering, and optional language coverage | Yes |
 | `phone_browser_test.py` | Phone-page interaction in headless Chrome against a desktop fixture | The desktop fixture does; Chrome is headless |
 | `qr_scan.py` | Decodes existing QR captures; launches no app | No |
@@ -50,7 +50,7 @@ These commands are explicit opt-ins, run from the repository root in PowerShell.
 | Build the single-file installer, no tests | `.\share.cmd` |
 | Build and explicitly request installer smoke test | `.\share.cmd test` |
 
-`--full` expands requested checks; it does not implicitly enable desktop checks. `build.cmd test --slow` includes expiry during a build. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across every palette, representative pairing links, and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
+`--full` expands requested checks; it does not implicitly enable desktop checks. `build.cmd test --slow` includes expiry during a build. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across representative pairing links and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
 
 Use `build.cmd checks` to prepare the desktop verifier and all console verifiers without running tests. Console binaries remain under `.build/checks-*/release`; only the desktop verifier goes in `runtime/Azec-checks.exe`. The test-only driver DLL is never copied into the app runtime. `build.cmd test` also builds it and explicitly runs behavior checks. Rebuild after changes to C++ or embedded assets; testing a stale executable does not validate source edits. The release app delegates `--ui-self-test` to the separate verification executable.
 
@@ -75,9 +75,9 @@ Available automated coverage:
 - Non-panic bindings accept any supported key; panic retains the stricter safe-key filter, and conflicting assignments are rejected.
 - Browsing the roster does not mark the profile dirty, and the wheel over a number field does not change a value.
 - The pairing code chip, copy actions, new-code rotation, and the server-failure retry path are exercised in the desktop and browser suites.
-- The phone Output card, independent primary/secondary Rapid fire, removal of obsolete controls, and the shared palette are checked in the browser suite.
+- The phone Output card, independent primary/secondary Rapid fire, removal of obsolete controls, and the single shared look are checked in the browser suite.
 
-Still manual or not covered: a physical iPhone, real in-game input, the audible sound cues, and the behaviour of the game-focus gate while a real game is running. Treat these as unverified and say so in delivery notes.
+Still manual or not covered: a physical iPhone, real in-game input, the audible sound cues, the acrylic blur behind the real window, and the behaviour of the game-focus gate while a real game is running. Treat these as unverified and say so in delivery notes.
 
 ## Fixtures and artifacts
 

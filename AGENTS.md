@@ -51,7 +51,7 @@ An explicit screenshot request authorizes the requested captures, not a test sui
 - **Driver:** `src/driver_input.hpp` dynamically loads Interception. `src/driver_setup.hpp` and `src/driver_download.hpp` own download, verification, and file placement.
 - **Phone:** `src/phone_bridge.cpp` maps requests to application state. `src/phone_server.hpp` validates and serves requests; `src/lan_address.hpp` selects the PC address. `assets/phone.html` is the self-contained client, embedded through `assets/operators.qrc`.
 - **Converter and profile sets:** `src/mouse_setup.cpp`, `src/sensitivity.hpp`, and `src/profile_sets.hpp` own Settings conversion, game-settings discovery, and named weapon-profile sets.
-- **Language and assets:** `src/strings.hpp`, `src/lang_*.hpp`, and `src/flags.hpp` own localization. Fonts, icons, flags, and phone assets are bundled; notices live in `licenses/`.
+- **Language and assets:** `src/strings.hpp`, `src/lang_*.hpp`, and `src/flags.hpp` own localization. Icons, flags, and phone assets are bundled; the design/sound reference notices live in `licenses/`.
 - **Verification:** `tests/` contains separate checks and isolation helpers. Verification executables and fixture DLLs never belong in a release.
 
 ## Profiles and persistence
@@ -59,8 +59,8 @@ An explicit screenshot request authorizes the requested captures, not a test sui
 Compatibility is a product requirement. Preserve the existing **3,734-byte** `r6_config.bin` layout and the meaning of every saved operator ID.
 
 - There are 78 operators. The binary holds the original 71 records; extension operators (Noor through Denari, IDs 71–77) use `primaryProfiles` in `azec_weapons.json`. Selection also persists in that JSON file; the binary selection field accepts only original-roster indexes. Append roster additions; never reorder existing records.
-- `azec_weapons.json` also holds secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, game-focus/aiming preferences, sensitivity, and the named profile library. `azec_ui.json` holds favorites, `colorTheme`, and `sidebarCollapsed`.
-- UI-preference writes must preserve other preferences. Ignore the obsolete `interface` key and remove it only on a successful atomic save. Normalize legacy binary appearance values on load and the next save; named themes do not change profile values.
+- `azec_weapons.json` also holds secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, game-focus/aiming preferences, sensitivity, and the named profile library. `azec_ui.json` holds favorites and `sidebarCollapsed`.
+- UI-preference writes must preserve other preferences. Ignore the obsolete `interface` and `colorTheme` keys and remove them only on a successful atomic save. Normalize legacy binary appearance values on load and the next save.
 - Keep save staging, atomic replacement, and rollback across configuration files. A failure must retain unsaved edits and show a persistent error. Never replace, commit, or package personal configuration as defaults.
 - A secondary profile copies primary settings only on first enable. Disabling preserves its edits. Selecting an operator starts on primary and persists only the selection, without marking profiles dirty or saving unrelated edits.
 - Accept backups containing 71–78 operators, matching records by name and preserving operators absent from an older backup. Imported profiles and UI preferences remain pending until Save; Discard retains the previously saved files.
@@ -81,28 +81,29 @@ Preserve migration from legacy `rapidActive` onto every primary and secondary pr
 
 ## Desktop and phone design
 
-The design reference is [GoofyUI for C++ / Qt](https://github.com/Azec-Zuckerberg/goofy-ui-cpp). Use that repository for design guidance instead of the former Luau library. Azec currently owns its Qt controls locally; a documentation or styling request does not authorize replacing them or changing the build system.
+The design reference is [monocode](https://github.com/hardbeat920/monocode) (MIT; notice in `licenses/monocode/`), stripped to its visual system and rebuilt natively in Qt: one dark neutral look with the system's acrylic blur behind a translucent window, hairline separators, translucent content fills, a single blue accent, system fonts (Segoe UI with Consolas numerics), and the ported cuelume interaction sounds. Azec owns its Qt controls locally; a documentation or styling request does not authorize replacing them or changing the build system.
 
-Keep one desktop layout in `src/desktop_layout.hpp` and the corresponding phone presentation. Themes change colors and materials, not behavior or layout. The eleven palettes in `src/theme.hpp` are authoritative, including Cocoa & mint; **Charcoal & blush** is the fresh-install default. Appearance shows all palettes as previews in a three-column grid and saves choices immediately. Do not add an interface selector, free accent picker, or radius slider.
+Keep one desktop layout in `src/desktop_layout.hpp` and the corresponding phone presentation. There is exactly one look: no theme picker, no palettes, no interface selector, no free accent picker, and no radius slider. The monocode tokens in `src/theme.hpp` are authoritative, and the phone follows the same tokens through the state's `appearance.colors`. The obsolete `colorTheme` preference is ignored and removed on the next successful UI-preferences save.
 
 ### Preserve the interaction model
 
-- Use flat color, chunky ink outlines, hard offset shadows, rounded panels, sticker headings, yellow numeric chips, and face toggles. No gradients, glow, or blurred shadows. Keep bundled Geist for body/controls, Fredoka for display headings, and Press Start 2P for the outlined Azec wordmark.
-- Retain the compact window, custom window controls, raised right panel, and seamless header. The sidebar expands to 200 px and collapses to 76 px; its Collapse control is independent of the theme. Search stays at the bottom and compact search expands and focuses it. Favorites appear once, only when nonempty and matching search, with a compact star shortcut in the collapsed sidebar.
-- Preserve existing hit targets and legibility: 52 px operator rows with 44 px icons, 34 px header targets with 20 px artwork, 24 px window/panel corners, and at least 20 px slider height. Long names and translations must fit without widening the sidebar.
-- Controls stay flat on hover; only context-menu items highlight. Keyboard focus uses an accent outline. Mouse clicks on switches must not add that keyboard ring. Keep favorite actions in a compact context menu without a nested button.
+- Use translucent content fills over the window glass, 1 px hairline separators, borderless action buttons, 6-10 px control corners and fully rounded header status buttons, and a soft shadow only on floating surfaces. No gradients, glow, chunky outlines, hard offset shadows, sticker headings, face toggles, or bundled display fonts.
+- The window paints the monocode window-glass wash — `#171717` at 40% — over the system acrylic blur, enabled after the first paint, and falls back to opaque when the system refuses the effect. Do not add a glass on/off preference. Never repaint the whole window on cursor movement or other idle motion: through the acrylic glass every repaint recomposes the blur and stalls the window.
+- Retain the compact window, custom window controls, raised right panel, and seamless header. The sidebar expands to 200 px and collapses to 76 px. Search stays at the bottom and compact search expands and focuses it. Favorites appear once, only when nonempty and matching search, with a compact star shortcut in the collapsed sidebar.
+- Preserve existing hit targets and legibility: 52 px operator rows with 44 px icons, 34 px header targets with 20 px artwork, and at least 20 px slider height. Long names and translations must fit without widening the sidebar.
+- Keyboard focus uses an accent outline. Mouse clicks on switches must not add that keyboard ring. Keep favorite actions in a compact context menu without a nested button.
 - Save stays flat with unchanged artwork: neutral ink when saved, accent when dirty, with readable foreground text. Success uses the tooltip; failures use a persistent banner. Temporary feedback must not clear the dirty state. Closing unsaved edits shows Save/Discard/Cancel; another close re-surfaces the prompt, and Cancel keeps the app running. Keep the close-confirmation and Quick Guide dialogs visually consistent with the hotkey dialog.
-- Generate feedback sounds inside the app and honor the sound preference. The unsaved-close cue is a soft descending two-note sound; do not use a Windows error beep or console bell.
-- Operator changes fade only the identity for about 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid changes settle on the last selection. Avoid continuous repainting and unbounded image caches.
-- Reserve scrollbar lanes. Show bars during scrolling/dragging and fade them after three idle seconds. Keep smooth wheel notches, native precision-touchpad deltas, and shared edge fades. An unfocused slider, number field, or dropdown forwards wheel scrolling to its page.
+- Generate feedback sounds inside the app as ported cuelume recipes and honor the sound preference: the mechanical toggle cue for switches and output toggles, the scan cue for copy actions, the success cue for explicit saves, and the calm refusal cue when leaving with unsaved changes. Do not use a Windows error beep or console bell.
+- Motion is 120-200 ms with the shared ease-out curve. Operator changes fade only the identity for about 120 ms while controls update immediately. Settings uses a stationary crossfade. Rapid changes settle on the last selection. Avoid continuous repainting and unbounded image caches.
+- Reserve scrollbar lanes. Show bars during scrolling/dragging and fade them after three idle seconds. Keep smooth wheel notches and native precision-touchpad deltas. Scroll viewports have clean edges without overlays hiding the next row. An unfocused slider, number field, or dropdown forwards wheel scrolling to its page.
 
-Settings categories remain General, Appearance, Shortcuts, Phone control, Profile backup, and Converter & profiles.
+Settings categories remain General, Shortcuts, Phone control, Profile backup, and Converter & profiles. There is no Appearance category.
 
 ### Keep both screens consistent
 
 A change to profiles, output switches, themes, language, or saving needs a decision for the desktop, tray where applicable, and phone. Keep shared behavior in the existing Engine/persistence paths rather than creating a separate phone implementation.
 
-- Serve the phone page locally with embedded assets and no external fonts, scripts, or internet requirement. Keep its palettes sourced from desktop theme tokens. A theme change on either screen saves the same preference and updates both without saving profile edits.
+- Serve the phone page locally with no external fonts, scripts, or internet requirement; system fonts only. Keep its colors sourced from the desktop's `appearance.colors` tokens so both screens always share the single look without saving profile edits.
 - The first card is **Output**, with live **Recoil active** and active-profile **Rapid fire active** switches. Phone profile edits carry explicit operator and weapon IDs so concurrent selection cannot redirect a write. Validate values before applying them and save through the desktop path.
 - Use the PC's actual LAN address, never phone localhost. Preserve the selectable six-digit code, Copy code, Copy link, New code, and startup-error Retry action. New code rotates both code and token and disconnects existing phones.
 - QR starts concealed and reveals only on explicit click/keyboard activation. Conceal it when leaving Phone control, hiding the window, or changing the link. Palette changes rebuild its textures without changing the encoded link. Keep the complete unbranded pattern, dark-on-light contrast, and four-module white quiet zone.

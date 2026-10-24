@@ -9,7 +9,7 @@
 
 namespace r6 {
 Engine::Engine(bool dry_run):dry_run_(dry_run) {
-    // GoofyUI purple is the current default; persisted binary layout is unchanged.
+    // Fixed compatibility accent for the unchanged binary layout; the visible look is fixed in theme.hpp.
     config_.neon[0]=114.0f/255;config_.neon[1]=72.0f/255;config_.neon[2]=215.0f/255;
 }
 Engine::~Engine(){stop();}
