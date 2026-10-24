@@ -50,7 +50,7 @@ An explicit screenshot request authorizes the requested captures, not a test sui
 - **Profiles and output:** `src/core.hpp` / `src/core.cpp` own binary compatibility and movement arithmetic. `src/engine.hpp` / `src/engine.cpp` synchronize configuration and run input workers. `src/profile_store.hpp`, `src/ui_preferences.hpp`, and `src/profile_transfer.*` own JSON preferences and backups.
 - **Driver:** `src/driver_input.hpp` dynamically loads Interception. `src/driver_setup.hpp` and `src/driver_download.hpp` own download, verification, and file placement.
 - **Phone:** `src/phone_bridge.cpp` maps requests to application state. `src/phone_server.hpp` validates and serves requests; `src/lan_address.hpp` selects the PC address. `assets/phone.html` is the self-contained client, embedded through `assets/operators.qrc`.
-- **Tour and mouse setup:** `src/onboarding.cpp`, `src/onboarding_widgets.hpp`, and `src/sensitivity.hpp` own onboarding, game-settings discovery, and sensitivity rescaling.
+- **Mouse setup:** `src/mouse_setup.cpp` and `src/sensitivity.hpp` own game-settings discovery and sensitivity rescaling.
 - **Language and assets:** `src/strings.hpp`, `src/lang_*.hpp`, and `src/flags.hpp` own localization. Fonts, icons, flags, and phone assets are bundled; notices live in `licenses/`.
 - **Verification:** `tests/` contains separate checks and isolation helpers. Verification executables and fixture DLLs never belong in a release.
 
@@ -59,12 +59,12 @@ An explicit screenshot request authorizes the requested captures, not a test sui
 Compatibility is a product requirement. Preserve the existing **3,734-byte** `r6_config.bin` layout and the meaning of every saved operator ID.
 
 - There are 78 operators. The binary holds the original 71 records; extension operators (Noor through Denari, IDs 71–77) use `primaryProfiles` in `azec_weapons.json`. Selection also persists in that JSON file; the binary selection field accepts only original-roster indexes. Append roster additions; never reorder existing records.
-- `azec_weapons.json` also holds secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, game-focus/aiming preferences, and mouse setup. `azec_ui.json` holds favorites, `colorTheme`, `sidebarCollapsed`, and `onboardingVersion`.
+- `azec_weapons.json` also holds secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, game-focus/aiming preferences, and mouse setup. `azec_ui.json` holds favorites, `colorTheme`, and `sidebarCollapsed`.
 - UI-preference writes must preserve other preferences. Ignore the obsolete `interface` key and remove it only on a successful atomic save. Normalize legacy binary appearance values on load and the next save; named themes do not change profile values.
 - Keep save staging, atomic replacement, and rollback across configuration files. A failure must retain unsaved edits and show a persistent error. Never replace, commit, or package personal configuration as defaults.
 - A secondary profile copies primary settings only on first enable. Disabling preserves its edits. Selecting an operator starts on primary and persists only the selection, without marking profiles dirty or saving unrelated edits.
 - Accept backups containing 71–78 operators, matching records by name and preserving operators absent from an older backup. Imported profiles and UI preferences remain pending until Save; Discard retains the previously saved files.
-- Mouse DPI is reference metadata. Rescale recoil using old/new game sensitivity and multiplier per axis, preview the change, and reject the entire operation if any affected profile exceeds its range. Backups include numeric setup values, not the local INI path. Dry-run instances skip automatic onboarding and game-settings discovery.
+- Mouse DPI is reference metadata. Rescale recoil using old/new game sensitivity and multiplier per axis, preview the change, and reject the entire operation if any affected profile exceeds its range. Backups include numeric setup values, not the local INI path. Dry-run instances skip automatic game-settings discovery.
 
 ## Output and shortcuts
 

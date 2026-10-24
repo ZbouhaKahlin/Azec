@@ -63,11 +63,11 @@ int main(int argc,char** argv){
     const auto path=std::filesystem::path(fixture.toStdWString())/L"r6_config.bin";
     const auto binary=QString::fromStdWString(path.wstring()),profiles=weaponFile(path),ui=fixture+"/azec_ui.json";
     r6::Engine engine(true);
-    const QByteArray originalUi="{\"version\":1,\"favorites\":[\"Ace\"],\"onboardingVersion\":1}";
+    const QByteArray originalUi="{\"version\":1,\"favorites\":[\"Ace\"],\"sidebarCollapsed\":true}";
     check(engine.save(path)&&write(ui,originalUi),"create original configuration files");
     const auto oldBinary=read(binary),oldProfiles=read(profiles);
     engine.edit([](r6::Config& config){config.operators[0].vertical=37;config.secondary[0].vertical=29;config.secondary_initialized[0]=true;});
-    const QByteArray importedUi="{\"version\":1,\"favorites\":[\"Ash\"],\"colorTheme\":\"rose\",\"onboardingVersion\":1}";
+    const QByteArray importedUi="{\"version\":1,\"favorites\":[\"Ash\"],\"colorTheme\":\"rose\",\"sidebarCollapsed\":true}";
     HANDLE held=lock(ui);bool saved=engine.save(path,importedUi);if(held!=INVALID_HANDLE_VALUE)CloseHandle(held);
     check(held!=INVALID_HANDLE_VALUE&&!saved&&read(binary)==oldBinary&&read(profiles)==oldProfiles&&read(ui)==originalUi,
           "failed UI commit rolls back both profile files and retains preferences");

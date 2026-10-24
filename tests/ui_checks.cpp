@@ -487,7 +487,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         invalidUi.open(QIODevice::WriteOnly|QIODevice::Truncate);invalidUi.write("{\"version\":1,\"interface\":\"retired\",\"favorites\":[\"Ash\"],\"colorTheme\":\"deep-sea\",\"sidebarCollapsed\":true}");invalidUi.close();
         kbtheme::writeColorTheme(uiFixture,"midnight");QJsonObject migratedUi;uiprefs::readDocument(uiprefs::filePath(uiFixture),migratedUi);
         checks["obsolete_interface_removed_without_losing_preferences"]=!migratedUi.contains("interface")&&migratedUi["favorites"].toArray().contains("Ash")&&kbtheme::readColorTheme(uiFixture)=="midnight"&&uiprefs::sidebarCollapsed(uiFixture);
-        // Newer mouse-setup and onboarding features use real production handlers.
+        // Mouse setup uses the production handlers with an isolated INI file.
         if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(mouse_setup_category_);wait(220);
         checks["mouse_setup_rejects_incomplete_values"]=mouse_save_&&!mouse_save_->isEnabled()&&mouse_rescale_&&!mouse_rescale_->isEnabled();
         const auto iniPath=QString::fromStdWString((config_path_.parent_path()/L"GameSettings-fixture.ini").wstring());
@@ -502,12 +502,6 @@ QJsonObject MainWindow::selfTest(const QString& output){
         rescaleMouseProfiles();
         checks["mouse_setup_confirmed_rescale_changes_profiles_and_marks_dirty"]=unsaved_&&qAbs(engine_.snapshot().operators[0].vertical-beforeRescale.operators[0].vertical*.5f)<.001f;
         {QFile ini(iniPath);ini.open(QIODevice::ReadOnly);checks["mouse_setup_never_writes_game_ini"]=ini.readAll()==iniBytes;}
-        checks["dry_run_skips_automatic_tour"]=tour_step_==-1&&!tour_pill_;
-        const auto beforeTour=engine_.snapshot().bytes();QApplication::setActiveWindow(this);startTour();
-        checks["manual_tour_owns_its_instruction_windows"]=tour_pill_&&tour_arrow_&&tour_pill_->parentWidget()==this&&tour_arrow_->parentWidget()==this;
-        bool tourSteps=true;for(int step=0;step<6;++step){setTourStep(step);tourSteps&=tour_step_==step&&tour_pill_->isVisible();}
-        finishTour();QJsonObject tourPrefs;uiprefs::readDocument(uiprefs::filePath(config_path_),tourPrefs);
-        checks["manual_tour_finishes_and_preserves_profiles"]=tourSteps&&tour_step_==-1&&!tour_pill_->isVisible()&&tourPrefs["onboardingVersion"].toInt()==1&&engine_.snapshot().bytes()==beforeTour;
         testDriver();checks["dry_run_driver_test_never_injects_input"]=engine_.injected_events==0;
         QJsonObject report;report["theme_samples"]=themeSamples;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("goofy");report["checks"]=checks;report["rounding_method"]=clipped?"native rounded window region (Windows 10)":"DWM rounded corners";report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="Interception (suppressed in dry-run)";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }

@@ -8,7 +8,7 @@ const SCENES=[
   [80,90,'Save your changes'],[90,109,'Shortcuts'],[109,126,'General'],
   [126,141,'Connect your phone'],[141,156,'Edit from your phone'],
   [156,167,'Appearance and favorites'],[167,175,'Profile backup'],
-  [175,186,'Updates and tour'],[186,189,'Azec']
+  [175,186,'Updates'],[186,189,'Azec']
 ].map(([start,end,title])=>({start,end,title}));
 const STORY_SCENES=SCENES.map(s=>({...s}));
 const canvas=document.getElementById('film'),ctx=canvas.getContext('2d',{alpha:false}),W=1920,H=1080;
@@ -101,7 +101,7 @@ function shortcuts(t){section(252,161,669,467,'Shortcuts',C.yellow);let labels=[
  if((t>=96.8&&t<100.6)||(t>=104&&t<107.8)){let duplicate=t>=104;modal('Recoil toggle',()=>{text(duplicate?'This key is already assigned.':'Press a key now',546,332,21,duplicate?C.pink:C.muted,500,'Geist','center');button(duplicate?'Insert':t>=99?'F8':'…',474,353,142,52,false,27);text(duplicate?'Choose another key.':'Esc cancels',546,445,17,C.muted,400,'Geist','center')})}
 }
 function general(t){section(252,161,669,254,'General',C.blue);text('Only in Rainbow Six',273,229,21,C.ink,500);toggle(834,204,1);text('Language',273,298,21,C.ink,500);button('English (US)',716,272,177,40,false,18);text('Feedback sound',273,365,21,C.ink,500);toggle(834,341,1);
- button('Quick guide',273,442,187);button('Replay tour',480,442,190);section(252,513,669,119,'Updates',C.yellow);button('Check for updates',273,566,276);
+ button('Quick guide',273,442,187);section(252,513,669,119,'Updates',C.yellow);button('Check for updates',273,566,276);
 }
 function qr(x,y,size){let n=QR.length,q=4,u=size/(n+q*2);rect(x,y,size,size,'#FFFFFF',10,C.outline,2);ctx.fillStyle='#211A29';for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(QR[r][c])ctx.fillRect(x+(c+q)*u,y+(r+q)*u,u+.12,u+.12)}
 function pairing(t){section(252,161,669,460,'Phone control',C.blue);text('Enable phone access',273,228,21,C.ink,500);toggle(834,204,1);rect(273,253,619,43,C.surface,10,C.outline,2);text('http://192.168.1.20:18764',292,282,21,C.ink,500);text('Pairing code',273,337,20,C.muted);number('123456',425,310,133);button('Copy code',576,308,143,40,false,17);button('Copy link',731,308,162,40,false,17);

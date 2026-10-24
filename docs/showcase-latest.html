@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azec desktop and phone</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #d7d0e8; }
+    .scene { position: relative; width: 1800px; height: 1100px; overflow: hidden; background: #d7d0e8; }
+    .grid { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .desktop { position: absolute; left: 540px; top: 140px; width: 1120px; border-radius: 30px; overflow: hidden; box-shadow: 14px 16px 0 #b4a9c8; }
+    .desktop img { display: block; width: 100%; height: auto; }
+    .phone { position: absolute; left: 115px; top: 190px; width: 365px; height: 736.723684px; }
+    .device { position: relative; width: 1520px; height: 3068px; transform: scale(.240131578947); transform-origin: top left; }
+    .screen { position: absolute; inset: 0; mask: url('showcase-assets/devices/iphone-16-pro-max-screen-mask.png') center / 100% 100% no-repeat; -webkit-mask: url('showcase-assets/devices/iphone-16-pro-max-screen-mask.png') center / 100% 100% no-repeat; }
+    .coordinates { position: absolute; left: 100px; top: 100px; width: 440px; height: 956px; transform: scale(3); transform-origin: top left; background: #222122; color: #f8eff2; }
+    .phone-ui { position: absolute; left: 0; top: 62px; width: 440px; height: 856px; display: block; }
+    .time { position: absolute; left: 32px; top: 14px; font: 600 15px / 20px Arial, sans-serif; letter-spacing: -.4px; }
+    .status { position: absolute; right: 29px; top: 17px; width: 72px; height: 15px; fill: currentColor; }
+    .island { position: absolute; left: 161px; top: 11px; width: 118px; height: 34px; border-radius: 22px; background: #000; }
+    .home { position: absolute; bottom: 10px; left: 148px; width: 144px; height: 5px; border-radius: 5px; background: #f8eff2; }
+    .hardware { position: absolute; inset: 0; display: block; width: 1520px; height: 3068px; }
+  </style>
+</head>
+<body>
+  <main class="scene" aria-label="Azec desktop and phone, using the Charcoal and blush palette">
+    <svg class="grid" viewBox="0 0 1800 1100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs><pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#65547d" stroke-opacity=".12" stroke-width="1"/></pattern></defs>
+      <rect width="1800" height="1100" fill="url(#grid)"/>
+      <g fill="none" stroke="#f7f2ff" stroke-opacity=".6" stroke-width="2"><circle cx="150" cy="420" r="400"/><circle cx="150" cy="420" r="475"/><circle cx="1690" cy="1060" r="410"/></g>
+    </svg>
+    <div class="desktop"><img src="showcase-assets/desktop/latest-charcoal.png" width="864" height="664" alt="Azec desktop with Ash selected, favorites, and independent weapon profile controls"></div>
+    <div class="phone"><div class="device">
+      <div class="screen"><div class="coordinates">
+        <span class="time">9:41</span>
+        <svg class="status" viewBox="0 0 72 15" aria-hidden="true"><path d="M0 10h3v5H0zm5-3h3v8H5zm5-3h3v11h-3zm5-3h3v14h-3z"/><path d="M23 4a15 15 0 0 1 22 0l-2.5 2.5a11.5 11.5 0 0 0-17 0zm4.5 4.5a8.5 8.5 0 0 1 13 0L38 11a5 5 0 0 0-8 0zm4 4a3 3 0 0 1 5 0L34 15z"/><rect x="50" y="2" width="19" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="52" y="4" width="15" height="7" rx="1"/><path d="M70 5v5c2 0 2-5 0-5"/></svg>
+        <img class="phone-ui" src="showcase-assets/phones/latest-charcoal.png" width="880" height="1712" alt="Phone browser connected to the same Ash profile">
+        <span class="island"></span><span class="home"></span>
+      </div></div>
+      <img class="hardware" src="showcase-assets/devices/iphone-16-pro-max-black.png" width="1520" height="3068" alt="iPhone presentation frame">
+    </div></div>
+  </main>
+</body>
+</html>

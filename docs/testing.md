@@ -93,7 +93,7 @@ Automated browser checks are emulation, not physical iPhone or in-game testing. 
 
 `tests/sensitivity_checks.pro` builds `Azec-sensitivity-checks.exe` with Qt Core only, without opening the desktop app. Build it using the pinned Qt qmake and nmake in `.build/sensitivity-checks`. Run `release/Azec-sensitivity-checks.exe <fresh-empty-fixture>` with the Qt kit's `bin` on PATH and an absolute, newly created fixture directory under `.build/verification`.
 
-This suite runs the existing core checks plus targeted coverage for INI parsing, unchanged game files, DPI reference values, per-axis rescaling, preserved secondary profiles, rejection without partial changes, sidecar and Engine persistence, backward-compatible backups, omitted machine paths, and tour-completion preferences. It never starts input workers, opens a game, moves the cursor, or plays sounds. It does not verify the tour's rendered layout, animation, or native focus behavior. Do not include this verification executable in a release package.
+This suite runs the existing core checks plus targeted coverage for INI parsing, unchanged game files, DPI reference values, per-axis rescaling, preserved secondary profiles, rejection without partial changes, sidecar and Engine persistence, backward-compatible backups, omitted machine paths, and preservation of UI preferences. It never starts input workers, opens a game, moves the cursor, or plays sounds. Do not include this verification executable in a release package.
 
 ## Update integrity checks
 

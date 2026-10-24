@@ -24,4 +24,4 @@ Appearance changes the palette without moving the controls. You can change it fr
 
 Use Profile backup to export your settings or import a backup. After importing profile changes, click Save.
 
-Check for updates in General. Your profiles stay in place when you update. You can also replay the built-in tour from here.
+Check for updates in General. Your profiles stay in place when you update.

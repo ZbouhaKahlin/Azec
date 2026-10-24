@@ -140,15 +140,6 @@ enum class UiText {
     SettingsBackupHint,
     OnlyWhileAiming,
     OnlyWhileAimingHint,
-    TourChooseTitle,
-    TourChooseHint,
-    TourProfilesHint,
-    TourRecoilHint,
-    TourRapidHint,
-    TourShortcutsHint,
-    TourSetupHint,
-    SkipTour,
-    ReplayTour,
     MouseSetup,
     MouseDpi,
     SensitivityHorizontal,
@@ -205,7 +196,7 @@ enum class UiText {
     DriverStateBlocked,
     DriverStateMissing,
 };
-inline constexpr int UiTextCount=200;
+inline constexpr int UiTextCount=static_cast<int>(UiText::DriverStateMissing)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

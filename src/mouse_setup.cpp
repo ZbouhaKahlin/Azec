@@ -48,8 +48,6 @@ void MainWindow::updateMouseSetupControls(){
     const bool changed=baseline.valid()&&input.valid()&&!sensitivity::sameGame(baseline,input);
     mouse_save_->setEnabled(input.valid()&&!save_blocked_);mouse_rescale_->setEnabled(changed&&!save_blocked_);
     mouse_save_->setText(text(changed?UiText::SaveWithoutRescaling:UiText::SaveMouseSetup));
-    if(tour_step_==5&&tour_pill_)tour_pill_->setNextEnabled(input.valid()&&!save_blocked_&&
-        (!baseline.valid()||(sensitivity::sameGame(baseline,input)&&baseline.dpi==input.dpi)));
 }
 
 void MainWindow::readGameSensitivity(bool chooseFile){
@@ -97,101 +95,8 @@ void MainWindow::rescaleMouseProfiles(){
     mouse_setup_dirty_=true;dirty();syncSelection();updateMouseSetupControls();mouse_setup_status_->setText(text(UiText::ProfilesRescaled));showNotice(text(UiText::ProfilesRescaled));
 }
 
-void MainWindow::maybeStartTour(){
-    if(tour_checked_||engine_.dry_run())return;tour_checked_=true;
-    if(save_blocked_)return;
-    QJsonObject preferences;if(!uiprefs::readDocument(uiprefs::filePath(config_path_),preferences))return;
-    if(preferences["onboardingVersion"].toInt()<1){startTour();return;}
+void MainWindow::checkMouseSensitivityChange(){
+    if(engine_.dry_run()||save_blocked_)return;
     const auto setup=engine_.snapshot().sensitivity;
     if(setup.valid()&&!setup.source.empty())if(const auto found=sensitivity::readFile(QString::fromStdWString(setup.source));found&&!sensitivity::sameGame(setup,*found))showNotice(text(UiText::SensitivityChanged),false,true);
-}
-
-void MainWindow::startTour(){
-    if(tour_step_>=0){positionTour();return;}
-    if(!tour_pill_){tour_pill_=new OnboardingPill(this);tour_pill_->onNext=[this]{advanceTour();};tour_pill_->onSkip=[this]{finishTour();};}
-    if(!tour_arrow_)tour_arrow_=new OnboardingArrow(this);
-    setSidebarCollapsed(false,false);search_->clear();setTourStep(0);tour_refresh_.start();
-    // Keep the instruction pill clear of the app on shorter laptop displays.
-    auto* screen=QGuiApplication::screenAt(frameGeometry().center());if(!screen)screen=QGuiApplication::primaryScreen();
-    const auto available=screen->availableGeometry();const int freeHeight=tour_pill_->y()-available.top()-32;
-    if(frameGeometry().bottom()+16>tour_pill_->y()&&freeHeight>=minimumHeight()){
-        resize(width(),std::min(height(),freeHeight));move(available.center().x()-width()/2,available.top()+16);
-    }
-    positionTour();
-}
-
-void MainWindow::setTourStep(int step){
-    if(!tour_pill_||step<0||step>=6)return;tour_step_=step;
-    if(step<4){
-        showOperators();
-    }else {
-        if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(step==4?2:mouse_setup_category_);
-    }
-    const UiText titles[]={UiText::TourChooseTitle,UiText::WeaponProfiles,UiText::RecoilControl,UiText::RapidFire,UiText::Shortcuts,UiText::MouseSetup};
-    const UiText descriptions[]={UiText::TourChooseHint,UiText::TourProfilesHint,UiText::TourRecoilHint,UiText::TourRapidHint,UiText::TourShortcutsHint,UiText::TourSetupHint};
-    QString description=text(descriptions[step]);
-    if(step==4&&description.contains("%1")){const auto config=engine_.snapshot();description=description.arg(bindingName(config.primary_key),bindingName(config.secondary_key));}
-    auto* screen=QGuiApplication::screenAt(frameGeometry().center());if(!screen)screen=QGuiApplication::primaryScreen();
-    tour_pill_->present(step,6,text(titles[step]),description,engine_.snapshot().language,screen->availableGeometry());
-    tour_pill_->setNextEnabled(true);if(step==5)updateMouseSetupControls();
-    QTimer::singleShot(50,this,[this,step]{
-        if(tour_step_!=step)return;
-        if(step==0){auto* list=favorites_.contains("Ace")?favorites_list_:operators_;
-            for(int i=0;i<list->count();++i)if(list->item(i)->data(Qt::UserRole).toInt()==0){
-                const auto row=list->visualItemRect(list->item(i)).intersected(list->viewport()->rect());
-                const QRect target(list->viewport()->mapToGlobal(row.topLeft()),row.size());auto* viewport=sidebar_scroll_->viewport();
-                if(!QRect(viewport->mapToGlobal(QPoint()),viewport->size()).contains(target)){
-                    const int y=list->viewport()->mapTo(sidebar_scroll_->widget(),row.topLeft()).y();
-                    sidebar_scroll_->verticalScrollBar()->setValue(std::max(0,y-48));
-                }break;
-            }
-        }
-        QWidget* target=step==1?static_cast<QWidget*>(dual_):step==2?static_cast<QWidget*>(vertical_):step==3?static_cast<QWidget*>(rapid_active_):nullptr;
-        if(target)scroll_->ensureWidgetVisible(target,20,40);
-        if(step==5&&mouse_setup_)preferences_scroll_->ensureWidgetVisible(mouse_setup_,0,12);
-        positionTour();
-    });positionTour();
-}
-
-void MainWindow::advanceTour(){
-    if(tour_step_<0)return;
-    if(tour_step_==0)selectOperator(0);
-    if(tour_step_==5){
-        const auto input=mouseSetupInput(),baseline=engine_.snapshot().sensitivity;
-        if(!input.valid()||(baseline.valid()&&(!sensitivity::sameGame(baseline,input)||baseline.dpi!=input.dpi)))return;
-        if((!baseline.valid()||mouse_setup_dirty_)&&!saveMouseSetup())return;
-        finishTour();return;
-    }setTourStep(tour_step_+1);
-}
-
-void MainWindow::finishTour(){
-    if(tour_step_<0)return;
-    if(!uiprefs::update(config_path_,[](QJsonObject& root){root["onboardingVersion"]=1;}))showNotice(text(UiText::CouldNotSaveConfiguration),true,true);
-    tour_step_=-1;tour_refresh_.stop();if(tour_arrow_)tour_arrow_->hide();if(tour_pill_)tour_pill_->hide();
-}
-
-void MainWindow::positionTour(){
-    if(tour_step_<0||!tour_pill_||!tour_arrow_)return;
-    auto* active=QApplication::activeWindow();
-    const bool ours=active&&(active==this||active==tour_pill_);
-    if(!isVisible()||isMinimized()||!ours||QApplication::activeModalWidget()||QApplication::activePopupWidget()){
-        tour_pill_->hide();tour_arrow_->hide();return;
-    }
-    auto* screen=QGuiApplication::screenAt(frameGeometry().center());if(!screen)screen=QGuiApplication::primaryScreen();
-    const auto available=screen->availableGeometry();tour_pill_->place(available);
-    if(!tour_pill_->isVisible())tour_pill_->show();
-    QRect target;QWidget* widget=nullptr;
-    if(tour_step_==0&&pages_->currentWidget()==operator_page_){
-        auto* list=favorites_.contains("Ace")?favorites_list_:operators_;
-        for(int i=0;i<list->count();++i)if(list->item(i)->data(Qt::UserRole).toInt()==0){const auto rect=list->visualItemRect(list->item(i)).intersected(list->viewport()->rect());target=QRect(list->viewport()->mapToGlobal(rect.topLeft()),rect.size());break;}
-    }else if(tour_step_<4&&pages_->currentWidget()==operator_page_){
-        widget=tour_step_==1?static_cast<QWidget*>(dual_):tour_step_==2?static_cast<QWidget*>(vertical_):static_cast<QWidget*>(rapid_active_);
-    }else if(tour_step_==4&&pages_->currentWidget()==preferences_&&preference_category_==2)widget=key_buttons_[0];
-    else if(tour_step_==5&&pages_->currentWidget()==preferences_&&preference_category_==mouse_setup_category_)widget=mouse_dpi_;
-    if(widget&&widget->isVisible())target=QRect(widget->mapToGlobal(QPoint()),widget->size());
-    const QRect windowArea(mapToGlobal(QPoint()),size());
-    auto* viewport=tour_step_==0?sidebar_scroll_->viewport():tour_step_<4?scroll_->viewport():preferences_scroll_->viewport();
-    const QRect visibleArea(viewport->mapToGlobal(QPoint()),viewport->size());
-    if(target.isEmpty()||!windowArea.contains(target.center())||!visibleArea.contains(target)){tour_arrow_->hide();return;}
-    tour_arrow_->pointTo(target);if(!tour_arrow_->isVisible())tour_arrow_->show();
 }

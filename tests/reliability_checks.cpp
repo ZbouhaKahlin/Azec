@@ -57,7 +57,7 @@ int main(int argc,char** argv){
     check(write(ui,{})&&uiprefs::readDocument(ui,preferences)&&preferences.isEmpty()&&
           uiprefs::update(path,[](QJsonObject& root){root["colorTheme"]="rose";root["favorites"]=QJsonArray{"Ace"};}),
           "empty UI preferences recover on the next atomic save");
-    check(uiprefs::update(path,[](QJsonObject& root){root["sidebarCollapsed"]=true;root["onboardingVersion"]=1;})&&
+    check(uiprefs::update(path,[](QJsonObject& root){root["sidebarCollapsed"]=true;})&&
           uiprefs::readDocument(ui,preferences)&&preferences["colorTheme"]=="rose"&&preferences["favorites"].toArray().contains("Ace"),
           "recovered preferences retain other settings on later writes");
     const QByteArray malformed="{broken preferences";

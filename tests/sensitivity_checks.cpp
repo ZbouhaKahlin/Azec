@@ -62,7 +62,7 @@ int main(int argc,char** argv){
     r6::Engine restored(true);check(restored.load(path)&&restored.snapshot().sensitivity.dpi==1600&&restored.snapshot().operators[0].horizontal==-2.3f&&restored.snapshot().secondary[0].vertical==24,"Engine restart retains scaled profiles and reference together");
     check(QFileInfo(QString::fromStdWString(path.wstring())).size()==3734,"reference never extends binary configuration");
     check(uiprefs::update(path,[](QJsonObject& root){root["favorites"]=QJsonArray{"Ace"};root["colorTheme"]="rose";root["sidebarCollapsed"]=true;}),"create isolated UI preferences");
-    check(uiprefs::update(path,[](QJsonObject& root){root["onboardingVersion"]=1;}),"save tour completion");
-    QJsonObject prefs;check(uiprefs::readDocument(uiprefs::filePath(path),prefs)&&prefs["onboardingVersion"].toInt()==1&&prefs["favorites"].toArray().contains("Ace")&&prefs["colorTheme"]=="rose"&&prefs["sidebarCollapsed"].toBool(),"tour completion preserves favorites, theme, and sidebar preference");
+    check(uiprefs::update(path,[](QJsonObject& root){root["colorTheme"]="charcoal";}),"update isolated appearance preferences");
+    QJsonObject prefs;check(uiprefs::readDocument(uiprefs::filePath(path),prefs)&&prefs["favorites"].toArray().contains("Ace")&&prefs["colorTheme"]=="charcoal"&&prefs["sidebarCollapsed"].toBool(),"appearance changes preserve favorites and sidebar preference");
     std::cout<<checks<<" console checks: "<<(ok?"PASS":"FAIL")<<'\n';return ok?0:1;
 }

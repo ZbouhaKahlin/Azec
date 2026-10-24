@@ -4,7 +4,7 @@ A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 op
 
 [Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec-releases/releases) · [Application reference](docs/reference.md)
 
-![Azec desktop themes and companion phone interface, with phone captures shown in device mockups](docs/showcase.png)
+![Current Azec desktop and connected phone browser in Charcoal & blush, using the same Ash profile](docs/showcase-latest.png)
 
 ## Get started
 
@@ -13,7 +13,7 @@ A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 op
 3. Select an operator, adjust its primary profile, and click **Save**. Enable a separate secondary profile if you want different settings for the second weapon.
 4. Turn on **Recoil** when ready. Fresh profiles have Rapid fire off; saved Rapid fire choices belong to each weapon profile.
 
-The first-start tour introduces the controls. Skip it at any time or replay it from **Settings → General → Replay tour**. You can configure mouse sensitivity separately in **Settings → Mouse setup**.
+Configure mouse sensitivity in **Settings → Mouse setup**.
 
 Azec runs locally. Profile editing and phone control do not need a cloud account or internet connection. Driver downloads and update checks need internet access.
 
@@ -142,7 +142,7 @@ Publication uses the GitHub CLI, uploads only **Azec.exe** to [Azec-releases](ht
 - [Agent instructions](AGENTS.md): project boundaries, compatibility, design, and delivery rules. [CLAUDE.md](CLAUDE.md) imports the same instructions.
 - [Testing](docs/testing.md): commands for explicitly authorized diagnostics.
 - [Theme gallery](docs/theme-gallery.md): palette previews.
-- Theme presentations: [pastel](docs/showcase-pastel.html) and [mixed palettes](docs/showcase.html), assembled from existing desktop and browser captures.
+- [Current desktop and phone presentation](docs/showcase-latest.html), captured from the working-tree build with isolated sample settings. Additional palette presentations: [pastel](docs/showcase-pastel.html) and [mixed palettes](docs/showcase.html).
 
 The design reference is [GoofyUI for C++ / Qt](https://github.com/Azec-Zuckerberg/goofy-ui-cpp). Azec's application-specific controls live in this repository.
 

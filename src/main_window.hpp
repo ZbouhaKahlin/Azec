@@ -18,7 +18,6 @@
 #include "version.hpp"
 #include "update_check.hpp"
 #include "app_paths.hpp"
-#include "onboarding_widgets.hpp"
 #include <windows.h>
 #include <shellapi.h>
 #include <dwmapi.h>
@@ -59,8 +58,6 @@ inline void roundWindow(QWidget* window){
 class MainWindow final : public QWidget {
     r6::Engine& engine_;
     std::filesystem::path config_path_;
-    QPointer<OnboardingPill> tour_pill_;QPointer<OnboardingArrow> tour_arrow_;
-    QTimer tour_refresh_;int tour_step_=-1;bool tour_checked_=false;
     QPointer<Section> mouse_setup_;QPointer<QSpinBox> mouse_dpi_;
     QPointer<QDoubleSpinBox> mouse_horizontal_,mouse_vertical_,mouse_multiplier_;
     QPointer<QLabel> mouse_setup_status_;QPointer<QPushButton> mouse_rescale_,mouse_save_;
@@ -71,12 +68,7 @@ class MainWindow final : public QWidget {
     void readGameSensitivity(bool chooseFile=false);
     bool saveMouseSetup();
     void rescaleMouseProfiles();
-    void maybeStartTour();
-    void startTour();
-    void setTourStep(int step);
-    void advanceTour();
-    void finishTour();
-    void positionTour();
+    void checkMouseSensitivityChange();
     void buildGoofyLayout(QVBoxLayout* layout);
     QListWidget* operators_=nullptr;QListWidget* favorites_list_=nullptr;QLineEdit* search_=nullptr;
     QLabel *favorites_title_=nullptr,*preferences_title_=nullptr;QWidget* favorites_group_=nullptr;
@@ -274,7 +266,6 @@ class MainWindow final : public QWidget {
     void applyStyle(){
         pages_->settle();qApp->setPalette(kbtheme::palette());setStyleSheet(applicationStyle(accent()));setPalette(kbtheme::palette());
         styleNotice();
-        if(tour_step_>=0)setTourStep(tour_step_);
         for(auto* child:findChildren<QWidget*>())child->update();update();
     }
     void syncThemeCards(){
@@ -611,7 +602,7 @@ class MainWindow final : public QWidget {
         buildMouseSetup(mouseLayout);
         auto* guideRow=new QHBoxLayout;
         auto* guide=new QPushButton(text(UiText::QuickGuide));guide->setObjectName("secondary");guideRow->addWidget(guide);connect(guide,&QPushButton::clicked,this,[this]{help();});
-        auto* replay=new QPushButton(text(UiText::ReplayTour));replay->setObjectName("secondary");guideRow->addWidget(replay);connect(replay,&QPushButton::clicked,this,[this]{startTour();});guideRow->addStretch();generalLayout->addLayout(guideRow);
+        guideRow->addStretch();generalLayout->addLayout(guideRow);
         auto* transfer=new Section(text(UiText::ProfileBackup),false,true,kbtheme::pink);backupLayout->addWidget(transfer);
         auto* transfers=new QHBoxLayout;auto* exportButton=new QPushButton(text(UiText::ExportProfiles));auto* importButton=new QPushButton(text(UiText::ImportProfiles));
         for(auto* button:{exportButton,importButton}){button->setObjectName("secondary");transfers->addWidget(button);}transfer->body->addLayout(transfers);
@@ -738,7 +729,7 @@ class MainWindow final : public QWidget {
         const bool editing=isActiveWindow()&&textEditingActive();
         const bool game=r6::gameIsActive();
         const bool focusOnly=engine_.game_focus_only.load();
-        const bool azecActive=isActiveWindow()||(tour_pill_&&tour_pill_->isActiveWindow())||QApplication::activeModalWidget()||QApplication::activePopupWidget();
+        const bool azecActive=isActiveWindow()||QApplication::activeModalWidget()||QApplication::activePopupWidget();
         engine_.input_allowed=!focusOnly||game;
         engine_.menu_visible=azecActive;
         if(binding_||QApplication::activeModalWidget()||QApplication::activePopupWidget())return;
@@ -842,7 +833,7 @@ protected:
     void showEvent(QShowEvent* event) override {
         QWidget::showEvent(event);engine_.menu_visible=true;if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);roundWindow(this);const BOOL dark=FALSE;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));}
     }
-    void hideEvent(QHideEvent* event) override {if(pairing_qr_)pairing_qr_->conceal();if(tour_pill_)tour_pill_->hide();if(tour_arrow_)tour_arrow_->hide();engine_.menu_visible=false;QWidget::hideEvent(event);}
+    void hideEvent(QHideEvent* event) override {if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);}
     void closeEvent(QCloseEvent* event) override {
         if(close_prompt_){if(!isVisible())showNormal();raise();activateWindow();QApplication::alert(this,0);if(close_alert_&&close_alert_->isVisible()){close_alert_->raise();close_alert_->activateWindow();}event->ignore();return;}
         if(unsaved_&&!force_close_){
@@ -859,7 +850,6 @@ protected:
             engine_.recoil_active=recoil;close_prompt_=false;
             if(choice==0||(choice==2&&!save())){event->ignore();return;}
         }
-        if(tour_pill_)tour_pill_->hide();if(tour_arrow_)tour_arrow_->hide();tour_refresh_.stop();
         if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
     void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);if(native_ready_)roundWindow(this);layoutNotice();}
@@ -927,7 +917,7 @@ public:
         operators_->setCurrentRow(c.selected);
         favorites_=readFavorites();refreshFavorites();
         connect(operators_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});connect(favorites_list_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});
-        for(auto* list:{operators_,favorites_list_})connect(list,&QListWidget::itemClicked,this,[this](QListWidgetItem* item){if(!item)return;const int id=item->data(Qt::UserRole).toInt();selectOperator(id);if(tour_step_==0&&id==0)QTimer::singleShot(0,this,[this]{if(tour_step_==0)advanceTour();});});
+        for(auto* list:{operators_,favorites_list_})connect(list,&QListWidget::itemClicked,this,[this](QListWidgetItem* item){if(!item)return;selectOperator(item->data(Qt::UserRole).toInt());});
         connect(search_,&QLineEdit::textChanged,this,[this]{filterOperators();});
         operator_transition_.setDuration(120);operator_transition_.setStartValue(.35);operator_transition_.setEndValue(1.0);operator_transition_.setEasingCurve(QEasingCurve::InOutQuad);
         connect(&operator_transition_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){name_opacity_->setOpacity(value.toReal());icon_opacity_->setOpacity(value.toReal());});
@@ -941,8 +931,7 @@ public:
         auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{if(sidebar_collapsed_)setSidebarCollapsed(false,true,true);else{search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();}});
         auto* escapeShortcut=new QShortcut(QKeySequence(Qt::Key_Escape),this);connect(escapeShortcut,&QShortcut::activated,this,[this]{if(pages_->currentWidget()==preferences_)showOperators();else if(!search_->text().isEmpty())search_->clear();});
         clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});paint_.start();
-        tour_refresh_.setInterval(60);connect(&tour_refresh_,&QTimer::timeout,this,[this]{positionTour();});
-        QTimer::singleShot(350,this,[this]{maybeStartTour();});
+        QTimer::singleShot(350,this,[this]{checkMouseSensitivityChange();});
     }
 
     void capture(const QString& file){grab().save(file);}

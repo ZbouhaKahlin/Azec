@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <title>Yellow tour arrow with four tapered cartoon folds</title>
-  <path d="M91 10L110 29L60 79L76 95L13 108L26 45L42 61Z" transform="translate(2 3)" fill="#131113" stroke="#131113" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M91 10L110 29L60 79L76 95L13 108L26 45L42 61Z" fill="#FFDD59" stroke="#131113" stroke-width="2.5" stroke-linejoin="round"/>
-  <path d="M79 22L82 19L87 34Z M83 56L79 60L69 51Z M60 41L63 38L68 53Z M47 101L43 102L45 90Z" fill="#131113"/>
-  <path d="M81 24L85 34M79 57L69 53M62 43L66 53M44 100L44 90" stroke="#FFF2AC" stroke-width="1.5" stroke-linecap="round"/>
-</svg>
