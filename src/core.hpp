@@ -59,6 +59,12 @@ struct SensitivitySetup {
     bool validGame() const;
     bool valid() const;
 };
+struct ProfileSet {
+    std::string id,name;
+    std::array<Operator,operator_count> primary,secondary;
+    std::array<bool,operator_count> secondary_enabled{},secondary_initialized{};
+    SensitivitySetup sensitivity;
+};
 struct Config {
     std::array<Operator, operator_count> operators;
     std::int32_t menu_key = 0x2d, recoil_key = 0x75, panic_key = 0x23;
@@ -74,6 +80,8 @@ struct Config {
     int weapon_slot = 0, primary_key = '1', secondary_key = '2';
     bool phone_enabled = true;
     SensitivitySetup sensitivity;
+    std::vector<ProfileSet> profile_sets;
+    std::string active_profile_set;
     Config();
     int active_slot() const { return weapon_slot == 1 && secondary_enabled[selected] ? 1 : 0; }
     Operator& active_operator() { return active_slot() ? secondary[selected] : operators[selected]; }

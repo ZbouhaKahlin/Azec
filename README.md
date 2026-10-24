@@ -13,7 +13,7 @@ A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 op
 3. Select an operator, adjust its primary profile, and click **Save**. Enable a separate secondary profile if you want different settings for the second weapon.
 4. Turn on **Recoil** when ready. Fresh profiles have Rapid fire off; saved Rapid fire choices belong to each weapon profile.
 
-Configure mouse sensitivity in **Settings → Mouse setup**.
+Convert sensitivity and manage profile sets in **Settings → Converter & profiles**.
 
 Azec runs locally. Profile editing and phone control do not need a cloud account or internet connection. Driver downloads and update checks need internet access.
 
@@ -68,19 +68,21 @@ Select a preview to apply and save the palette immediately. The phone offers the
 
 The sidebar remembers whether it is expanded or collapsed. Right-click an operator to add or remove a favorite. Favorites appear once, above the remaining operators. Search works in either sidebar state; selecting the compact search icon expands and focuses it.
 
-Settings groups options into **General**, **Appearance**, **Shortcuts**, **Phone control**, **Profile backup**, and **Mouse setup**. Language and feedback sound are available in General.
+Settings groups options into **General**, **Appearance**, **Shortcuts**, **Phone control**, **Profile backup**, and **Converter & profiles**. Language and feedback sound are available in General.
 
-## Mouse setup and backups
+## Converter, profile sets, and backups
 
 ### Keep sensitivity changes manageable
 
-Open **Settings → Mouse setup** to record DPI and game sensitivity. Azec can read your local `GameSettings.ini` and preview a recoil-profile rescale when game sensitivity changes.
+Open **Settings → Converter & profiles**. Import an Azec JSON backup or use your current profiles, enter the original **From** and your **To** DPI, horizontal/vertical sensitivity, and multiplier, then choose **Convert as new set**. Reading your local `GameSettings.ini` fills the To game values. The preview shows both conversion factors. Your current profiles and an imported original are preserved as separate named sets; imported app preferences are not applied by the converter.
+
+Switch sets from the same Settings page, or save a copy, rename, and delete sets. Each set holds all primary/secondary weapon profiles and its sensitivity. Switching retains edits; click **Save** to persist the library and current values. The main screen and phone keep editing the active set through the shared engine.
 
 DPI is reference information; rescaling uses the change in game sensitivity and multiplier on each axis. A rescale is rejected in full if any affected profile would exceed its allowed range. Accepted changes remain unsaved until you click **Save**.
 
 ### Move or restore your profiles
 
-Use **Settings → Profile backup** to export or import profiles and supported preferences, including favorites, theme, sidebar state, and numeric mouse setup. Backups omit the machine-specific game-settings path.
+Use **Settings → Profile backup** to export or import profiles and supported preferences, including favorites, theme, sidebar state, the named profile library, and numeric sensitivity settings. Backups omit the machine-specific game-settings path.
 
 Older backups preserve operators that were not included in them. Imported settings remain pending until **Save**; closing with **Discard** keeps the previously saved configuration.
 

@@ -8,13 +8,15 @@ QJsonObject MainWindow::mobileState() const {
         QJsonArray themes;for(const auto& theme:kbtheme::colorThemes)themes.append(QJsonObject{{"id",theme.id},{"name",theme.name}});
         const QJsonObject colors{{"paper",kbtheme::paper.name()},{"surface",kbtheme::surface.name()},{"card",kbtheme::card.name()},{"ink",kbtheme::ink.name()},{"muted",kbtheme::muted.name()},{"accent",accent().name()},{"accent-ink",kbtheme::readableOn(accent()).name()},{"lavender",kbtheme::lavender.name()},{"outline",kbtheme::outline.name()},{"chip-ink",kbtheme::chipInk.name()}};
         const QJsonObject appearance{{"id",kbtheme::activeColorTheme},{"scheme",kbtheme::paper.lightness()<128?"dark":"light"},{"colors",colors},{"themes",themes}};
-        return {{"operators",operators},{"operatorId",c.selected},{"weaponSlot",c.active_slot()},{"dual",c.secondary_enabled[c.selected]},{"profile",profileJson(c.active_operator())},{"dirty",unsaved_},{"keys",keys},{"appearance",appearance},
+        return {{"operators",operators},{"operatorId",c.selected},{"weaponSlot",c.active_slot()},{"profileSet",QString::fromStdString(c.active_profile_set)},{"dual",c.secondary_enabled[c.selected]},{"profile",profileJson(c.active_operator())},{"dirty",unsaved_},{"keys",keys},{"appearance",appearance},
             {"globals",QJsonObject{{"recoilActive",engine_.recoil_active.load()},{"rapidActive",c.active_operator().rapid!=0},
                 {"gameFocusOnly",engine_.game_focus_only.load()},{"adsOnly",engine_.ads_only.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()}}}};
     }
 QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
         const auto fail=[](const QString& message){return QJsonObject{{"error",message}};};
         const auto action=request["action"].toString();auto next=engine_.snapshot();
+        const bool editsSet=action=="setProfile"||action=="setDual"||(action=="setGlobal"&&request["values"].toObject().contains("rapidActive"));
+        if(editsSet&&request["profileSet"].toString()!=QString::fromStdString(next.active_profile_set))return fail("The active profile set changed. Refresh the phone page before editing.");
         const auto validNumber=[](const QJsonValue& v,double low,double high){return v.isDouble()&&std::isfinite(v.toDouble())&&v.toDouble()>=low&&v.toDouble()<=high;};
         const auto validInteger=[&](const QJsonValue& v,int low,int high){return validNumber(v,low,high)&&std::floor(v.toDouble())==v.toDouble();};
         if(action=="save"){if(!save())return fail("Could not save configuration");return mobileState();}

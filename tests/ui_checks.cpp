@@ -418,8 +418,8 @@ QJsonObject MainWindow::selfTest(const QString& output){
         wait(220);
 
             const auto originalTheme=kbtheme::activeColorTheme;const auto themeProfiles=engine_.snapshot().bytes();const bool themeDirty=unsaved_;const auto themePanel=panel_->geometry();
-            checks["all_requested_palettes_available"]=theme_cards_.size()==10;
-            bool themeCardsVisible=theme_cards_.size()==10;
+            checks["all_requested_palettes_available"]=theme_cards_.size()==11;
+            bool themeCardsVisible=theme_cards_.size()==11;
             for(auto* card:theme_cards_)themeCardsVisible&=card->isVisible();
             const QString clickTheme=kbtheme::activeColorTheme=="rose"?QStringLiteral("goofy"):QStringLiteral("rose");
             ThemeCard* clickCard=nullptr;for(auto* card:theme_cards_)if(card->themeId()==clickTheme)clickCard=card;
@@ -434,7 +434,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 palettesApply&=accent()==QColor(palette.accent)&&kbtheme::paper==QColor(palette.paper)&&kbtheme::surface==QColor(palette.surface)&&matchingText&&selectedThemeId()==QLatin1String(palette.id);
                 palettesPersist&=kbtheme::readColorTheme(config_path_)==QLatin1String(palette.id);
                 const auto phoneAppearance=mobileState()["appearance"].toObject();const auto phoneColors=phoneAppearance["colors"].toObject();
-                mobilePalettesMatch&=phoneAppearance["id"].toString()==QLatin1String(palette.id)&&phoneColors["paper"].toString()==QColor(palette.paper).name()&&phoneColors["ink"].toString()==QColor(palette.text).name()&&phoneColors["outline"].toString()==QColor(palette.outline).name()&&phoneAppearance["themes"].toArray().size()==10;
+                mobilePalettesMatch&=phoneAppearance["id"].toString()==QLatin1String(palette.id)&&phoneColors["paper"].toString()==QColor(palette.paper).name()&&phoneColors["ink"].toString()==QColor(palette.text).name()&&phoneColors["outline"].toString()==QColor(palette.outline).name()&&phoneAppearance["themes"].toArray().size()==11;
                 themeSamples.append(QJsonObject{{"theme",palette.id},{"panelUnchanged",panel_->geometry()==themePanel},{"sidebarExpanded",sidebar_->width()==200},{"profilesUnchanged",engine_.snapshot().bytes()==themeProfiles},{"unsavedUnchanged",unsaved_==themeDirty}});
                 themeLayoutStable&=panel_->geometry()==themePanel&&sidebar_->width()==200&&engine_.snapshot().bytes()==themeProfiles&&unsaved_==themeDirty;
                 showOperators();wait(200);const auto headerImage=titleBar->grab().toImage();seamlessHeaders&=kbtheme::header==kbtheme::paper&&headerImage.pixelColor(headerImage.width()/2,headerImage.height()-1)==kbtheme::paper;capture(output+"/theme-"+QLatin1String(palette.id)+".png");showPreferences();chooseSettingsCategory(1);wait(200);

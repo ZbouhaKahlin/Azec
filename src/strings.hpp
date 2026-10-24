@@ -195,8 +195,24 @@ enum class UiText {
     DriverStateReady,
     DriverStateBlocked,
     DriverStateMissing,
+    ProfileSets,
+    FromSensitivity,
+    ToSensitivity,
+    ConvertAsNewSet,
+    ProfileSetName,
+    SaveSetCopy,
+    RenameSet,
+    DeleteSet,
+    CurrentProfiles,
+    ConvertedProfiles,
+    ImportedSource,
+    InvalidSetName,
+    ProfileSetLimit,
+    ProfileSetsHint,
+    ConversionPreview,
+    DeleteSetPrompt,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::DriverStateMissing)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::DeleteSetPrompt)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

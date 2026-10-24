@@ -50,7 +50,7 @@ An explicit screenshot request authorizes the requested captures, not a test sui
 - **Profiles and output:** `src/core.hpp` / `src/core.cpp` own binary compatibility and movement arithmetic. `src/engine.hpp` / `src/engine.cpp` synchronize configuration and run input workers. `src/profile_store.hpp`, `src/ui_preferences.hpp`, and `src/profile_transfer.*` own JSON preferences and backups.
 - **Driver:** `src/driver_input.hpp` dynamically loads Interception. `src/driver_setup.hpp` and `src/driver_download.hpp` own download, verification, and file placement.
 - **Phone:** `src/phone_bridge.cpp` maps requests to application state. `src/phone_server.hpp` validates and serves requests; `src/lan_address.hpp` selects the PC address. `assets/phone.html` is the self-contained client, embedded through `assets/operators.qrc`.
-- **Mouse setup:** `src/mouse_setup.cpp` and `src/sensitivity.hpp` own game-settings discovery and sensitivity rescaling.
+- **Converter and profile sets:** `src/mouse_setup.cpp`, `src/sensitivity.hpp`, and `src/profile_sets.hpp` own Settings conversion, game-settings discovery, and named weapon-profile sets.
 - **Language and assets:** `src/strings.hpp`, `src/lang_*.hpp`, and `src/flags.hpp` own localization. Fonts, icons, flags, and phone assets are bundled; notices live in `licenses/`.
 - **Verification:** `tests/` contains separate checks and isolation helpers. Verification executables and fixture DLLs never belong in a release.
 
@@ -59,11 +59,12 @@ An explicit screenshot request authorizes the requested captures, not a test sui
 Compatibility is a product requirement. Preserve the existing **3,734-byte** `r6_config.bin` layout and the meaning of every saved operator ID.
 
 - There are 78 operators. The binary holds the original 71 records; extension operators (Noor through Denari, IDs 71–77) use `primaryProfiles` in `azec_weapons.json`. Selection also persists in that JSON file; the binary selection field accepts only original-roster indexes. Append roster additions; never reorder existing records.
-- `azec_weapons.json` also holds secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, game-focus/aiming preferences, and mouse setup. `azec_ui.json` holds favorites, `colorTheme`, and `sidebarCollapsed`.
+- `azec_weapons.json` also holds secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, game-focus/aiming preferences, sensitivity, and the named profile library. `azec_ui.json` holds favorites, `colorTheme`, and `sidebarCollapsed`.
 - UI-preference writes must preserve other preferences. Ignore the obsolete `interface` key and remove it only on a successful atomic save. Normalize legacy binary appearance values on load and the next save; named themes do not change profile values.
 - Keep save staging, atomic replacement, and rollback across configuration files. A failure must retain unsaved edits and show a persistent error. Never replace, commit, or package personal configuration as defaults.
 - A secondary profile copies primary settings only on first enable. Disabling preserves its edits. Selecting an operator starts on primary and persists only the selection, without marking profiles dirty or saving unrelated edits.
 - Accept backups containing 71–78 operators, matching records by name and preserving operators absent from an older backup. Imported profiles and UI preferences remain pending until Save; Discard retains the previously saved files.
+- Named sets live in the weapon sidecar and backups; switching preserves pending edits through the shared Engine. Converter imports never apply app preferences and create a separate converted set while preserving current and original profiles. Library changes use the existing Save/Discard path. Desktop Settings owns library management; phone edits operate on the same active set.
 - Mouse DPI is reference metadata. Rescale recoil using old/new game sensitivity and multiplier per axis, preview the change, and reject the entire operation if any affected profile exceeds its range. Backups include numeric setup values, not the local INI path. Dry-run instances skip automatic game-settings discovery.
 
 ## Output and shortcuts
@@ -95,7 +96,7 @@ Keep one desktop layout in `src/desktop_layout.hpp` and the corresponding phone 
 - Operator changes fade only the identity for about 120 ms while controls update immediately. Settings uses a stationary 180 ms crossfade. Rapid changes settle on the last selection. Avoid continuous repainting and unbounded image caches.
 - Reserve scrollbar lanes. Show bars during scrolling/dragging and fade them after three idle seconds. Keep smooth wheel notches, native precision-touchpad deltas, and shared edge fades. An unfocused slider, number field, or dropdown forwards wheel scrolling to its page.
 
-Settings categories remain General, Appearance, Shortcuts, Phone control, Profile backup, and Mouse setup.
+Settings categories remain General, Appearance, Shortcuts, Phone control, Profile backup, and Converter & profiles.
 
 ### Keep both screens consistent
 

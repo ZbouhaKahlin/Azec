@@ -26,7 +26,7 @@ inline const QColor chipInk("#31204C");
 
 // Named palettes change materials only; all Goofy themes share one widget tree.
 struct ColorTheme {const char *id,*name,*paper,*surface,*card,*accent,*selection,*text,*muted,*outline;};
-inline const std::array<ColorTheme,10> colorThemes{{
+inline const std::array<ColorTheme,11> colorThemes{{
     {"charcoal","Charcoal & blush","#222122","#323032","#2C2A2C","#F2B3C6","#58414A","#F8EFF2","#C8B7BF","#131113"},
     {"goofy","Goofy (original)","#FFFAEE","#FFFFFF","#FFFAEE","#7248D7","#EBDEFF","#31204C","#5D4973","#31204C"},
     {"pistachio","Pistachio & coral","#EEF5E9","#FFFFFF","#F7FAF2","#D85947","#F9DDD2","#27372D","#596D5D","#27372D"},
@@ -36,7 +36,8 @@ inline const std::array<ColorTheme,10> colorThemes{{
     {"rose","Rose","#FBECEF","#FFFCFD","#FFF5F7","#AF3B64","#F6D4E1","#442536","#886071","#442536"},
     {"midnight","Midnight violet","#171522","#242131","#211F2C","#B89AFF","#47385F","#F2EAFB","#B9ADC8","#100E17"},
     {"forest","Forest & tangerine","#14241E","#21382D","#1D3027","#F7A25B","#3F5743","#F3EED9","#B0C5B4","#0B1711"},
-    {"deep-sea","Deep sea & citron","#14242C","#21343E","#1B2E37","#DDE877","#41524A","#F0F4E4","#B0C5CC","#0B171E"}
+    {"deep-sea","Deep sea & citron","#14242C","#21343E","#1B2E37","#DDE877","#41524A","#F0F4E4","#B0C5CC","#0B171E"},
+    {"cocoa-mint","Cocoa & mint","#261B14","#372A1F","#2F241B","#7FE0B8","#4B3A2B","#F7EFE3","#C3AE9A","#150D07"}
 }};
 inline QString activeColorTheme="charcoal";
 inline const ColorTheme& colorTheme(const QString& id){for(const auto& theme:colorThemes)if(id==QLatin1String(theme.id))return theme;return colorThemes.front();}

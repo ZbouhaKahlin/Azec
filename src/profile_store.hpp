@@ -5,6 +5,7 @@
 #include <algorithm>
 #include "diagnostics.hpp"
 #include "sensitivity.hpp"
+#include "profile_sets.hpp"
 
 inline QString weaponFile(const std::filesystem::path& base){return QString::fromStdWString((base.parent_path()/L"azec_weapons.json").wstring());}
 // Rapid fire is stored per weapon profile. Older sidecars carried a single
@@ -42,6 +43,7 @@ inline void readWeaponProfiles(r6::Config& config,bool& gameFocusOnly,bool& adsO
         auto& op=config.operators[id];op.vertical=float(vertical);op.horizontal=float(horizontal);op.delay=delay;op.rapid=item["rapid"].toBool();op.humanize=item["humanize"].toBool(true);
     }
     if(!root["perProfileRapid"].toBool(false)){for(auto& op:config.operators)op.rapid=legacyRapid?1:0;for(auto& op:config.secondary)op.rapid=legacyRapid?1:0;}
+    if(!profilesets::read(root,config))diagnostic("load profile sets","Invalid profile library; active weapon values retained");
 }
 inline QByteArray weaponProfilesBytes(const r6::Config& config,bool gameFocusOnly,bool adsOnly){
     QJsonObject profiles,primaries;
@@ -51,12 +53,14 @@ inline QByteArray weaponProfilesBytes(const r6::Config& config,bool gameFocusOnl
     return QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},
         {"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},{"recoilMaster",true},{"rapidMaster",bool(config.rapid_master)},
         {"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries},
-        {"sensitivity",config.sensitivity.valid()?QJsonValue(sensitivity::json(config.sensitivity)):QJsonValue(QJsonValue::Null)}}).toJson();
+        {"profileSets",profilesets::json(config)},{"activeProfileSet",QString::fromStdString(config.active_profile_set)},
+        {"sensitivity",config.sensitivity.valid()?QJsonValue(sensitivity::json(config.sensitivity)):QJsonValue(QJsonValue::Null)}}).toJson(QJsonDocument::Compact);
 }
 // Two-phase write: the sidecar is prepared without touching the disk copy and
 // only committed after the primary binary write succeeded.
 inline bool stageWeaponProfiles(const r6::Config& config,bool gameFocusOnly,bool adsOnly,const std::filesystem::path& base,QSaveFile& file){
     const auto bytes=weaponProfilesBytes(config,gameFocusOnly,adsOnly);
+    if(bytes.size()>1024*1024)return false;
     file.setFileName(weaponFile(base));
     return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size();
 }

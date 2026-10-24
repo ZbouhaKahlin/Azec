@@ -2,6 +2,7 @@
 #include "core.hpp"
 #include "hotkeys.hpp"
 #include "sensitivity.hpp"
+#include "profile_sets.hpp"
 #include <QtCore>
 #include <cmath>
 #include <optional>
@@ -33,6 +34,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
     QStringList names(favorites.begin(),favorites.end());names.sort();
     auto setup=sensitivity::json(config.sensitivity);setup.remove("source");
     return {{"application","Azec"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
+        {"profileSets",profilesets::json(config)},{"activeProfileSet",QString::fromStdString(config.active_profile_set)},
         {"settings",QJsonObject{{"keys",keyArray},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
             {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},
             {"colorTheme",colorTheme},{"sidebarCollapsed",sidebarCollapsed},
@@ -112,6 +114,11 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
         if(seen.contains(QString::fromUtf8(next.operators[id].name)))continue;
         next.operators[id]=existing->operators[id];next.secondary[id]=existing->secondary[id];
         next.secondary_enabled[id]=existing->secondary_enabled[id];next.secondary_initialized[id]=existing->secondary_initialized[id];
+    }
+    if(root.contains("profileSets")){
+        if(!profilesets::read(root,next))return false;
+    }else if(existing){
+        auto previous=*existing;profilesets::remember(previous);next.profile_sets=std::move(previous.profile_sets);
     }
     result=next;favorites=nextFavorites;return true;
 }
