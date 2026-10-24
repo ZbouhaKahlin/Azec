@@ -120,7 +120,7 @@ Requires **Windows x64**, Visual Studio 2022 C++ tools, a Windows SDK, Python, a
 
 The setup script installs the pinned Qt kit. Set `NEON_QT_ROOT` to select another compatible installation. The app uses qmake through `Azec.pro`. Build intermediates are written to `.build/`, with a root launcher and deployed files in `runtime/`.
 
-**Do not run tests unless Azec explicitly requests them.** Ordinary changes, bug reports, builds, and releases do not grant that permission. `build.cmd checks` builds the separate verifier without executing it. Authorized diagnostic commands and isolation requirements are documented in [Testing](docs/testing.md); the permission rule in [AGENTS.md](AGENTS.md) takes precedence.
+**Do not run tests unless the user explicitly requests them.** Ordinary changes, bug reports, builds, and releases do not grant that permission. `build.cmd checks` builds the separate verifier without executing it. Authorized diagnostic commands and isolation requirements are documented in [Testing](docs/testing.md); the permission rule in [AGENTS.md](AGENTS.md) takes precedence.
 
 ### Package and publish
 

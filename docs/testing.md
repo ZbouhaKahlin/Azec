@@ -1,6 +1,6 @@
 # Optional testing for Azec
 
-Tests run only when Azec explicitly requests tests or asks to investigate a bug. Normal edits, builds, and releases do not authorize them. This document lists available tools; it is not an instruction to run them. The shared policy is in [AGENTS.md](../AGENTS.md).
+Tests run only when the user explicitly requests them. Normal edits, bug reports, builds, and releases do not authorize them. This document lists available tools; it is not an instruction to run them. The shared policy is in [AGENTS.md](../AGENTS.md).
 
 When testing is requested, choose checks relevant to the problem and stop after they pass. Extra scales, languages, expiry waits, and matrices require an explicit request. Tests must not open visible windows, steal focus, move the cursor, or play sounds. Desktop-backed Python runners use `hidden_process.py`: each GUI fixture runs on a noninteractive Windows station with its own desktop and a cleanup job covering descendants. The station has no access to your visible desktop or clipboard. Isolation failure stops the launch; there is no visible fallback.
 

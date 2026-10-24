@@ -7,11 +7,12 @@ Read [README.md](README.md) for setup and everyday use. This file is the shared 
 ## Working agreements
 
 - Understand the current source before changing behavior. Keep changes within the request, follow existing patterns, and choose the smallest implementation that handles the real constraint.
-- **Do not run tests unless Azec explicitly asks.** A bug report, code change, build, or release request does not by itself authorize tests. This includes unit tests, UI self-checks, browser checks, installer smoke tests, and ad-hoc scripts that exercise behavior. Source review, diff review, and checking syntax, links, or file references are allowed.
+- **Do not run tests unless the user explicitly asks.** A bug report, code change, build, or release request does not by itself authorize tests. This includes unit tests, UI self-checks, browser checks, installer smoke tests, and ad-hoc scripts that exercise behavior. Source review, diff review, and checking syntax, links, or file references are allowed.
 - Preserve unrelated work, including staged changes. Never reset, stash, revert, stage, or commit another task's edits. Do not stop the running app or modify personal settings to make a build succeed.
 - Interception is the intentional output backend. Preserve that architecture and its explicit setup flow; do not substitute another backend or turn setup into a silent installation.
 - Explain what changed and what was actually checked. A successful build does not establish runtime behavior. Do not claim physical-phone, driver, or in-game verification without performing it.
-- Use plain English. Keep routine updates short and report incomplete work directly. Do not create a pull request unless asked.
+- Write for a user who is not comfortable with code. Explain changes, options, and problems in plain English, focusing on what they mean for the app. Avoid jargon, code snippets, file paths, and line numbers unless requested or needed to identify a problem. Speak as a peer, keep routine updates short, and report incomplete work directly.
+- Address the user as “you”; do not use their personal name. Do not create a pull request unless asked.
 
 ## Build and inspect
 
