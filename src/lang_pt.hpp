@@ -221,4 +221,7 @@ inline const char* const lang_pt[]={
     "Usar perfis atuais",
     "2 · Defina a sensibilidade",
     "3 · Dê um nome à cópia",
+    "Nenhuma conexão de rede disponível. Conecte o PC e o celular à mesma rede.",
+    "Reinício como administrador cancelado. O Azec continua aberto.",
+    "Não foi possível reiniciar o Azec como administrador. Tente novamente.",
 };

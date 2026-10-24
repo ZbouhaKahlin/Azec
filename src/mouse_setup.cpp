@@ -37,7 +37,7 @@ r6::SensitivitySetup MainWindow::converterSourceInput() const {
 
 void MainWindow::buildMouseSetup(QVBoxLayout* column){
     const auto config=engine_.snapshot();
-    auto* library=new Section(text(UiText::ProfileSets),false,true,kbtheme::pink);column->addWidget(library);
+    auto* library=new Section(text(UiText::ProfileSets));column->addWidget(library);
     auto* libraryHint=label(text(UiText::ProfileSetsHint),"rowHint");libraryHint->setWordWrap(true);libraryHint->setContentsMargins(14,4,12,4);library->body->addWidget(libraryHint);
     auto* row=new QHBoxLayout;row->setContentsMargins(14,0,12,8);row->setSpacing(8);library->body->addLayout(row);profile_sets_=new LanguageComboBox;
     profile_sets_->setMinimumWidth(0);profile_sets_->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);profile_sets_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);profile_sets_->setMinimumContentsLength(8);profile_sets_->setAccessibleName(text(UiText::ActiveProfileSet));
@@ -53,7 +53,7 @@ void MainWindow::buildMouseSetup(QVBoxLayout* column){
     });
     profile_sets_->setEnabled(!save_blocked_);connect(profile_sets_,qOverload<int>(&QComboBox::activated),this,[this]{manageProfileSet(3);});
 
-    mouse_setup_=new Section(text(UiText::ConvertSensitivity),false,true,kbtheme::yellow);column->addWidget(mouse_setup_);auto* section=mouse_setup_.data();
+    mouse_setup_=new Section(text(UiText::ConvertSensitivity));column->addWidget(mouse_setup_);auto* section=mouse_setup_.data();
     const auto step=[&](UiText title){auto* heading=label(text(title),"rowTitle");heading->setWordWrap(true);heading->setContentsMargins(14,8,12,0);section->body->addWidget(heading);};
     step(UiText::ChooseConversionSource);
     auto* sourceStatus=label(converter_import_?text(UiText::ImportedSource).arg(converter_import_name_):text(UiText::CurrentProfiles),"rowHint");sourceStatus->setTextFormat(Qt::PlainText);sourceStatus->setWordWrap(true);sourceStatus->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);sourceStatus->setContentsMargins(14,0,12,0);section->body->addWidget(sourceStatus);

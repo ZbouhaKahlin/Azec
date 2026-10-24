@@ -13,11 +13,15 @@ void MainWindow::exportProfiles(){
 bool MainWindow::applyBackup(const QByteArray& bytes){
     if(bytes.size()>1024*1024)return false;
     QJsonParseError error;const auto document=QJsonDocument::fromJson(bytes,&error);const auto existing=engine_.snapshot();r6::Config config;QSet<QString> favorites;BackupOptions options;
-    if(error.error!=QJsonParseError::NoError||!document.isObject()||!parseBackup(document.object(),config,favorites,options,&existing))return false;
+    if(error.error!=QJsonParseError::NoError||!document.isObject()||!parseBackup(document.object(),config,favorites,options,&existing)){
+        diagnostic("import profiles","Invalid backup or unsupported version");return false;
+    }
     // Keep imported UI choices in memory alongside the unsaved profiles.
     // Save commits all three files; Discard (including panic exit) writes none.
     QJsonObject ui;
-    if(!uiprefs::readDocument(uiprefs::filePath(config_path_),ui))return false;
+    if(!uiprefs::readDocument(uiprefs::filePath(config_path_),ui)){
+        diagnostic("import profiles","Could not read existing UI preferences; no changes applied");return false;
+    }
     imported_ui_pending_=true;favorites_=favorites;
     engine_.edit([&](r6::Config& current){current=config;});
     resetConverter();mouse_setup_dirty_=false;
@@ -35,12 +39,12 @@ void MainWindow::importProfiles(){
     if(file.open(QIODevice::ReadOnly)&&file.size()<=1024*1024){bytes=file.readAll();document=QJsonDocument::fromJson(bytes);}
     const bool valid=file.error()==QFile::NoError&&document.isObject()&&parseBackup(document.object(),imported,favorites,options,&existing);file.close();
     if(!valid){
+        diagnostic("import profiles",file.error()!=QFile::NoError?file.errorString():QStringLiteral("Invalid backup, unsupported version, or file exceeds 1 MiB"));
         showNotice(text(UiText::ImportFailedCheckTheBackupFormatAndFilePermissionsExistingProfile),true,true);return;
     }
     const auto summary=text(UiText::ImportBackupPreview).arg(QFileInfo(path).fileName()).arg(document.object()["operators"].toArray().size());
     if(!confirmProfileAction(text(UiText::ImportBackup),summary,text(UiText::ImportBackup)))return;
     if(!applyBackup(bytes)){
-        diagnostic("import profiles","Invalid backup, unsupported version, read error, or favorites write failure");
         showNotice(text(UiText::ImportFailedCheckTheBackupFormatAndFilePermissionsExistingProfile),true,true);
     }else showNotice(text(UiText::ProfilesImportedSaveToKeepTheChanges));
 }

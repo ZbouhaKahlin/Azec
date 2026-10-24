@@ -111,21 +111,29 @@ void Engine::recoil_worker(){
     }
 }
 void Engine::rapid_worker(){
-    bool enabled=false;
+    bool released=false;HWND releaseWindow=nullptr;
+    const auto handBack=[&]{
+        // Restore only a release we sent, while output is still permitted.
+        // Never restore a held press into the app or a changed foreground window.
+        if(released&&input_allowed.load()&&!menu_visible.load()&&
+           releaseWindow&&GetForegroundWindow()==releaseWindow&&(GetAsyncKeyState(VK_LBUTTON)&0x8000))input(MOUSEEVENTF_LEFTDOWN);
+        released=false;
+    };
     while(running){
         const auto op=current_profile().first;
         if(!op.rapid||!input_allowed||(ads_only&&!(GetAsyncKeyState(VK_RBUTTON)&0x8000))){
             // Rapid fire stopped mid-burst: hand the trigger back to the player
             // instead of leaving our injected release as the last button event.
             // Never inject the hand-back into another application.
-            if(enabled){enabled=false;if(input_allowed.load()&&(GetAsyncKeyState(VK_LBUTTON)&0x8000))input(MOUSEEVENTF_LEFTDOWN);}
+            handBack();
             sleep(50);continue;
         }
-        enabled=true;
         if((GetAsyncKeyState(VK_LBUTTON)&0x8000)&&!menu_visible){
-            input(MOUSEEVENTF_LEFTUP);sleep(5);if(!running)break;
-            input(MOUSEEVENTF_LEFTDOWN);sleep(25);input(MOUSEEVENTF_LEFTUP);sleep(rapid_interval(op));
+            releaseWindow=GetForegroundWindow();input(MOUSEEVENTF_LEFTUP);released=true;sleep(5);if(!running)break;
+            input(MOUSEEVENTF_LEFTDOWN);released=false;sleep(25);if(!running)break;
+            releaseWindow=GetForegroundWindow();input(MOUSEEVENTF_LEFTUP);released=true;sleep(rapid_interval(op));
         }else sleep(4);
     }
+    handBack();
 }
 }

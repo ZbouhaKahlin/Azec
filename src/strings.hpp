@@ -90,7 +90,7 @@ enum class UiText {
     ToggleRecoilActivity,
     Minimize,
     Close,
-    SearchOperators4c533,
+    SearchOperatorsLabel,
     FavoriteOperators,
     CouldNotExportProfilesCheckTheDestinationPermissions,
     ProfilesExported,
@@ -225,8 +225,11 @@ enum class UiText {
     UseCurrentProfiles,
     ConversionValues,
     ConversionResult,
+    PhoneNetworkUnavailable,
+    AdministratorRestartCancelled,
+    AdministratorRestartFailed,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::ConversionResult)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::AdministratorRestartFailed)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

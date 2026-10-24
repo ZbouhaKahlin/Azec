@@ -31,7 +31,7 @@ int main(int argc,char** argv){
     const lan::Adapter physical{QHostAddress("192.168.8.2"),true,false,false,100};
     check(lan::selectAddress({vpn,physical})=="192.168.8.2"&&lan::selectAddress({physical,vpn})=="192.168.8.2",
           "physical LAN without gateway outranks VPN in either order");
-    check(lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}})=="127.0.0.1",
+    check(lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}}).isEmpty(),
           "link-local adapters are not advertised");
 
     const auto source=fixture+"/manual/library/x64/interception.dll";

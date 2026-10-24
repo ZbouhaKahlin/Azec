@@ -221,4 +221,7 @@ inline const char* const lang_en[]={
     "Use current profiles",
     "2 · Set sensitivity",
     "3 · Name your copy",
+    "No usable network connection. Connect your PC and phone to the same network.",
+    "Administrator restart cancelled. Azec is still running.",
+    "Could not restart Azec as administrator. Try again.",
 };

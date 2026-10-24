@@ -47,7 +47,7 @@ class PhoneServer final : public QObject {
         ++failures_[peer].first;
     }
     static void reply(QTcpSocket* socket,int status,const QByteArray& body,const QByteArray& type="application/json; charset=utf-8"){
-        const QByteArray reason=status==200?"OK":status==400?"Bad Request":status==401?"Unauthorized":status==403?"Forbidden":status==404?"Not Found":status==429?"Too Many Requests":"Error";
+        const QByteArray reason=status==200?"OK":status==400?"Bad Request":status==401?"Unauthorized":status==403?"Forbidden":status==404?"Not Found":status==429?"Too Many Requests":status==503?"Service Unavailable":"Error";
         socket->write("HTTP/1.1 "+QByteArray::number(status)+" "+reason+"\r\nContent-Type: "+type+"\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'\r\nConnection: close\r\n\r\n"+body);socket->disconnectFromHost();
     }
     static QByteArray json(const QJsonObject& value){return QJsonDocument(value).toJson(QJsonDocument::Compact);}
@@ -101,7 +101,13 @@ class PhoneServer final : public QObject {
     }
     void accept(){
         while(server_.hasPendingConnections()){
-            auto* socket=server_.nextPendingConnection();if(connections_>=24){socket->abort();socket->deleteLater();continue;}++connections_;socket->setReadBufferSize(32768);
+            auto* socket=server_.nextPendingConnection();
+            if(connections_>=24){
+                connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+                QTimer::singleShot(1000,socket,&QTcpSocket::abort);
+                reply(socket,503,"{\"error\":\"Server busy. Try again shortly.\"}");continue;
+            }
+            ++connections_;socket->setReadBufferSize(32768);
             auto buffer=QSharedPointer<QByteArray>::create();auto completed=QSharedPointer<bool>::create(false);
             auto* timeout=new QTimer(socket);timeout->setSingleShot(true);timeout->setInterval(5000);connect(timeout,&QTimer::timeout,socket,&QTcpSocket::abort);timeout->start();
             connect(socket,&QTcpSocket::disconnected,this,[this,socket]{--connections_;socket->deleteLater();});
@@ -111,7 +117,9 @@ class PhoneServer final : public QObject {
                 int length=0;bool hasLength=false;
                 for(const auto& line:buffer->left(end).split('\n')){if(line.trimmed().toLower().startsWith("transfer-encoding:")){*completed=true;reply(socket,400,"{}");return;}if(line.trimmed().toLower().startsWith("content-length:")){bool ok=false;const auto parsed=line.mid(line.indexOf(':')+1).trimmed().toInt(&ok);if(hasLength||!ok||parsed<0||parsed>16384){*completed=true;reply(socket,400,"{}");return;}hasLength=true;length=parsed;}}
                 if(end>8192){*completed=true;reply(socket,400,"{}");return;}if(buffer->size()<end+4+length)return;
-                *completed=true;timeout->stop();handle(socket,*buffer,end,length);
+                // Keep a deadline while the reply drains as well as while
+                // parsing. A client that stops reading cannot retain a slot.
+                *completed=true;timeout->start();handle(socket,*buffer,end,length);
             });
         }
     }
@@ -136,15 +144,18 @@ public:
     void rotate(){
         token_=QUuid::createUuid().toString(QUuid::Id128);
         code_=QString::number(QRandomGenerator::system()->bounded(100000,1000000));
-        const auto sockets=findChildren<QTcpSocket*>();
+        const auto sockets=server_.findChildren<QTcpSocket*>();
         for(auto* socket:sockets)socket->abort();
         if(network_changed_)network_changed_();
     }
     QString currentAddress() const{
-        return "http://"+lan::currentAddress()+":"+QString::number(port());
+        auto address=lan::currentAddress();
+        // Isolated verification may use loopback; never advertise it to phones.
+        if(address.isEmpty()&&QCoreApplication::arguments().contains("--dry-run"))address="127.0.0.1";
+        return address.isEmpty()?QString():"http://"+address+":"+QString::number(port());
     }
     // refreshNetwork owns adapter enumeration; repeated UI reads in one toggle
     // must not rescan every interface for the address, link, and QR separately.
     QString address() const{return server_.isListening()&&!advertised_.isEmpty()?advertised_:currentAddress();}
-    QString pairingLink() const{return address()+"/#token="+token_;}
+    QString pairingLink() const{const auto base=address();return base.isEmpty()?QString():base+"/#token="+token_;}
 };

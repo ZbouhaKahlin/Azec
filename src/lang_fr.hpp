@@ -221,4 +221,7 @@ inline const char* const lang_fr[]={
     "Utiliser les profils actuels",
     "2 · Réglez la sensibilité",
     "3 · Nommez votre copie",
+    "Aucune connexion réseau utilisable. Connectez le PC et le téléphone au même réseau.",
+    "Redémarrage en tant qu’administrateur annulé. Azec reste ouvert.",
+    "Impossible de redémarrer Azec en tant qu’administrateur. Réessayez.",
 };

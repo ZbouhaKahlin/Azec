@@ -221,4 +221,7 @@ inline const char* const lang_de[]={
     "Aktuelle Profile verwenden",
     "2 · Empfindlichkeit einstellen",
     "3 · Kopie benennen",
+    "Keine nutzbare Netzwerkverbindung. Verbinde PC und Telefon mit demselben Netzwerk.",
+    "Neustart als Administrator abgebrochen. Azec läuft weiter.",
+    "Azec konnte nicht als Administrator neu gestartet werden. Versuche es erneut.",
 };

@@ -65,7 +65,16 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
                 else return fail("Invalid setting: "+key);
             }
             if(!uniqueHotkeys(next))return fail("Each action must use a different hotkey");
-            if(rapidSet){auto& op=next.active_operator();if((op.rapid!=0)!=rapid){op.rapid=rapid?1:0;rapidChanged=true;}}
+            if(rapidSet){
+                // Older clients may still send this as a global edit. Require
+                // the same explicit target as an ordinary profile edit.
+                if(!validInteger(request["operator"],0,r6::operator_count-1))return fail("Invalid operator");
+                if(!validInteger(request["slot"],0,1))return fail("Invalid weapon slot");
+                const int id=request["operator"].toInt(),slot=request["slot"].toInt();
+                if(slot==1&&!next.secondary_enabled[id])return fail("Enable the secondary profile first");
+                auto& op=slot?next.secondary[id]:next.operators[id];
+                if((op.rapid!=0)!=rapid){op.rapid=rapid?1:0;rapidChanged=true;}
+            }
             const bool persistenceChanged=next.bytes()!=before.bytes()||next.primary_key!=before.primary_key||next.secondary_key!=before.secondary_key||
                 rapidChanged||focus!=engine_.game_focus_only||ads!=engine_.ads_only;
             engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_active=active;engine_.game_focus_only=focus;engine_.ads_only=ads;

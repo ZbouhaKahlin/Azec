@@ -17,7 +17,7 @@ struct Adapter {
 // Prefer a real LAN with a gateway, then an isolated physical LAN. Internal
 // virtual switches without a gateway are never useful pairing destinations.
 inline QString selectAddress(const QList<Adapter>& adapters){
-    QString best="127.0.0.1";int bestScore=-1;quint32 bestMetric=std::numeric_limits<quint32>::max();
+    QString best;int bestScore=-1;quint32 bestMetric=std::numeric_limits<quint32>::max();
     for(const auto& adapter:adapters){
         const auto ip=adapter.address;
         if(ip.protocol()!=QAbstractSocket::IPv4Protocol||ip.isLoopback()||ip.isLinkLocal()||ip.isNull()||(!adapter.physical&&!adapter.gateway))continue;

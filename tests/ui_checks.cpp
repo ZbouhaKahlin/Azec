@@ -246,7 +246,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["phone_server_listens_and_provides_pairing"]=phone_->listening()&&phone_->port()>0&&phone_->code().size()==6&&phone_->token().size()==32;
         const lan::Adapter virtualSwitch{QHostAddress("172.28.176.1"),false,false,false,1},ethernet{QHostAddress("192.168.11.103"),true,true,false,25},wifi{QHostAddress("10.0.0.8"),true,true,true,50},vpn{QHostAddress("10.9.0.2"),false,true,false,1};
         checks["phone_prefers_lan_over_virtual_adapters"]=lan::selectAddress({virtualSwitch,ethernet})=="192.168.11.103"&&lan::selectAddress({ethernet,virtualSwitch})=="192.168.11.103"&&lan::selectAddress({vpn,ethernet})=="192.168.11.103"&&lan::selectAddress({ethernet,wifi})=="10.0.0.8";
-        checks["phone_handles_isolated_or_missing_lan"]=lan::selectAddress({virtualSwitch})=="127.0.0.1"&&lan::selectAddress({virtualSwitch,{QHostAddress("192.168.8.1"),true,false,false,10}})=="192.168.8.1"&&lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}})=="127.0.0.1";
+        checks["phone_handles_isolated_or_missing_lan"]=lan::selectAddress({virtualSwitch}).isEmpty()&&lan::selectAddress({virtualSwitch,{QHostAddress("192.168.8.1"),true,false,false,10}})=="192.168.8.1"&&lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}}).isEmpty();
         checks["phone_state_matches_desktop"]=mobileState()["operatorId"].toInt()==4&&mobileState()["profile"].toObject()["vertical"].toDouble()==12.3;
         checks["phone_state_reports_ads_only"]=mobileState()["globals"].toObject()["adsOnly"].toBool()==engine_.ads_only.load();
         // Exercise timing and drag behavior on all three production scrollbars.
@@ -305,12 +305,6 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 const auto name=QString("qr-sample-%1.png").arg(++sampleIndex);samplesReady&=sample.grab().save(output+"/"+name);qrCases.append(scanCase(name,link));
             }
             checks["branded_qr_samples_rendered"]=samplesReady;
-            PairingQr refreshedSample(QStringLiteral("Reveal QR"),QStringLiteral("Hide QR"));refreshedSample.setPairingLink(sampleLinks[4]);
-            bool refreshedReady=true;
-            for(int attempt=0;attempt<200&&!refreshedSample.framesReady();++attempt)wait(10);
-            refreshedReady&=refreshedSample.framesReady();refreshedSample.refreshTheme();wait(460);
-            if(!refreshedSample.revealed())refreshedSample.click();wait(460);
-            checks["qr_theme_refresh_keeps_same_link"]=refreshedReady&&refreshedSample.revealed();
             QFile scanManifest(output+"/qr-scan-cases.json");scanManifest.open(QIODevice::WriteOnly);scanManifest.write(QJsonDocument(qrCases).toJson());
         }
         showPreferences();chooseSettingsCategory(2);wait(220);phone_enabled_->setFocus(Qt::MouseFocusReason);preferences_scroll_->ensureWidgetVisible(phone_enabled_);wait(80);

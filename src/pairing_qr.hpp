@@ -104,12 +104,6 @@ public:
         }
         prepareFrames();updateLabel();
     }
-    // Rebuild the cached textures when the active palette changes. The encoded
-    // link is unchanged, so every theme still pairs with the same working code.
-    void refreshTheme(){
-        if(image_.isNull())return;
-        frames_.clear();obscured_=QPixmap();raster_ratio_=0;++generation_;prepareFrames();update();
-    }
 protected:
     void hideEvent(QHideEvent* event) override{conceal();QPushButton::hideEvent(event);}
     void showEvent(QShowEvent* event) override{prepareFrames();QPushButton::showEvent(event);}

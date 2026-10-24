@@ -760,16 +760,12 @@ protected:
 
 class Section final : public QFrame {
 public:
-    QVBoxLayout* body;QWidget* content;QPushButton* heading=nullptr;QHBoxLayout* headerRow;
-    explicit Section(const QString& title,bool collapsible,bool expanded,const QColor& stickerColor=QColor(),QWidget* parent=nullptr):QFrame(parent) {
-        Q_UNUSED(stickerColor)
+    QVBoxLayout* body;QWidget* content;QHBoxLayout* headerRow;
+    explicit Section(const QString& title,QWidget* parent=nullptr):QFrame(parent) {
         setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(8);
         auto* header=new QWidget;auto* row=headerRow=new QHBoxLayout(header);row->setContentsMargins(2,0,2,0);header->setMinimumHeight(24);
-        if(collapsible){heading=new MonoButton(title);heading->setObjectName("sectionHeading");heading->setCursor(Qt::PointingHandCursor);row->addWidget(heading,1);
-            auto* arrow=new QLabel(expanded?QString::fromUtf8("⌄"):QString::fromUtf8("›"));arrow->setObjectName("sectionArrow");row->addWidget(arrow);
-            layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);content->setVisible(expanded);layout->addWidget(content);
-            connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));});
-        }else{auto* titleLabel=new QLabel(title);titleLabel->setObjectName("sectionTitle");titleLabel->setWordWrap(true);titleLabel->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);row->addWidget(titleLabel,1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);layout->addWidget(content);}
+        auto* titleLabel=new QLabel(title);titleLabel->setObjectName("sectionTitle");titleLabel->setWordWrap(true);titleLabel->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);row->addWidget(titleLabel,1);layout->addWidget(header);
+        content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);layout->addWidget(content);
         content->setObjectName("settingGroup");content->setAttribute(Qt::WA_StyledBackground);
     }
 };

@@ -32,6 +32,8 @@ inline void readWeaponProfiles(r6::Config& config,bool& gameFocusOnly,bool& adsO
         const auto vertical=item["vertical"].toDouble(-1),horizontal=item["horizontal"].toDouble(-1000);const int delay=item["delay"].toInt(-1);
         if(!std::isfinite(vertical)||!std::isfinite(horizontal)||vertical<0||vertical>100||horizontal<-50||horizontal>50||delay<0||delay>60000){diagnostic("load weapon profile",QString::fromUtf8(config.operators[id].name)+": invalid values; ignored");continue;}
         auto& op=config.secondary[id];op=config.operators[id];op.vertical=float(vertical);op.horizontal=float(horizontal);op.delay=delay;op.rapid=item["rapid"].toBool();op.humanize=item["humanize"].toBool(true);
+        // Older saved secondary profiles may omit the marker. Retain
+        // their edits; absent or invalid records above still initialize on enable.
         config.secondary_enabled[id]=item["enabled"].toBool();config.secondary_initialized[id]=item["initialized"].toBool(true);
     }
     const int selected=root["selected"].toInt(-1);if(selected>=0&&selected<r6::operator_count)config.selected=selected;
