@@ -44,7 +44,7 @@ void MainWindow::buildMouseSetup(QVBoxLayout* column){
     if(config.active_profile_set.empty())profile_sets_->addItem(text(UiText::CurrentProfiles),QString());
     for(const auto& set:config.profile_sets)profile_sets_->addItem(QString::fromStdString(set.name),QString::fromStdString(set.id));
     profile_sets_->setCurrentIndex(profile_sets_->findData(QString::fromStdString(config.active_profile_set)));row->addWidget(profile_sets_,1);
-    auto* options=new QPushButton(QString::fromUtf8("⋯"));options->setObjectName("secondary");options->setFixedSize(44,38);options->setAccessibleName(text(UiText::ProfileSetOptions));options->setToolTip(text(UiText::ProfileSetOptions));options->setEnabled(!save_blocked_);row->addWidget(options);
+    auto* options=new MonoButton(QString::fromUtf8("⋯"));options->setObjectName("secondary");options->setFixedSize(44,38);options->setAccessibleName(text(UiText::ProfileSetOptions));options->setToolTip(text(UiText::ProfileSetOptions));options->setEnabled(!save_blocked_);row->addWidget(options);
     connect(options,&QPushButton::clicked,this,[this,options]{
         QMenu menu(this);const auto config=engine_.snapshot();const UiText actions[]={UiText::DuplicateSet,UiText::RenameSet,UiText::DeleteSet};
         for(int i=0;i<3;++i){if(i==2)menu.addSeparator();auto* action=menu.addAction(text(actions[i]));action->setData(i);action->setEnabled(i==0||!config.active_profile_set.empty());}
@@ -58,7 +58,7 @@ void MainWindow::buildMouseSetup(QVBoxLayout* column){
     step(UiText::ChooseConversionSource);
     auto* sourceStatus=label(converter_import_?text(UiText::ImportedSource).arg(converter_import_name_):text(UiText::CurrentProfiles),"rowHint");sourceStatus->setTextFormat(Qt::PlainText);sourceStatus->setWordWrap(true);sourceStatus->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);sourceStatus->setContentsMargins(14,0,12,0);section->body->addWidget(sourceStatus);
     auto* sourceActions=new QVBoxLayout;sourceActions->setContentsMargins(14,6,12,8);sourceActions->setSpacing(8);
-    auto* import=new QPushButton(text(UiText::ChooseBackup));auto* current=new QPushButton(text(UiText::UseCurrentProfiles));if(!converter_import_)current->hide();
+    auto* import=new MonoButton(text(UiText::ChooseBackup));auto* current=new MonoButton(text(UiText::UseCurrentProfiles));if(!converter_import_)current->hide();
     for(auto* button:{import,current}){button->setObjectName("secondary");sourceActions->addWidget(button);}section->body->addLayout(sourceActions);
     connect(import,&QPushButton::clicked,this,[this]{importForConversion();});connect(current,&QPushButton::clicked,this,[this]{resetConverter();buildPreferences();});
     step(UiText::ConversionValues);
@@ -77,7 +77,7 @@ void MainWindow::buildMouseSetup(QVBoxLayout* column){
     converter_vertical_=number(UiText::SensitivityVertical,3,1,3,100,1,from.vertical);mouse_vertical_=number(UiText::SensitivityVertical,3,2,3,100,1,to.vertical);
     converter_multiplier_=number(UiText::SensitivityMultiplier,4,1,6,1,.001,from.multiplier);mouse_multiplier_=number(UiText::SensitivityMultiplier,4,2,6,1,.001,to.multiplier);section->body->addLayout(grid);
     auto* fileActions=new QHBoxLayout;fileActions->setContentsMargins(14,0,12,8);fileActions->setSpacing(8);
-    auto* read=new QPushButton(text(UiText::ReadGameSettings));auto* choose=new QPushButton(text(UiText::ChooseGameSettings));
+    auto* read=new MonoButton(text(UiText::ReadGameSettings));auto* choose=new MonoButton(text(UiText::ChooseGameSettings));
     for(auto* button:{read,choose}){button->setObjectName("secondary");fileActions->addWidget(button);}section->body->addLayout(fileActions);
     connect(read,&QPushButton::clicked,this,[this]{readGameSensitivity();});connect(choose,&QPushButton::clicked,this,[this]{readGameSensitivity(true);});
     mouse_setup_status_=label({},"rowHint");mouse_setup_status_->setWordWrap(true);mouse_setup_status_->setContentsMargins(14,0,12,0);section->body->addWidget(mouse_setup_status_);mouse_setup_status_->hide();
@@ -85,7 +85,7 @@ void MainWindow::buildMouseSetup(QVBoxLayout* column){
     converter_name_=new QLineEdit;converter_name_->setMaxLength(80);converter_name_->setAccessibleName(text(UiText::ProfileSetName));converter_name_->setText(converter_name_draft_.isEmpty()?uniqueSetName(config,text(UiText::ConvertedProfiles)):converter_name_draft_);section->body->addWidget(converter_name_);
     auto* hint=label(text(UiText::MouseSetupHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,0,12,8);section->body->addWidget(hint);
     converter_validation_=label({},"rowHint");converter_validation_->setWordWrap(true);converter_validation_->setContentsMargins(14,0,12,4);section->body->addWidget(converter_validation_);
-    auto* actionsRow=new QHBoxLayout;actionsRow->setContentsMargins(14,0,12,8);mouse_rescale_=new QPushButton(text(UiText::ConvertAsNewSet));mouse_rescale_->setObjectName("save");actionsRow->addWidget(mouse_rescale_);section->body->addLayout(actionsRow);mouse_save_=nullptr;
+    auto* actionsRow=new QHBoxLayout;actionsRow->setContentsMargins(14,0,12,8);mouse_rescale_=new MonoButton(text(UiText::ConvertAsNewSet));mouse_rescale_->setObjectName("save");actionsRow->addWidget(mouse_rescale_);section->body->addLayout(actionsRow);mouse_save_=nullptr;
     connect(mouse_rescale_,&QPushButton::clicked,this,[this]{rescaleMouseProfiles();});
     for(auto* field:{mouse_dpi_.data(),converter_dpi_.data()})connect(field,qOverload<int>(&QSpinBox::valueChanged),this,[this]{updateMouseSetupControls();});
     for(auto* field:{mouse_horizontal_.data(),mouse_vertical_.data(),mouse_multiplier_.data(),converter_horizontal_.data(),converter_vertical_.data(),converter_multiplier_.data()})connect(field,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[this]{updateMouseSetupControls();});
@@ -107,13 +107,13 @@ void MainWindow::resetConverter(){
 bool MainWindow::confirmProfileAction(const QString& title,const QString& body,const QString& action){
     QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setObjectName("helpDialog");dialog.setAttribute(Qt::WA_StyledBackground);dialog.setWindowTitle(title);dialog.setFixedWidth(420);
     auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(24,20,24,22);layout->setSpacing(16);auto* heading=label(title,"cardTitle");heading->setWordWrap(true);layout->addWidget(heading);auto* description=label(body);description->setTextFormat(Qt::PlainText);description->setWordWrap(true);layout->addWidget(description);
-    auto* row=new QHBoxLayout;auto* cancel=new QPushButton(text(UiText::Cancel));cancel->setObjectName("secondary");auto* apply=new QPushButton(action);apply->setObjectName("save");row->addWidget(cancel);row->addWidget(apply);layout->addLayout(row);
+    auto* row=new QHBoxLayout;auto* cancel=new MonoButton(text(UiText::Cancel));cancel->setObjectName("secondary");auto* apply=new MonoButton(action);apply->setObjectName("save");row->addWidget(cancel);row->addWidget(apply);layout->addLayout(row);
     connect(cancel,&QPushButton::clicked,&dialog,&QDialog::reject);connect(apply,&QPushButton::clicked,&dialog,&QDialog::accept);dialog.adjustSize();roundWindow(&dialog);dialog.move(frameGeometry().center()-dialog.rect().center());return dialog.exec()==QDialog::Accepted;
 }
 QString MainWindow::askProfileSetName(const QString& initial,const QString& action){
     QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setObjectName("helpDialog");dialog.setAttribute(Qt::WA_StyledBackground);dialog.setWindowTitle(text(UiText::ProfileSetName));dialog.setFixedWidth(380);
     auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(24,20,24,22);layout->setSpacing(16);layout->addWidget(label(text(UiText::ProfileSetName),"cardTitle"));auto* field=new QLineEdit(initial);field->setMaxLength(80);field->setAccessibleName(text(UiText::ProfileSetName));layout->addWidget(field);
-    auto* row=new QHBoxLayout;auto* cancel=new QPushButton(text(UiText::Cancel));cancel->setObjectName("secondary");auto* apply=new QPushButton(action);apply->setObjectName("save");row->addWidget(cancel);row->addWidget(apply);layout->addLayout(row);
+    auto* row=new QHBoxLayout;auto* cancel=new MonoButton(text(UiText::Cancel));cancel->setObjectName("secondary");auto* apply=new MonoButton(action);apply->setObjectName("save");row->addWidget(cancel);row->addWidget(apply);layout->addLayout(row);
     connect(field,&QLineEdit::textChanged,apply,[apply](const QString& name){apply->setEnabled(!name.trimmed().isEmpty());});connect(cancel,&QPushButton::clicked,&dialog,&QDialog::reject);connect(apply,&QPushButton::clicked,&dialog,&QDialog::accept);field->selectAll();field->setFocus();dialog.adjustSize();roundWindow(&dialog);dialog.move(frameGeometry().center()-dialog.rect().center());return dialog.exec()==QDialog::Accepted?field->text().trimmed():QString();
 }
 void MainWindow::manageProfileSet(int action){

@@ -10,11 +10,13 @@
 // below is the product look.
 namespace kbtheme {
 inline QColor paper("#171717");          // hsl(240 0% 9%) — the app surface
-inline QColor windowGlass(23,23,23,102); // MonoCode's 40% window wash over system blur
+inline QColor windowGlass(13,13,13,204); // inset-outer: #0d0d0d at 80%, below the content/5 wash
+inline QColor windowWash(235,235,235,13);
+inline QColor panelGlass(6,6,6,102);     // inset-card: #060606 at 40%, over the already dark shell
 inline QColor surface("#202020");        // menus, popovers, inputs (opaque hosts)
-inline QColor card(255,255,255,13);      // content 5% — raised cards
+inline QColor card(235,235,235,8);       // Settings Group: content/3
 inline QColor ink("#EBEBEB");            // content hsl(240 0% 92%)
-inline QColor muted("#A3A3A3");          // secondary text
+inline QColor muted(235,235,235,115);          // secondary text
 inline QColor purple("#459BF7");         // accent hsl(211 92% 62%)
 inline QColor lavender(235,235,235,26);  // selection: content 10%
 inline QColor yellow("#E8C547");         // highlight marks
@@ -23,14 +25,14 @@ inline QColor pink("#F43F5E");           // destructive
 inline QColor blue("#7DD3FC");           // links
 inline QColor danger("#FB7185");         // error ink
 inline QColor defaultAccent=purple;
-inline QColor outline(235,235,235,18);   // stroke: content 7% hairline
+inline QColor outline(235,235,235,10);   // inset-stroke: content/4
 inline const QColor chipInk("#171717");
 
 inline void initialize(){
-    paper=QColor("#171717");windowGlass=QColor(23,23,23,102);surface=QColor("#202020");card=QColor(255,255,255,13);
-    ink=QColor("#EBEBEB");muted=QColor("#A3A3A3");purple=defaultAccent=QColor("#459BF7");lavender=QColor(235,235,235,26);
+    paper=QColor("#171717");windowGlass=QColor(13,13,13,204);windowWash=QColor(235,235,235,13);panelGlass=QColor(6,6,6,102);surface=QColor("#202020");card=QColor(235,235,235,8);
+    ink=QColor("#EBEBEB");muted=QColor(235,235,235,115);purple=defaultAccent=QColor("#459BF7");lavender=QColor(235,235,235,26);
     yellow=QColor("#E8C547");lime=QColor("#10B981");pink=QColor("#F43F5E");blue=QColor("#7DD3FC");danger=QColor("#FB7185");
-    outline=QColor(235,235,235,18);
+    outline=QColor(235,235,235,10);
 }
 
 // Text that stays readable on a filled surface (the library's 150-luminance rule).

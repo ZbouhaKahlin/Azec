@@ -2,6 +2,7 @@
 #include <QtWidgets>
 #include <QSvgRenderer>
 #include "theme.hpp"
+#include "mono_controls.hpp"
 #include <functional>
 #include <algorithm>
 #include <cmath>
@@ -69,7 +70,7 @@ public:
         QFont font(QStringLiteral("Consolas"));font.setStyleHint(QFont::Monospace);font.setPixelSize(12);
         code_->setFont(font);
         layout->addWidget(code_,1);
-        copy_=new QPushButton(copyLabel_);copy_->setObjectName("secondary");
+        copy_=new MonoButton(copyLabel_);copy_->setObjectName("secondary");
         copy_->setAccessibleName(copyLabel_);
         layout->addWidget(copy_,0,Qt::AlignTop);
         connect(copy_,&QPushButton::clicked,this,[this]{
@@ -89,7 +90,7 @@ protected:
         sized_=true;
         const auto metrics=copy_->fontMetrics();
         const int width=qMax(metrics.horizontalAdvance(copyLabel_),metrics.horizontalAdvance(copiedLabel_));
-        copy_->setFixedWidth(width+34);
+        copy_->setFixedWidth(width+20);
     }
 };
 
@@ -239,7 +240,7 @@ inline void paintSettingsGlyphDetails(QPainter& painter,SettingsGlyph glyph,cons
 }
 
 inline void paintStickerGlyph(QPainter& painter,const QRectF& box,SettingsGlyph glyph,bool active){
-    const QColor stroke=active?kbtheme::defaultAccent:kbtheme::muted;
+    const QColor stroke=active?kbtheme::ink:QColor(235,235,235,128);
     const QPainterPath shape=settingsGlyphShape(glyph);
     const qreal scale=box.width()/24.0;
     painter.save();painter.translate(box.topLeft());painter.scale(scale,scale);painter.translate(12,12);
@@ -296,8 +297,8 @@ protected:
         const QRectF iconRect(rtl?width()-16-art:iconX,(height()-art)/2.0,art,art);
         paintStickerGlyph(painter,iconRect,glyph_,isChecked());
         if(progress>0.01){
-            QFont nameFont("Segoe UI");nameFont.setPixelSize(14);nameFont.setWeight(QFont::DemiBold);
-            QFont hintFont("Segoe UI");hintFont.setPixelSize(11);hintFont.setWeight(QFont::Normal);
+            QFont nameFont=font();nameFont.setPixelSize(13);nameFont.setWeight(QFont::Medium);
+            QFont hintFont=font();hintFont.setPixelSize(11);hintFont.setWeight(QFont::Normal);
             const qreal left=rtl?8:iconRect.right()+12,available=rtl?iconRect.left()-16:width()-iconRect.right()-20;
             const QRectF nameRect(left,8,available,20),hintRect(left,28,available,18);
             const Qt::Alignment alignment=Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft);
@@ -340,26 +341,26 @@ protected:
         const qreal clamped=std::clamp(position,0.0,1.0);
         if(!isEnabled())p.setOpacity(.4);
         const QColor accent=accent_();
-        const QRectF track=QRectF(4,4,40,20);
-        // A 10% content well when off; the accent fill fades in when on.
-        const QColor fill=mixColor(kbtheme::lavender,accent,clamped);
+        const QRectF track=QRectF(6,4,36,20);
+        // A 20% content well when off; the accent fill fades in when on.
+        const QColor fill=mixColor(QColor(235,235,235,51),accent,clamped);
         p.setPen(Qt::NoPen);p.setBrush(fill);p.drawRoundedRect(track,10,10);
-        const qreal knobX=14.0+20.0*clamped;
-        p.setBrush(Qt::white);p.drawEllipse(QPointF(knobX,14),7,7);
+        const qreal knobX=16.0+16.0*clamped;
+        p.setBrush(Qt::white);p.drawEllipse(QPointF(knobX,14),8,8);
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setBrush(Qt::NoBrush);p.setPen(QPen(accent,1.5));p.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),11,11);}
 
     }
 };
 
 // Compact chip that nudges a value by one increment; holding repeats.
-class StepButton final : public QPushButton {
+class StepButton final : public MonoButton {
     QTimer repeat_,delay_;
     int direction_;
     std::function<void(int)> callback_;
     void fire(){if(isEnabled()&&isDown()&&callback_)callback_(direction_);}
 public:
     StepButton(const QString& glyph,int direction,std::function<void(int)> callback,QWidget* parent=nullptr)
-        :QPushButton(glyph,parent),direction_(direction),callback_(std::move(callback)){
+        :MonoButton(glyph,parent),direction_(direction),callback_(std::move(callback)){
         setObjectName("stepButton");setFixedSize(26,26);setAutoDefault(false);setDefault(false);setCursor(Qt::PointingHandCursor);
         repeat_.setInterval(70);delay_.setSingleShot(true);delay_.setInterval(350);
         connect(&delay_,&QTimer::timeout,this,[this]{repeat_.start();});
@@ -368,7 +369,7 @@ public:
         connect(this,&QPushButton::released,this,[this]{delay_.stop();repeat_.stop();});
     }
 protected:
-    void hideEvent(QHideEvent* event) override{delay_.stop();repeat_.stop();QPushButton::hideEvent(event);}
+    void hideEvent(QHideEvent* event) override{delay_.stop();repeat_.stop();MonoButton::hideEvent(event);}
 };
 
 // Keep the content at its natural size while its viewport opens/closes. Reversals
@@ -443,10 +444,10 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
         const QRectF pill=QRectF(rect()).adjusted(1,1,-1,-1);
         const qreal amount=std::clamp(amount_,0.0,1.0);
-        // A 5% wash unselected; solid accent when chosen, no outline on either.
-        const QColor fill=mixColor(kbtheme::card,accent_(),amount);
+        // MonoCode segmented choice: transparent idle, content/10 selected.
+        const QColor fill=mixColor(QColor(235,235,235,0),kbtheme::lavender,amount);
         painter.setPen(Qt::NoPen);painter.setBrush(fill);painter.drawRoundedRect(pill,8,8);
-        QColor ink=mixColor(kbtheme::muted,kbtheme::readableOn(accent_()),amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
+        QColor ink=mixColor(QColor(235,235,235,179),kbtheme::ink,amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
         painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),1.5));painter.drawRoundedRect(pill,8,8);}
 
@@ -491,7 +492,7 @@ public:
         const int visibleRight=option.widget?option.widget->width()-1:r.right();
         const int iconX=rtl?visibleRight-operatorIconSize-5:r.left()+6;
         qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(iconX,r.top()+4,operatorIconSize,operatorIconSize));
-        QFont f=option.font;f.setFamily("Segoe UI");f.setStyleStrategy(QFont::PreferAntialias);f.setPixelSize(14);f.setWeight(QFont::Medium);p->setFont(f);p->setPen(kbtheme::ink);
+        QFont f=option.font;f.setFamily("Segoe UI");f.setPixelSize(13);f.setWeight(QFont::Normal);p->setFont(f);p->setPen(kbtheme::ink);
         p->setClipRect(r);p->setOpacity(std::clamp((r.width()-58.0)/116.0,0.0,1.0));
         if(rtl){
             // Qt mirrors rect alignments with the layout direction, so the
@@ -524,7 +525,7 @@ class BrandLabel final : public QLabel {
 public:
     BrandLabel(){
         setText("Azec");setObjectName("brand");setAccessibleName("Azec");setAlignment(Qt::AlignCenter);
-        QFont brand(QStringLiteral("Segoe UI"));brand.setPixelSize(15);brand.setWeight(QFont::DemiBold);brand.setLetterSpacing(QFont::AbsoluteSpacing,0.4);
+        QFont brand=QApplication::font();brand.setPixelSize(13);brand.setWeight(QFont::Medium);brand.setLetterSpacing(QFont::AbsoluteSpacing,0.4);
         setFont(brand);setFixedHeight(36);
     }
 };
@@ -560,7 +561,7 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);
         const auto surface=surfaceRect();
         // The inset card: a deep translucent panel over the glass, one hairline.
-        painter.setBrush(QColor(6,6,6,110));painter.drawRoundedRect(surface,raisedPanelRadius,raisedPanelRadius);
+        painter.setBrush(kbtheme::panelGlass);painter.drawRoundedRect(surface,raisedPanelRadius,raisedPanelRadius);
         painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,1));painter.drawRoundedRect(surface.adjusted(.5,.5,-.5,-.5),raisedPanelRadius,raisedPanelRadius);
     }
 };
@@ -747,7 +748,7 @@ public:
     QSize sizeHint() const override {const QFontMetrics metrics(stickerFont());return {metrics.horizontalAdvance(text())+2,26};}
     // Long translations must never widen the 200 px sidebar: the chip elides instead.
     QSize minimumSizeHint() const override {return {qMin(sizeHint().width(),150),26};}
-    static QFont stickerFont(){QFont font("Segoe UI");font.setPixelSize(13);font.setWeight(QFont::DemiBold);return font;}
+    static QFont stickerFont(){QFont font=QApplication::font();font.setPixelSize(13);font.setWeight(QFont::DemiBold);return font;}
 protected:
     void paintEvent(QPaintEvent*) override {
 
@@ -762,12 +763,13 @@ public:
     QVBoxLayout* body;QWidget* content;QPushButton* heading=nullptr;QHBoxLayout* headerRow;
     explicit Section(const QString& title,bool collapsible,bool expanded,const QColor& stickerColor=QColor(),QWidget* parent=nullptr):QFrame(parent) {
         Q_UNUSED(stickerColor)
-        setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(12,11,12,12);layout->setSpacing(0);
+        setObjectName("settingCard");auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(8);
         auto* header=new QWidget;auto* row=headerRow=new QHBoxLayout(header);row->setContentsMargins(2,0,2,0);header->setMinimumHeight(24);
-        if(collapsible){heading=new QPushButton(title);heading->setObjectName("sectionHeading");heading->setCursor(Qt::PointingHandCursor);row->addWidget(heading,1);
+        if(collapsible){heading=new MonoButton(title);heading->setObjectName("sectionHeading");heading->setCursor(Qt::PointingHandCursor);row->addWidget(heading,1);
             auto* arrow=new QLabel(expanded?QString::fromUtf8("⌄"):QString::fromUtf8("›"));arrow->setObjectName("sectionArrow");row->addWidget(arrow);
-            layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);content->setVisible(expanded);layout->addWidget(content);if(!expanded)layout->setContentsMargins(12,4,12,4);
-            connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));layout->setContentsMargins(12,open?11:4,12,open?12:4);});
-        }else{auto* sticker=new StickerLabel(title,Qt::white);row->addWidget(sticker);row->addStretch(1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(0,8,0,0);body->setSpacing(8);layout->addWidget(content);}
+            layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);content->setVisible(expanded);layout->addWidget(content);
+            connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));});
+        }else{auto* sticker=new StickerLabel(title,Qt::white);row->addWidget(sticker);row->addStretch(1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);layout->addWidget(content);}
+        content->setObjectName("settingGroup");content->setAttribute(Qt::WA_StyledBackground);
     }
 };

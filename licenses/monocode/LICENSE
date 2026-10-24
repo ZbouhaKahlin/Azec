@@ -1,5 +1,9 @@
 Azec's desktop and phone presentation is adapted from MonoCode
 (https://github.com/hardbeat920/monocode), MIT License, Copyright (c) 2026 Nick.
+The button states and spacing are ported from src/shared/ui/SecondaryButton.tsx;
+the description typography and switch geometry from SettingsView.tsx and index.css.
+The Azec tile mark is adapted from MonoCode's monochrome app icon.
+
 The interaction sounds are ported from cuelume
 (https://github.com/Danilaa1/cuelume), MIT License, Copyright (c) Daniel Belyi.
 

@@ -43,7 +43,7 @@ inline void MainWindow::buildGoofyLayout(QVBoxLayout* layout){
         preferences_scroll_=new SmoothScrollArea;preferences_scroll_->setWidgetResizable(true);preferences_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);FadingScrollBar::install(preferences_scroll_);preferenceLayout->addWidget(preferences_scroll_,1);pages_->addWidget(preferences_);
         profile_save_dock_=new QWidget;auto* pendingRow=new QHBoxLayout(profile_save_dock_);pendingRow->setContentsMargins(2,8,0,0);pendingRow->setSpacing(12);
         profile_save_hint_=label({},"rowHint");profile_save_hint_->setWordWrap(true);pendingRow->addWidget(profile_save_hint_,1);
-        profile_save_button_=new QPushButton(text(UiText::SaveChanges));profile_save_button_->setObjectName("save");pendingRow->addWidget(profile_save_button_);connect(profile_save_button_,&QPushButton::clicked,this,[this]{save(true);});preferenceLayout->addWidget(profile_save_dock_);profile_save_dock_->hide();
+        profile_save_button_=new MonoButton(text(UiText::SaveChanges));profile_save_button_->setObjectName("save");pendingRow->addWidget(profile_save_button_);connect(profile_save_button_,&QPushButton::clicked,this,[this]{save(true);});preferenceLayout->addWidget(profile_save_dock_);profile_save_dock_->hide();
         panel_=new RaisedPanel;panel_->setObjectName("raisedPanel");auto* panelLayout=new QVBoxLayout(panel_);panelLayout->setContentsMargins(8,3,12,13);panelLayout->setSpacing(0);panelLayout->addWidget(pages_);columns->addWidget(panel_,1);layout->addWidget(body,1);
 
 }

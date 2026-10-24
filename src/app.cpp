@@ -6,7 +6,9 @@
 int main(int argc,char** argv){
     QApplication app(argc,argv);QApplication::setApplicationName("Azec");QApplication::setOrganizationName("Azec");QCoreApplication::setApplicationVersion(AZEC_VERSION);QApplication::setStyle("Fusion");app.setWindowIcon(QIcon(":/ui/app-icon.svg"));
     // The system UI face, exactly as the reference renders on Windows.
-    QFont font("Segoe UI");font.setPixelSize(13);font.setWeight(QFont::Normal);font.setStyleStrategy(QFont::PreferAntialias);app.setFont(font);
+    QFont font("Segoe UI");font.setPixelSize(13);font.setWeight(QFont::Normal);
+    font.setHintingPreference(QFont::PreferNoHinting);
+    font.setStyleStrategy(QFont::StyleStrategy(QFont::PreferAntialias|QFont::NoSubpixelAntialias));app.setFont(font);
     if(!azec_paths::initializeStorage()){
         QMessageBox::critical(nullptr,"Azec","Azec could not open its settings folder. Check the folder permissions and try again.");
         return 3;
