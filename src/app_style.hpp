@@ -31,6 +31,7 @@ inline QString applicationStyle(const QColor& accent){
         QLabel#phoneAddress { background:$card; color:$ink; border:1px solid $outline; border-radius:6px; padding:6px 8px; font-family:'Consolas'; font-size:12px; }
         QLabel#pairingCode { background:$soft; color:$ink; border:1px solid $outline; border-radius:6px; padding:4px 9px; font-family:'Consolas'; font-size:16px; font-weight:700; }
         QLabel#rowTitle { color:$ink; font-size:13px; font-weight:500; }
+        QLabel#sectionTitle { color:$ink; font-size:13px; font-weight:600; }
         QLabel#rowHint { color:$muted; font-size:12px; font-weight:400; }
         QTextEdit#codeText { background:transparent; color:$ink; border:0; padding:0; font-family:'Consolas'; font-size:12px; }
         QWidget#codeBlock { background:$card; border:1px solid $outline; border-radius:8px; }
@@ -50,6 +51,7 @@ inline QString applicationStyle(const QColor& accent){
         /* MonoCode Group: a plain heading above a content/3 row group. */
         QFrame#settingCard { background:transparent; border:0; }
         QWidget#settingGroup { background:$card; border:1px solid $outline; border-radius:12px; }
+        QWidget#weaponChoices { background:$card; border:1px solid $outline; border-radius:8px; }
         QWidget#settingRow { background:transparent; border:0; border-radius:8px; }
 
         QLineEdit#search { background:$card; color:$ink; border:1px solid $outline; border-radius:8px; padding:8px 10px; font-size:13px; }

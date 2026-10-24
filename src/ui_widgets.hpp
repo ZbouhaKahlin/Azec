@@ -427,7 +427,7 @@ class WeaponButton final : public QPushButton {
     std::function<QColor()> accent_;
 public:
     explicit WeaponButton(std::function<QColor()> accent):accent_(std::move(accent)){
-        setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);motion_.setEasingCurve(monoEase());
+        setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);setMinimumSize(88,32);setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Fixed);motion_.setEasingCurve(monoEase());
         connect(&motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){amount_=value.toReal();update();});
     }
     void setChosen(bool chosen){
@@ -769,7 +769,7 @@ public:
             auto* arrow=new QLabel(expanded?QString::fromUtf8("⌄"):QString::fromUtf8("›"));arrow->setObjectName("sectionArrow");row->addWidget(arrow);
             layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);content->setVisible(expanded);layout->addWidget(content);
             connect(heading,&QPushButton::clicked,this,[=]{const bool open=!content->isVisible();content->setVisible(open);arrow->setText(open?QString::fromUtf8("⌄"):QString::fromUtf8("›"));});
-        }else{auto* sticker=new StickerLabel(title,Qt::white);row->addWidget(sticker);row->addStretch(1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);layout->addWidget(content);}
+        }else{auto* titleLabel=new QLabel(title);titleLabel->setObjectName("sectionTitle");titleLabel->setWordWrap(true);titleLabel->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);row->addWidget(titleLabel,1);layout->addWidget(header);content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);layout->addWidget(content);}
         content->setObjectName("settingGroup");content->setAttribute(Qt::WA_StyledBackground);
     }
 };
