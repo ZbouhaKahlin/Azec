@@ -66,6 +66,7 @@ class MainWindow final : public QWidget {
     QPointer<QDoubleSpinBox> converter_horizontal_,converter_vertical_,converter_multiplier_;
     QPointer<QComboBox> profile_sets_;
     QPointer<QLineEdit> converter_name_;
+    QPointer<QLabel> converter_validation_;
     std::optional<r6::SensitivitySetup> converter_draft_;
     std::optional<r6::Config> converter_import_;
     QString converter_import_name_,converter_name_draft_;
@@ -73,7 +74,7 @@ class MainWindow final : public QWidget {
     void importForConversion();
     void resetConverter();
     void manageProfileSet(int action);
-    QString askProfileSetName(const QString& initial);
+    QString askProfileSetName(const QString& initial,const QString& action);
     bool confirmProfileAction(const QString& title,const QString& body,const QString& action);
     void buildMouseSetup(QVBoxLayout* column);
     r6::SensitivitySetup mouseSetupInput() const;
@@ -99,6 +100,7 @@ class MainWindow final : public QWidget {
     QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr,*subtitle_=nullptr;
     QPushButton* status_=nullptr;QPushButton* rapid_status_=nullptr;IconButton *save_=nullptr,*close_=nullptr,*gear_=nullptr;
     QWidget* preferences_=nullptr;QScrollArea* preferences_scroll_=nullptr;
+    QWidget* profile_save_dock_=nullptr;QLabel* profile_save_hint_=nullptr;QPushButton* profile_save_button_=nullptr;
     QScrollArea* scroll_=nullptr;QWidget* settings_=nullptr;QVBoxLayout* cards_=nullptr;
     Section *system_=nullptr;
     Toggle *rapid_active_=nullptr,*game_focus_only_=nullptr,*ads_only_=nullptr,*humanize_=nullptr,*dual_=nullptr;
@@ -119,7 +121,7 @@ class MainWindow final : public QWidget {
     QPointer<Toggle> phone_enabled_;
     QPointer<QPushButton> copy_link_,copy_code_,phone_new_code_,phone_retry_;
     QPointer<QPushButton> update_button_;QNetworkAccessManager* network_=nullptr;bool update_in_progress_=false;
-    QWidget* notice_bar_=nullptr;QLabel* notice_=nullptr;QPushButton* notice_close_=nullptr;
+    QWidget* notice_bar_=nullptr;QLabel *notice_=nullptr,*notice_title_=nullptr,*notice_badge_=nullptr;QPushButton* notice_close_=nullptr;QScrollArea* notice_scroll_=nullptr;
     QSystemTrayIcon* tray_=nullptr;
     QMenu* tray_menu_=nullptr;
     QAction *tray_window_=nullptr,*tray_recoil_=nullptr,*tray_rapid_=nullptr,*tray_exit_=nullptr;
@@ -172,6 +174,10 @@ class MainWindow final : public QWidget {
         save_->setProperty("saveState",state);
         save_->setToolTip(state=="dirty"?text(UiText::SaveConfigurationUnsavedChanges):state=="saved"?text(UiText::ConfigurationSaved):state=="error"?text(UiText::CouldNotSaveConfiguration):text(UiText::SaveConfiguration));
         save_->update();
+        if(profile_save_button_){
+            profile_save_hint_->setText(text(state=="error"?UiText::CouldNotSaveConfiguration:unsaved_?UiText::UnsavedChanges:UiText::ConfigurationSaved));
+            profile_save_button_->setText(text(UiText::SaveChanges));profile_save_button_->setEnabled(unsaved_&&!save_blocked_);
+        }
     }
     void dirty(){if(!refreshing_){unsaved_=true;save_feedback_.stop();updateSavePresentation("dirty");update();}}
     void editOperator(const std::function<void(r6::Operator&)>& change){engine_.edit([&](r6::Config& c){change(c.active_operator());});dirty();}
@@ -269,16 +275,19 @@ class MainWindow final : public QWidget {
     void styleNotice(){
         if(!notice_bar_)return;
         const bool error=notice_bar_->property("error").toBool();
-        const QColor background=error?kbtheme::pink:kbtheme::lavender;
-        notice_bar_->setStyleSheet(QString("QWidget#noticeBar{background:%1;border:2px solid %2;border-radius:12px;}"
-            "QLabel#startupNotice{color:%3;font-weight:600;}"
-            "QPushButton#noticeClose{background:transparent;border:2px solid transparent;border-radius:6px;color:%3;font-size:18px;font-weight:800;padding:0;}"
-            "QPushButton#noticeClose[keyboardFocus=\"true\"]{border-color:%4;}")
-            .arg(background.name(),kbtheme::outline.name(),kbtheme::readableOn(background).name(),accent().name()));
+        const QColor badge=error?kbtheme::pink:kbtheme::lavender;
+        notice_title_->setText(text(error?UiText::NoticeErrorTitle:UiText::NoticeTitle));notice_close_->setText(text(UiText::Understood));
+        notice_badge_->setText(error?QStringLiteral("!"):QStringLiteral("i"));
+        notice_bar_->setStyleSheet(QString("QWidget#noticeBar{background:%1;border:3px solid %2;border-radius:24px;}"
+            "QLabel#noticeBadge{background:%3;color:%4;border:2px solid %2;border-radius:16px;font-size:18px;font-weight:700;}"
+            "QLabel#startupNotice{color:%5;font-size:14px;font-weight:400;}")
+            .arg(kbtheme::paper.name(),kbtheme::outline.name(),badge.name(),kbtheme::readableOn(badge).name(),kbtheme::ink.name()));
+        if(auto* shadow=qobject_cast<QGraphicsDropShadowEffect*>(notice_bar_->graphicsEffect()))shadow->setColor(kbtheme::outline);
     }
     void applyStyle(){
         pages_->settle();qApp->setPalette(kbtheme::palette());setStyleSheet(applicationStyle(accent()));setPalette(kbtheme::palette());
         styleNotice();
+        layoutNotice();
         for(auto* child:findChildren<QWidget*>())child->update();update();
     }
     void syncThemeCards(){
@@ -302,6 +311,7 @@ class MainWindow final : public QWidget {
         if(pairing_qr_&&index!=3)pairing_qr_->conceal();preference_category_=index;
         for(int i=0;i<preference_categories_.size();++i)preference_categories_[i]->setVisible(i==index);
         for(int i=0;i<settings_nav_buttons_.size();++i)settings_nav_buttons_[i]->setChecked(i==index);
+        if(profile_save_dock_)profile_save_dock_->setVisible(index==4||index==mouse_setup_category_);
         preferences_scroll_->verticalScrollBar()->setValue(0);
     }
     static void setWidgetOpacity(QWidget* widget,qreal opacity){
@@ -616,9 +626,12 @@ class MainWindow final : public QWidget {
         auto* guideRow=new QHBoxLayout;
         auto* guide=new QPushButton(text(UiText::QuickGuide));guide->setObjectName("secondary");guideRow->addWidget(guide);connect(guide,&QPushButton::clicked,this,[this]{help();});
         guideRow->addStretch();generalLayout->addLayout(guideRow);
-        auto* transfer=new Section(text(UiText::ProfileBackup),false,true,kbtheme::pink);backupLayout->addWidget(transfer);
-        auto* transfers=new QHBoxLayout;auto* exportButton=new QPushButton(text(UiText::ExportProfiles));auto* importButton=new QPushButton(text(UiText::ImportProfiles));
-        for(auto* button:{exportButton,importButton}){button->setObjectName("secondary");transfers->addWidget(button);}transfer->body->addLayout(transfers);
+        auto* exportCard=new Section(text(UiText::ExportBackup),false,true,kbtheme::lime);backupLayout->addWidget(exportCard);
+        auto* exportHint=label(text(UiText::ExportBackupHint),"rowHint");exportHint->setWordWrap(true);exportHint->setContentsMargins(14,4,12,4);exportCard->body->addWidget(exportHint);
+        auto* exportButton=new QPushButton(text(UiText::ExportBackup));exportButton->setObjectName("secondary");exportCard->body->addWidget(exportButton);
+        auto* importCard=new Section(text(UiText::ImportBackup),false,true,kbtheme::pink);backupLayout->addWidget(importCard);
+        auto* importHint=label(text(UiText::ImportBackupHint),"rowHint");importHint->setWordWrap(true);importHint->setContentsMargins(14,4,12,4);importCard->body->addWidget(importHint);
+        auto* importButton=new QPushButton(text(UiText::ChooseBackup));importButton->setObjectName("secondary");importButton->setEnabled(!save_blocked_);importCard->body->addWidget(importButton);
         connect(exportButton,&QPushButton::clicked,this,[this]{exportProfiles();});connect(importButton,&QPushButton::clicked,this,[this]{importProfiles();});
         outer->addStretch();preferences_scroll_->setWidget(content);updateSettingsNavLabels();chooseSettingsCategory(preference_category_);refreshing_=false;
     }
@@ -716,6 +729,7 @@ class MainWindow final : public QWidget {
         if(qApp->layoutDirection()!=direction){qApp->setLayoutDirection(direction);applyStyle();}
         operators_title_->setText(text(UiText::AllOperators));favorites_title_->setText(text(UiText::Favorites));search_->setPlaceholderText(text(UiText::SearchOperators));subtitle_->setText(text(UiText::OperatorSettings));
         updateSettingsNavLabels();
+        styleNotice();layoutNotice();
         updateSidebarControls();
         updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));status_->setToolTip(text(UiText::ToggleRecoilActivity));rapid_status_->setToolTip(text(UiText::RapidFire));filterOperators();syncSelection();updateStatus();
     }
@@ -766,7 +780,7 @@ class MainWindow final : public QWidget {
         if(imported_ui_pending_){
             QJsonObject root;
             if(!uiprefs::readDocument(uiprefs::filePath(config_path_),root)){
-                showNotice(text(UiText::CouldNotSaveConfiguration),true,true);return false;
+                updateSavePresentation("error");save_feedback_.stop();showNotice(text(UiText::CouldNotSaveConfiguration),true,true);notice_bar_->setProperty("saveError",true);return false;
             }
             QStringList names(favorites_.begin(),favorites_.end());names.sort(Qt::CaseInsensitive);
             root["favorites"]=QJsonArray::fromStringList(names);root["colorTheme"]=kbtheme::activeColorTheme;
@@ -918,13 +932,14 @@ public:
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
         gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});top->addSpacing(7);auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
-        notice_bar_=new QWidget(this);notice_bar_->setObjectName("noticeBar");auto* noticeLayout=new QHBoxLayout(notice_bar_);noticeLayout->setContentsMargins(14,6,8,6);noticeLayout->setSpacing(8);
-        notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);
-        notice_close_=new QPushButton(QString::fromUtf8("×"));notice_close_->setObjectName("noticeClose");notice_close_->setFixedSize(24,24);notice_close_->setToolTip(text(UiText::Close));notice_close_->setAccessibleName(text(UiText::Close));
+        notice_bar_=new QWidget(this);notice_bar_->setObjectName("noticeBar");notice_bar_->setAttribute(Qt::WA_StyledBackground);auto* noticeLayout=new QVBoxLayout(notice_bar_);noticeLayout->setContentsMargins(24,22,24,22);noticeLayout->setSpacing(16);
+        auto* noticeHeader=new QHBoxLayout;noticeHeader->setSpacing(12);notice_badge_=label({},"noticeBadge");notice_badge_->setFixedSize(34,34);notice_badge_->setAlignment(Qt::AlignCenter);noticeHeader->addWidget(notice_badge_);
+        notice_title_=label({},"cardTitle");notice_title_->setWordWrap(true);noticeHeader->addWidget(notice_title_,1);noticeLayout->addLayout(noticeHeader);
+        notice_=new QLabel;notice_->setObjectName("startupNotice");notice_->setWordWrap(true);notice_->setTextFormat(Qt::PlainText);notice_->setTextInteractionFlags(Qt::TextSelectableByMouse);notice_->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+        notice_scroll_=new QScrollArea;notice_scroll_->setWidgetResizable(true);notice_scroll_->setFrameShape(QFrame::NoFrame);notice_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);notice_scroll_->setWidget(notice_);noticeLayout->addWidget(notice_scroll_);FadingScrollBar::install(notice_scroll_);
+        notice_close_=new QPushButton;notice_close_->setObjectName("secondary");notice_close_->setMinimumHeight(40);
         connect(notice_close_,&QPushButton::clicked,this,[this]{notice_timer_.stop();notice_bar_->hide();});
-        // The notice floats above the content: putting it in the column layout
-        // pushed the whole window down whenever a message appeared.
-        noticeLayout->addWidget(notice_,1);noticeLayout->addWidget(notice_close_,0,Qt::AlignTop);notice_bar_->hide();
+        noticeLayout->addWidget(notice_close_);auto* noticeShadow=new QGraphicsDropShadowEffect(notice_bar_);noticeShadow->setBlurRadius(0);noticeShadow->setOffset(3,4);notice_bar_->setGraphicsEffect(noticeShadow);notice_bar_->hide();
         buildGoofyLayout(layout);
         const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);item->setToolTip(name);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+operatorAssetName(name)+".svg");if(!renderer.isValid())icon_failures_<<name;}
         operators_->setCurrentRow(c.selected);
@@ -942,7 +957,7 @@ public:
         buildSettings();updateLanguage();applyStyle();buildTray();qApp->installEventFilter(this);
         auto* saveShortcut=new QShortcut(QKeySequence::Save,this);connect(saveShortcut,&QShortcut::activated,this,[this]{save();});
         auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{if(sidebar_collapsed_)setSidebarCollapsed(false,true,true);else{search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();}});
-        auto* escapeShortcut=new QShortcut(QKeySequence(Qt::Key_Escape),this);connect(escapeShortcut,&QShortcut::activated,this,[this]{if(pages_->currentWidget()==preferences_)showOperators();else if(!search_->text().isEmpty())search_->clear();});
+        auto* escapeShortcut=new QShortcut(QKeySequence(Qt::Key_Escape),this);connect(escapeShortcut,&QShortcut::activated,this,[this]{if(notice_bar_->isVisible()){notice_timer_.stop();notice_bar_->hide();}else if(pages_->currentWidget()==preferences_)showOperators();else if(!search_->text().isEmpty())search_->clear();});
         clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});paint_.start();
         QTimer::singleShot(350,this,[this]{checkMouseSensitivityChange();});
     }
@@ -952,23 +967,26 @@ public:
     void closeUsingControl(){close_->click();}
     void showNotice(const QString& message,bool error=false,bool persistent=false){
         if(!notice_bar_||!notice_)return;
+        // A routine success must not erase an unresolved save failure.
+        if(!error&&notice_bar_->isVisible()&&notice_bar_->property("saveError").toBool())return;
         notice_bar_->setProperty("saveError",false);notice_bar_->setProperty("phoneError",false);
         notice_bar_->setProperty("error",error);notice_->setText(message);styleNotice();
-        notice_bar_->show();layoutNotice();notice_timer_.stop();
-        if(!persistent){notice_timer_.setInterval(error?6000:3500);notice_timer_.start();}
+        notice_bar_->show();notice_scroll_->verticalScrollBar()->setValue(0);layoutNotice();notice_timer_.stop();
+        if(!persistent&&!error){notice_timer_.setInterval(5000);notice_timer_.start();}
     }
-    // The notice is an overlay under the header, so showing it never reflows the
-    // window content.
+    // A nonmodal card stays centered inside Azec without taking keyboard focus.
     void layoutNotice(){
-        if(!notice_bar_||!notice_->isVisible())return;
-        constexpr int margin=12,top=68;
-        const int width=qMax(240,this->width()-margin*2);
-        const int height=qMax(32,notice_->heightForWidth(width-60));
-        notice_bar_->setGeometry(margin,top,width,height+14);
+        if(!notice_bar_||notice_bar_->isHidden())return;
+        const int width=qMin(400,this->width()-40);
+        const int bodyHeight=qMax(40,notice_->heightForWidth(width-64));
+        notice_scroll_->setFixedHeight(qMin(bodyHeight,qMax(60,this->height()-280)));
+        notice_bar_->setFixedWidth(width);notice_bar_->adjustSize();
+        notice_bar_->move((this->width()-width)/2,(this->height()-notice_bar_->height())/2);
         notice_bar_->raise();
     }
     void setStartupNotice(const QString& message,bool blockSaving){
         save_blocked_=blockSaving;
+        updateSavePresentation(save_->property("saveState").toString());
         if(!message.isEmpty())showNotice(message,blockSaving,true);
         else if(!uniqueHotkeys(engine_.snapshot()))showNotice(text(UiText::ConflictingHotkeys),true,false);
     }

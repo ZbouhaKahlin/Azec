@@ -211,8 +211,27 @@ enum class UiText {
     ProfileSetsHint,
     ConversionPreview,
     DeleteSetPrompt,
+    NoticeTitle,
+    NoticeErrorTitle,
+    Understood,
+    SaveChanges,
+    ExportBackup,
+    ExportBackupHint,
+    ImportBackup,
+    ImportBackupHint,
+    ChooseBackup,
+    ImportBackupPreview,
+    ActiveProfileSet,
+    ProfileSetOptions,
+    DuplicateSet,
+    CreateCopy,
+    ConvertSensitivity,
+    ChooseConversionSource,
+    UseCurrentProfiles,
+    ConversionValues,
+    ConversionResult,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::DeleteSetPrompt)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::ConversionResult)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

@@ -74,17 +74,17 @@ Settings groups options into **General**, **Appearance**, **Shortcuts**, **Phone
 
 ### Keep sensitivity changes manageable
 
-Open **Settings → Converter & profiles**. Import an Azec JSON backup or use your current profiles, enter the original **From** and your **To** DPI, horizontal/vertical sensitivity, and multiplier, then choose **Convert as new set**. Reading your local `GameSettings.ini` fills the To game values. The preview shows both conversion factors. Your current profiles and an imported original are preserved as separate named sets; imported app preferences are not applied by the converter.
+Open **Settings → Converter & profiles**. Import an Azec JSON backup or use your current profiles, enter the original **From** and your **To** DPI, horizontal/vertical sensitivity, and multiplier, then choose **Preview conversion** and **Create copy**. Reading your local `GameSettings.ini` fills the To game values. The preview shows both conversion factors. Your current profiles and an imported original are preserved as separate named sets; imported app preferences are not applied by the converter.
 
-Switch sets from the same Settings page, or save a copy, rename, and delete sets. Each set holds all primary/secondary weapon profiles and its sensitivity. Switching retains edits; click **Save** to persist the library and current values. The main screen and phone keep editing the active set through the shared engine.
+Choose a set from the selector on the same Settings page. The **⋯** menu lets you duplicate, rename, or delete a set. Each set holds all primary/secondary weapon profiles and its sensitivity. Switching retains edits; click **Save changes** at the bottom to keep the library and current values. The main screen and phone keep editing the active set through the shared engine.
 
 DPI is reference information; rescaling uses the change in game sensitivity and multiplier on each axis. A rescale is rejected in full if any affected profile would exceed its allowed range. Accepted changes remain unsaved until you click **Save**.
 
 ### Move or restore your profiles
 
-Use **Settings → Profile backup** to export or import profiles and supported preferences, including favorites, theme, sidebar state, the named profile library, and numeric sensitivity settings. Backups omit the machine-specific game-settings path.
+Open **Settings → Profile backup**. **Export backup** saves your profiles and supported settings to one file. Under **Import backup**, choose a backup file, review the summary, and confirm the import. Backups include favorites, theme, sidebar state, the named profile library, and numeric sensitivity settings, and omit the machine-specific game-settings path.
 
-Older backups preserve operators that were not included in them. Imported settings remain pending until **Save**; closing with **Discard** keeps the previously saved configuration.
+Older backups preserve operators that were not included in them. Imported settings remain pending until **Save changes**; closing with **Discard** keeps the previously saved configuration.
 
 ## Default shortcuts
 

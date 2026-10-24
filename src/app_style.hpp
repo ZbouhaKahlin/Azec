@@ -115,8 +115,6 @@ inline QString applicationStyle(const QColor& accent){
         QLabel#palestineArabic { color:$ink; font-size:24px; font-weight:900; }
         QToolTip { background:$surface; color:$ink; border:2px solid $outline; border-radius:10px; padding:6px 8px; font-size:12px; }
         QPushButton#secondary:disabled { color:$muted; border-color:$soft; }
-        QPushButton#noticeClose { background:transparent; border:2px solid transparent; border-radius:6px; padding:0; }
-        QPushButton#noticeClose[keyboardFocus="true"] { border-color:%1; }
         QPushButton:focus { outline:0; }
     )CSS").arg(accentHex,onAccent);
     const std::pair<const char*,QColor> tokens[]={{"$ink",kbtheme::ink},{"$paper",kbtheme::paper},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$lime",kbtheme::lime},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$header",kbtheme::header},{"$chipInk",kbtheme::chipInk},{"$danger",kbtheme::danger}};
