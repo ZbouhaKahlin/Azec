@@ -75,7 +75,7 @@ def run_http(parent, slow=False):
         # Session credentials must never be uploaded as verification artifacts.
         (folder / 'phone-info.json').unlink(missing_ok=True)
 
-def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,console=False,browser=False,jobs=2):
+def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,console=False,browser=False,jobs=2,interaction_motion=False):
     started = time.monotonic()
     parent = ROOT / '.build' / 'verification'
     parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +91,7 @@ def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,console=False
             env = os.environ.copy()
             env['QT_SCALE_FACTOR'] = scale
             run_hidden([str(CHECKS), '--ui-self-test']
+                       + (['--interaction-motion-only'] if interaction_motion else [])
                        + (['--all-languages'] if full else []), cwd=fixture, env=env, timeout=150)
             report = json.loads((fixture / 'ui-verification.json').read_text())
             if not report['passed']:
@@ -155,6 +156,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ui', action='store_true')
     parser.add_argument('--ui-only', action='store_true')
+    parser.add_argument('--interaction-motion-only',action='store_true',help='Only check desktop switches, confirmation returns and move/resize corners')
     parser.add_argument('--qr-scan', action='store_true', help='Decode UI QR captures (requires opencv-python-headless)')
     parser.add_argument('--full', action='store_true', help='Include 150%% UI scaling, all UI languages, and real-time HTTP expiry')
     parser.add_argument('--slow', action='store_true', help='Include real-time HTTP expiry without expanding the UI matrix')
@@ -163,5 +165,8 @@ if __name__ == '__main__':
     parser.add_argument('--suite',action='store_true',help='Run console, behavior, desktop and browser coverage without extended matrices')
     parser.add_argument('--jobs',type=int,choices=(1,2),default=2,help='Concurrent independent groups; default 2')
     args=parser.parse_args()
-    run(args.ui or args.ui_only or args.qr_scan or args.suite,args.ui_only,args.qr_scan,args.full,args.slow,
-        args.console or args.suite,args.browser or args.suite,args.jobs)
+    if args.interaction_motion_only:
+        run(ui=True,ui_only=True,interaction_motion=True)
+    else:
+        run(args.ui or args.ui_only or args.qr_scan or args.suite,args.ui_only,args.qr_scan,args.full,args.slow,
+            args.console or args.suite,args.browser or args.suite,args.jobs)

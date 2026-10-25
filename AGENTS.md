@@ -27,7 +27,7 @@ This file is the shared working agreement for coding agents; `CLAUDE.md` imports
 - **Profile:** one operator's recoil and weapon settings. Primary and secondary are independent; the named library holds saved sets.
 - **Binary:** `r6_config.bin`, fixed at 3,734 bytes, holding the original 71 operator records, language, and other compatible settings.
 - **Sidecar:** `azec_weapons.json`, holding extension operators, selection, secondary profiles, per-profile rapid-fire flags, weapon bindings, phone access, focus/aiming preferences, sensitivity, and the named library.
-- **UI preferences:** `azec_ui.json`, holding favorites, `sidebarCollapsed`, and the local `theme` choice. Language is stored in the binary.
+- **UI preferences:** `azec_ui.json`, holding favorites and the local `theme` choice. Language is stored in the binary.
 - **Engine:** the shared configuration and worker synchronization layer.
 - **Driver:** Interception; `interception.dll` is loaded at runtime, never linked or bundled.
 - **Phone:** the self-contained LAN page, paired by a six-digit code and session token.
@@ -76,7 +76,7 @@ Read [docs/testing.md](docs/testing.md) before choosing a verification command.
 
 "Build and push," "ship a release," "publish an update," and "release a new version" authorize both the source commit/push and public EXE publication. Complete both without asking again. Honor restrictions such as build-only, source-only, no push, or no publishing. An ordinary edit is not a release request. Publishing does not require tests; the artifact, version, and hash verification below is required delivery verification.
 
-Source-only delivery does not require installer version stamping or public-asset verification. If a release stops partway through, inspect the existing tag, local artifact, verification results, and source commit before resuming. After a successful upload, retry `verify-release.ps1` with `-Version` set to that release's numeric version; do not rerun `share.cmd publish`, which stamps a new version. If no release was created, fix the failure and restart publication normally. Do not create a new release or replace a published asset just to bypass a verification failure.
+Source-only delivery does not require installer version stamping or public-asset verification. If a release stops partway through, inspect the existing tag, local artifact, verification results, and source commit before resuming. After a successful upload, retry `verify-release.ps1` with `-Version` set to that release's numeric version; do not rerun `share.cmd publish`, which stamps a new version. To resume an interrupted download, also pass `-ResumeDirectory` with the verification folder printed by that run; completed downloads still require the full published hash. If no release was created, fix the failure and restart publication normally. Do not create a new release or replace a published asset just to bypass a verification failure.
 
 1. Review the full working tree, not only staged files: packaging compiles the working files. Keep unrelated application source or embedded-asset edits out of the EXE, using a separate checkout with the intended task changes when necessary. Confirm the source destination is private `Azec-Zuckerberg/Azec` and the binary destination is public `Azec-Zuckerberg/Azec-releases`. Preserve unrelated and staged work.
 2. Resolve failures from your checks. Do not stop the user's app or alter personal settings.
@@ -143,14 +143,14 @@ Consult [Appearance and settings](docs/reference.md#appearance-and-settings) and
 ### Azec UX preferences
 
 - Aim for clean, Apple-like polish through precise button design, consistent SVG icons, immediate click feedback, and subtle, satisfying motion. Keep Azec's own identity, compact layout, and Windows presentation; refine the existing controls in place.
-- The approved direction includes animated Settings sliders, Copy icons that draw a check while their labels stay still, one traveling weapon-tab underline, a switch thumb that widens under pressure, and a directional sidebar chevron. Carry matching details to the phone where applicable.
+- The approved direction includes animated Settings sliders, Copy icons that draw a check while their labels stay still, one traveling weapon-tab underline, a switch thumb that widens under pressure, and an always-expanded sidebar. Carry matching details to the phone where applicable.
 - Motion should explain the action and follow its real result. Keep it brief, smooth, reversible where appropriate, and confined to the control; preserve hit targets and scroll position. Settle on the latest state and stop animating at rest. Avoid decorative loops, bounce, glow, and extra containers.
 - For a new visual direction, show separate before-and-after variations with screenshots and replayable animations before changing the app. Once a variation and its accompanying details are approved, implement the full approved set without asking for the same approval again.
 
 ## Phone
 
 - Serve the page locally and self-contained: no external fonts, scripts, or internet requirement; system fonts only.
-- The first card is **Output**, with live **Recoil active** and active-profile **Rapid fire active** switches. Profile edits carry explicit operator and weapon IDs so concurrent selection cannot redirect a write. Validate values before applying them and save through the desktop path.
+- The first card is **Output**, with the live **Recoil active** switch. The active-profile **Rapid fire active** switch sits above the phone’s **Rapid fire** heading. Profile edits carry explicit operator and weapon IDs so concurrent selection cannot redirect a write. Validate values before applying them and save through the desktop path.
 - Use the PC's actual LAN address, never phone localhost. Preserve the selectable six-digit code, Copy code, Copy link, New code, and startup-error Retry action. New code rotates both code and token and disconnects existing phones.
 - QR starts concealed and reveals only on explicit click/keyboard activation. Conceal it when leaving Phone control, hiding the window, or changing the link. Theme changes preserve the encoded link and dark-on-white contrast. Keep the complete unbranded pattern and four-module white quiet zone.
 - Preserve session-token authorization, pairing rate limits, host/origin checks, request-size limits, and server-disable behavior. Pause polling while the page is hidden. Do not add public hosting, router forwarding, or telemetry.

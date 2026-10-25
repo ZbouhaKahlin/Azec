@@ -3,20 +3,31 @@
 #include <algorithm>
 #include <cmath>
 
-enum class InteractionIcon { None, Save, Settings, Copy, Sidebar, Recoil, Rapid };
+enum class InteractionIcon { None, Save, Settings, Copy, Recoil, Rapid };
 
 inline const char* interactionIconAsset(InteractionIcon icon){
     switch(icon){
     case InteractionIcon::Save:return ":/ui/save.svg";
     case InteractionIcon::Settings:return ":/ui/settings.svg";
     case InteractionIcon::Copy:return ":/ui/copy.svg";
-    case InteractionIcon::Sidebar:return ":/ui/sidebar-toggle.svg";
     case InteractionIcon::Recoil:return ":/ui/recoil.svg";
     case InteractionIcon::Rapid:return ":/ui/rapid.svg";
     default:return "";
     }
 }
 inline qreal interactionEase(qreal value){return 1-std::pow(1-std::clamp(value,qreal(0),qreal(1)),3);}
+inline QEasingCurve controlEase(){
+    QEasingCurve curve(QEasingCurve::BezierSpline);
+    curve.addCubicBezierSegment(QPointF(.2,0),QPointF(.2,1),QPointF(1,1));
+    return curve;
+}
+inline QColor mixColor(const QColor& from,const QColor& to,qreal amount){
+    return QColor::fromRgbF(from.redF()+(to.redF()-from.redF())*amount,from.greenF()+(to.greenF()-from.greenF())*amount,from.blueF()+(to.blueF()-from.blueF())*amount,from.alphaF()+(to.alphaF()-from.alphaF())*amount);
+}
+inline qreal interactionReturnBlend(qreal progress){
+    const qreal value=std::clamp(progress-1,qreal(0),qreal(1));
+    return value*value*(3-2*value);
+}
 inline void drawInteractionStroke(QPainter& painter,const QPainterPath& path,qreal progress){
     progress=std::clamp(progress,qreal(0),qreal(1));if(progress<=0)return;
     painter.save();
@@ -28,6 +39,12 @@ inline QPainterPath interactionCheck(){QPainterPath path;path.moveTo(6.5,12);pat
 // Resting artwork matches the bundled SVGs; native strokes animate their parts.
 // No renderer or timer keeps running after an interaction has settled.
 inline void paintInteractionIcon(QPainter& painter,const QRectF& area,InteractionIcon icon,const QColor& ink,qreal progress=0){
+    // The second half fades the completed check back to its resting artwork.
+    if((icon==InteractionIcon::Save||icon==InteractionIcon::Copy)&&progress>1){
+        const qreal blend=interactionReturnBlend(progress),opacity=painter.opacity();
+        painter.save();painter.setOpacity(opacity*(1-blend));paintInteractionIcon(painter,area,icon,ink,1);
+        painter.setOpacity(opacity*blend);paintInteractionIcon(painter,area,icon,ink,0);painter.restore();return;
+    }
     painter.save();painter.translate(area.topLeft());painter.scale(area.width()/24,area.height()/24);
     painter.setRenderHint(QPainter::Antialiasing);painter.setPen(QPen(ink,1.65,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));painter.setBrush(Qt::NoBrush);
     const qreal opacity=painter.opacity();
@@ -48,10 +65,6 @@ inline void paintInteractionIcon(QPainter& painter,const QRectF& area,Interactio
         painter.drawRoundedRect(QRectF(8,8,11,12),2,2);
         QPainterPath back;back.moveTo(15.5,8);back.lineTo(15.5,5.5);back.quadTo(15.5,4,14,4);back.lineTo(5.5,4);back.quadTo(4,4,4,5.5);back.lineTo(4,14);back.quadTo(4,15.5,5.5,15.5);back.lineTo(8,15.5);painter.drawPath(back);
         painter.setOpacity(opacity);drawInteractionStroke(painter,interactionCheck(),interactionEase((progress-.25)/.75));
-    }else if(icon==InteractionIcon::Sidebar){
-        painter.drawRoundedRect(QRectF(4,5,16,14),2,2);painter.drawLine(QPointF(9,5),QPointF(9,19));
-        painter.translate(13.5,12);painter.rotate(180*progress);painter.translate(-13.5,-12);
-        QPainterPath arrow;arrow.moveTo(15,9);arrow.lineTo(12,12);arrow.lineTo(15,15);painter.drawPath(arrow);
     }else if(icon==InteractionIcon::Recoil){
         QPainterPath circle;circle.arcMoveTo(QRectF(4,4,16,16),125);circle.arcTo(QRectF(4,4,16,16),125,290);drawInteractionStroke(painter,circle,progress);
         painter.drawLine(QPointF(12,3),QPointF(12,11));

@@ -17,6 +17,7 @@ The files in `tests/` are development tools. They do not run when a user opens A
 | `preferences_restart_test.py` | Checks profiles, favorites, obsolete-key cleanup, and old preference migration across restarts | Yes |
 | `ui_checks.cpp` | Desktop layout, controls, focus, motion, dialogs, QR rendering, and optional language coverage | Yes |
 | `phone_browser_test.py` | Phone-page interaction in headless Chrome against a desktop fixture | The desktop fixture does; Chrome is headless |
+| `phone_companion_test.py` | Real QR-photo decoding, pairing failure/retry, compact delay layout, and muted Web Audio scheduling | The desktop fixture does; Chrome is headless and audio is muted |
 | `qr_scan.py` | Decodes existing QR captures; launches no app | No |
 | `installation_test.py` | Checks the actual installer, updates, migration, and installed profiles in redirected folders | Yes |
 | `update_checks.cpp`, `update_checks.pro` | Separate console executable for updater downloads, hashes, and failure handling | No |
@@ -39,8 +40,11 @@ These commands run from the repository root in PowerShell. Desktop-backed runner
 | Complete suite: console, behavior, desktop UI and headless phone browser | `.\build.cmd test --suite` |
 | Repeat the complete suite against current binaries | `python tests/run_checks.py --suite` |
 | Repeat behavior checks against an already current build | `python tests/run_checks.py` |
+| Switch motion, Save/Copy returns, and native corners after move/resize | `python tests/run_checks.py --interaction-motion-only` |
+| Phone switch and Save return motion | `python tests/phone_browser_test.py --interaction-motion-only` |
 | Desktop checks at 100% | `python tests/run_checks.py --ui-only` |
 | Phone browser checks | `python tests/phone_browser_test.py` |
+| Phone QR-photo pairing, delay layout, and sound scheduling | `python tests/phone_companion_test.py` |
 | Pairing expiry, including the real 61-second wait | `python tests/run_checks.py --slow` |
 | Extended desktop matrix | `python tests/run_checks.py --ui-only --full` |
 | Extended phone browser matrix | `python tests/phone_browser_test.py --full` |
@@ -48,9 +52,10 @@ These commands run from the repository root in PowerShell. Desktop-backed runner
 | Decode rendered desktop QR images | `python tests/run_checks.py --ui-only --full --qr-scan` |
 | Package the current build as a portable ZIP | `.\package-release.ps1` |
 | Build the single-file installer, no tests | `.\share.cmd` |
+| Resume verification of an uploaded release | `powershell -NoProfile -File .\verify-release.ps1 -Version <version> -ResumeDirectory <printed-folder>` |
 | Build and run the installer smoke test | `.\share.cmd test` |
 
-`--full` expands requested checks; it does not implicitly enable desktop checks. In `run_checks.py`, it also enables the real pairing-expiry wait whenever HTTP behavior checks are included; `--ui-only --full` omits HTTP and that wait. `build.cmd test --slow` includes expiry during a build. The console group, including `build.cmd test`, requires Node.js with `node --test` support for `phone_api_test.cjs`. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across representative pairing links and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
+`--full` expands requested checks; it does not implicitly enable desktop checks. In `run_checks.py`, it also enables the real pairing-expiry wait whenever HTTP behavior checks are included; `--ui-only --full` omits HTTP and that wait. `build.cmd test --slow` includes expiry during a build. The console group, including `build.cmd test`, requires Node.js with `node --test` support for `phone_api_test.cjs`. The browser runner requires `pip install playwright` and installed Google Chrome. The separate companion runner also needs `pip install qrcode pillow`; its temporary pairing QR images are deleted during cleanup. Both browser runners use `--mute-audio` so Web Audio cannot play through the current desktop. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across representative pairing links and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
 
 Use `build.cmd checks` to prepare the desktop verifier and all console verifiers without running tests. Console binaries remain under `.build/checks-*/release`; only the desktop verifier goes in `runtime/Azec-checks.exe`. The test-only driver DLL is never copied into the app runtime. `build.cmd test` also builds it and explicitly runs behavior checks. Rebuild after changes to C++ or embedded assets; testing a stale executable does not validate source edits. The release app delegates `--ui-self-test` to the separate verification executable.
 

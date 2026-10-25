@@ -66,10 +66,9 @@ class MainWindow final : public QWidget {
     IconButton* back_=nullptr;QSet<QString> favorites_;bool imported_ui_pending_=false;
     PageStack* pages_=nullptr;QWidget* operator_page_=nullptr;
     RaisedPanel* panel_=nullptr;QScrollArea* sidebar_scroll_=nullptr;
-    QWidget *sidebar_=nullptr,*favorites_header_=nullptr,*favorites_heading_=nullptr,*operators_header_=nullptr,*sidebar_search_box_=nullptr,*settings_nav_=nullptr;
+    QWidget *sidebar_=nullptr,*operators_header_=nullptr,*sidebar_search_box_=nullptr,*settings_nav_=nullptr;
     QVector<SettingsNavButton*> settings_nav_buttons_;bool settings_sidebar_=false;
-    IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;FavoriteStarButton* sidebar_favorites_=nullptr;
-    QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false,sidebar_animating_=false,favorites_shown_=false;
+    bool favorites_shown_=false;
     QVector<QWidget*> preference_categories_;int preference_category_=0;
     bool glass_active_=false,glass_applied_=false,glass_lightweight_=false;
     QVariantAnimation theme_motion_;
@@ -197,7 +196,7 @@ class MainWindow final : public QWidget {
     void refreshFavorites(){
         QSignalBlocker blocked(favorites_list_);favorites_list_->clear();const auto c=engine_.snapshot();
         for(int i=0;i<operators_->count();++i){auto* original=operators_->item(i);const bool favorite=favorites_.contains(original->text());original->setData(Qt::UserRole+1,favorite);
-            if(favorite){auto* item=new QListWidgetItem(original->icon(),original->text());item->setToolTip(original->text());item->setData(Qt::UserRole,i);item->setData(Qt::UserRole+1,true);favorites_list_->addItem(item);if(i==c.selected)favorites_list_->setCurrentItem(item);}}
+            if(favorite){auto* item=new QListWidgetItem(original->icon(),original->text());item->setData(Qt::UserRole,i);item->setData(Qt::UserRole+1,true);favorites_list_->addItem(item);if(i==c.selected)favorites_list_->setCurrentItem(item);}}
         operators_->viewport()->update();filterOperators();updateSidebarControls();syncSidebarSelection();
     }
     void setFavorite(int id,bool enabled){
@@ -329,19 +328,6 @@ class MainWindow final : public QWidget {
         };
         if(animate)pages_->transition(change);else{pages_->settle();change();}
     }
-    static void setWidgetOpacity(QWidget* widget,qreal opacity){
-        if(!widget)return;
-        auto* effect=qobject_cast<QGraphicsOpacityEffect*>(widget->graphicsEffect());
-        if(!effect){effect=new QGraphicsOpacityEffect(widget);widget->setGraphicsEffect(effect);}
-        effect->setOpacity(std::clamp(opacity,0.0,1.0));
-    }
-    void updateSidebarFades(){
-        if(!sidebar_||settings_sidebar_)return;
-        const qreal expanded=std::clamp((sidebar_->width()-88.0)/72.0,0.0,1.0);
-        setWidgetOpacity(favorites_heading_,expanded);
-        setWidgetOpacity(operators_header_,expanded);
-        setWidgetOpacity(sidebar_favorites_,1.0-expanded);
-    }
     void updateSettingsNavLabels(){
         const QString names[]={text(UiText::General),text(UiText::Shortcuts),text(UiText::PhoneControl),text(UiText::ProfileBackup)};
         const QString hints[]={text(UiText::SettingsGeneralHint),text(UiText::SettingsShortcutsHint),text(UiText::SettingsPhoneHint),text(UiText::SettingsBackupHint)};
@@ -349,36 +335,9 @@ class MainWindow final : public QWidget {
     }
     void updateSidebarControls(){
         if(!sidebar_)return;
-        const bool compact=sidebar_collapsed_;
-        const bool labelsVisible=sidebar_animating_||(!compact&&sidebar_->width()>=170);
-        if(settings_sidebar_){
-            search_->setVisible(false);sidebar_search_->setVisible(false);sidebar_search_box_->setVisible(false);
-            sidebar_scroll_->setVisible(false);if(sidebar_favorites_)sidebar_favorites_->setVisible(false);
-            settings_nav_->setVisible(true);
-        }else{
-            settings_nav_->setVisible(false);
-            sidebar_scroll_->setVisible(true);sidebar_search_box_->setVisible(true);
-            search_->setVisible(!compact);sidebar_search_->setVisible(compact);
-            if(sidebar_favorites_){sidebar_favorites_->setVisible(favorites_shown_&&(compact||sidebar_animating_));sidebar_favorites_->setToolTip(text(UiText::Favorites));sidebar_favorites_->setAccessibleName(text(UiText::Favorites));}
-            favorites_header_->setVisible(true);favorites_heading_->setVisible(labelsVisible);
-            // Both group headers retain their height, including while their
-            // labels fade, so collapsing never shifts either list vertically.
-            operators_header_->setVisible(true);operators_title_->setVisible(labelsVisible);
-        }
-        const QString title=text(compact?UiText::ExpandSidebar:UiText::CollapseSidebar);
-        sidebar_toggle_->setToolTip(title);sidebar_toggle_->setAccessibleName(title);sidebar_toggle_->setChecked(compact);sidebar_toggle_->setText(text(UiText::Collapse));
-        sidebar_search_->setToolTip(text(UiText::SearchOperators));sidebar_search_->setAccessibleName(text(UiText::SearchOperators));
-        updateSidebarFades();
-    }
-    void setSidebarCollapsed(bool collapsed,bool animate=true,bool focusSearch=false){
-        if(!sidebar_)return;
-        if(!imported_ui_pending_&&collapsed!=sidebar_collapsed_&&!uiprefs::update(config_path_,[=](QJsonObject& root){root["sidebarCollapsed"]=collapsed;})){
-            updateSidebarControls();showNotice(text(UiText::SidebarSaveFailed),true,true);return;
-        }
-        sidebar_collapsed_=collapsed;focus_sidebar_search_=focusSearch&&!collapsed;
-        const int target=collapsed?76:200;sidebar_animating_=animate&&sidebar_->width()!=target;updateSidebarControls();
-        if(!animate||sidebar_->width()==target){sidebar_animation_.stop();sidebar_animating_=false;sidebar_->setFixedWidth(target);updateSidebarControls();if(focus_sidebar_search_){search_->setFocus(Qt::ShortcutFocusReason);focus_sidebar_search_=false;}return;}
-        retargetAnimation(sidebar_animation_,sidebar_->width(),target,180);
+        settings_nav_->setVisible(settings_sidebar_);
+        sidebar_scroll_->setVisible(!settings_sidebar_);
+        sidebar_search_box_->setVisible(!settings_sidebar_);
     }
     void buildSettings(){
         refreshing_=true;const auto c=engine_.snapshot();const auto hint=[this](UiText id){return text(id);};if(settings_){scroll_->takeWidget();delete settings_;}
@@ -779,6 +738,8 @@ class MainWindow final : public QWidget {
         close_->setToolTip(text(UiText::Close));close_->setAccessibleName(text(UiText::Close));
         styleNotice();layoutNotice();
         updateSidebarControls();
+        status_->setReservedLabels({text(UiText::RecoilOn),text(UiText::RecoilOff)});
+        rapid_status_->setReservedLabels({text(UiText::RapidFireOn),text(UiText::RapidFireOff)});
         updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));status_->setToolTip(text(UiText::ToggleRecoilActivity));rapid_status_->setToolTip(text(UiText::RapidFire));filterOperators();syncSelection();updateStatus();
     }
     void syncSelection(){
@@ -832,7 +793,7 @@ class MainWindow final : public QWidget {
             }
             QStringList names(favorites_.begin(),favorites_.end());names.sort(Qt::CaseInsensitive);
             root["favorites"]=QJsonArray::fromStringList(names);
-            root["sidebarCollapsed"]=sidebar_collapsed_;root["version"]=1;root.remove("interface");root.remove("colorTheme");
+            root["version"]=1;root.remove("interface");root.remove("colorTheme");root.remove("sidebarCollapsed");
             uiBytes=QJsonDocument(root).toJson();
         }
         const bool saved=!save_blocked_&&engine_.save(config_path_,uiBytes);
@@ -908,11 +869,17 @@ class MainWindow final : public QWidget {
     }
 protected:
     void updateWindowShape(){
-        if(isMaximized()||isFullScreen()){clearMask();return;}
         // Painting a curve alone leaves the native acrylic rectangle behind it.
         // A Qt mask also clips the HWND's blur and child surfaces on Windows 10.
-        QPainterPath shape;shape.addRoundedRect(QRectF(rect()),16,16);
-        setMask(QRegion(shape.toFillPolygon().toPolygon()));
+        QRegion region;
+        if(!isMaximized()&&!isFullScreen()){
+            QPainterPath shape;shape.addRoundedRect(QRectF(rect()),16,16);
+            region=QRegion(shape.toFillPolygon().toPolygon());
+        }
+        setMask(region);
+        // QWidget skips identical masks, even if a native material/move reset
+        // the HWND region. QWindow reapplies it without briefly clearing it.
+        if(auto* native=windowHandle())native->setMask(region);
     }
     void paintEvent(QPaintEvent*) override {
 
@@ -941,6 +908,7 @@ protected:
         if(!setComposition(HWND(winId()),&helper))return false;
         const bool wasActive=glass_active_;
         glass_active_=true;glass_lightweight_=lightweight;
+        updateWindowShape();
         if(wasActive!=glass_active_)update();
         return true;
     }
@@ -991,7 +959,6 @@ protected:
         if(event->type()==QEvent::WindowStateChange)updateWindowShape();
     }
     bool eventFilter(QObject* object,QEvent* event) override {
-        if(object==sidebar_search_box_&&event->type()==QEvent::Resize&&sidebar_search_)sidebar_search_->setFixedWidth(static_cast<QResizeEvent*>(event)->size().width());
         if(event->type()==QEvent::FocusIn||event->type()==QEvent::FocusOut||event->type()==QEvent::MouseButtonPress){
             if(auto* button=qobject_cast<QPushButton*>(object);button&&(isAncestorOf(button)||button->window()->parentWidget()==this)){
                 const auto reason=event->type()==QEvent::MouseButtonPress?Qt::MouseFocusReason:static_cast<QFocusEvent*>(event)->reason();const bool keyboard=event->type()==QEvent::FocusIn&&(reason==Qt::TabFocusReason||reason==Qt::BacktabFocusReason||reason==Qt::ShortcutFocusReason);
@@ -1034,10 +1001,12 @@ protected:
             // its own compositor performance problems.
             const auto windows=QOperatingSystemVersion::current();
             if(windows.majorVersion()==10&&windows.microVersion()<22000&&!glass_lightweight_){settleThemeTransition();applyWindowGlass(true);}
-        }else if(msg->message==WM_EXITSIZEMOVE&&glass_lightweight_){
+        }else if(msg->message==WM_EXITSIZEMOVE){
             // Also sent for a cancelled move/resize. Failed changes retain the
             // last successful material instead of losing the glass background.
-            applyWindowGlass(false);
+            if(glass_lightweight_)applyWindowGlass(false);
+            updateWindowShape();
+            QTimer::singleShot(0,this,[this]{updateWindowShape();});
         }
         if(msg->message==WM_NCCALCSIZE&&msg->wParam){*result=0;return true;}
         if(msg->message==WM_NCHITTEST){RECT r;GetWindowRect(HWND(winId()),&r);const int x=short(LOWORD(msg->lParam)),y=short(HIWORD(msg->lParam)),edge=qRound(6*devicePixelRatioF());const bool left=x<r.left+edge,right=x>=r.right-edge,top=y<r.top+edge,bottom=y>=r.bottom-edge;
@@ -1057,7 +1026,7 @@ public:
         rapid_status_=new MonoButton;rapid_status_->setObjectName("statusRapid");rapid_status_->setInteractionIcon(InteractionIcon::Rapid);rapid_status_->setFixedHeight(32);rapid_status_->setCursor(Qt::PointingHandCursor);rapid_status_->setToolTip(text(UiText::RapidFire));top->addWidget(rapid_status_);connect(rapid_status_,&QPushButton::clicked,this,[this]{toggleRapid();});
         save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addSpacing(7);top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save(true);});
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
-        gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});top->addSpacing(7);minimize_=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize_->setObjectName("windowControl");minimize_->setAccessibleName(text(UiText::Minimize));minimize_->setToolTip(text(UiText::Minimize));top->addWidget(minimize_);connect(minimize_,&QPushButton::clicked,this,&QWidget::showMinimized);
+        gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{if(engine_.snapshot().sound)sound::playSettings();showPreferences();});top->addSpacing(7);minimize_=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize_->setObjectName("windowControl");minimize_->setAccessibleName(text(UiText::Minimize));minimize_->setToolTip(text(UiText::Minimize));top->addWidget(minimize_);connect(minimize_,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
         notice_bar_=new QWidget(this);notice_bar_->setObjectName("noticeBar");notice_bar_->setAttribute(Qt::WA_StyledBackground);auto* noticeLayout=new QVBoxLayout(notice_bar_);noticeLayout->setContentsMargins(24,22,24,22);noticeLayout->setSpacing(16);
         auto* noticeHeader=new QHBoxLayout;noticeHeader->setSpacing(12);notice_badge_=label({},"noticeBadge");notice_badge_->setFixedSize(34,34);notice_badge_->setAlignment(Qt::AlignCenter);noticeHeader->addWidget(notice_badge_);
@@ -1068,7 +1037,7 @@ public:
         connect(notice_close_,&QPushButton::clicked,this,[this]{notice_timer_.stop();notice_bar_->hide();});
         noticeLayout->addWidget(notice_close_);auto* noticeShadow=new QGraphicsDropShadowEffect(notice_bar_);noticeShadow->setBlurRadius(0);noticeShadow->setOffset(3,4);notice_bar_->setGraphicsEffect(noticeShadow);notice_bar_->hide();
         buildDesktopLayout(layout);
-        const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);item->setToolTip(name);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+operatorAssetName(name)+".svg");if(!renderer.isValid())icon_failures_<<name;}
+        const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+operatorAssetName(name)+".svg");if(!renderer.isValid())icon_failures_<<name;}
         operators_->setCurrentRow(c.selected);
         favorites_=readFavorites();refreshFavorites();
         connect(operators_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});connect(favorites_list_,&QListWidget::currentItemChanged,this,[this](QListWidgetItem* item,QListWidgetItem*){if(item)selectOperator(item->data(Qt::UserRole).toInt());});
@@ -1083,7 +1052,7 @@ public:
         if(c.phone_enabled&&!phone_->listening()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}
         buildSettings();updateLanguage();applyStyle();buildTray();qApp->installEventFilter(this);
         auto* saveShortcut=new QShortcut(QKeySequence::Save,this);connect(saveShortcut,&QShortcut::activated,this,[this]{save(true);});
-        auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{if(sidebar_collapsed_)setSidebarCollapsed(false,true,true);else{search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();}});
+        auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{showOperators();search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();});
         auto* escapeShortcut=new QShortcut(QKeySequence(Qt::Key_Escape),this);connect(escapeShortcut,&QShortcut::activated,this,[this]{if(notice_bar_->isVisible()){notice_timer_.stop();notice_bar_->hide();}else if(pages_->currentWidget()==preferences_)showOperators();else if(!search_->text().isEmpty())search_->clear();});
         clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});paint_.start();
     }

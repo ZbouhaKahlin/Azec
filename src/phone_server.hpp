@@ -58,7 +58,7 @@ class PhoneServer final : public QObject {
         const auto host=QString::fromUtf8(headers.value("host")).toLower();const auto hostname=host.section(':',0,0);const auto expectedHost=hostname+":"+QString::number(port());
         if(!hosts_.contains(hostname)||host!=expectedHost){reply(socket,403,"{\"error\":\"Invalid host\"}");return;}
         const auto origin=headers.value("origin");if(!origin.isEmpty()&&origin!="http://"+host.toUtf8()){reply(socket,403,"{\"error\":\"Invalid origin\"}");return;}
-        if(method=="GET"&&path=="/"){QFile file(":/ui/phone.html");if(!file.open(QIODevice::ReadOnly)){reply(socket,404,"{}");return;}auto html=file.readAll();reply(socket,200,html,"text/html; charset=utf-8");return;}
+        if(method=="GET"&&path=="/"){QFile file(":/ui/phone.html");if(!file.open(QIODevice::ReadOnly)){reply(socket,404,"{}");return;}auto html=file.readAll();QFile decoder(":/ui/qr-decoder.js");if(!decoder.open(QIODevice::ReadOnly)){reply(socket,503,"{}");return;}html.replace("/*AZEC_QR_DECODER*/",decoder.readAll());reply(socket,200,html,"text/html; charset=utf-8");return;}
         if(method=="GET"&&(path=="/manifest.webmanifest"||path=="/app-icon.svg")){
             QFile file(path=="/manifest.webmanifest"?":/ui/manifest.webmanifest":":/ui/app-icon.svg");
             if(!file.open(QIODevice::ReadOnly)){reply(socket,404,"{}");return;}

@@ -31,7 +31,7 @@ int main(int argc,char** argv){
         live.secondary[id].vertical=float(id-30);live.secondary[id].rapid=(id+1)%2;
         live.secondary_initialized[id]=true;live.secondary_enabled[id]=id%2;
     }
-    auto backup=makeBackup(backupConfig,{},true,"original",false);
+    auto backup=makeBackup(backupConfig,{},true,false);
     auto records=backup["operators"].toArray();QJsonArray oldRecords;
     for(int id=70;id>=0;--id)oldRecords.append(records[id]);
     auto oldBackup=backup;oldBackup["operators"]=oldRecords;
@@ -57,8 +57,8 @@ int main(int argc,char** argv){
     check(write(ui,{})&&uiprefs::readDocument(ui,preferences)&&preferences.isEmpty()&&
           uiprefs::update(path,[](QJsonObject& root){root["colorTheme"]="rose";root["favorites"]=QJsonArray{"Ace"};}),
           "empty UI preferences recover on the next atomic save");
-    check(uiprefs::update(path,[](QJsonObject& root){root["sidebarCollapsed"]=true;})&&
-          uiprefs::readDocument(ui,preferences)&&!preferences.contains("colorTheme")&&preferences["favorites"].toArray().contains("Ace")&&preferences["sidebarCollapsed"].toBool(),
+    check(uiprefs::update(path,[](QJsonObject& root){root["theme"]="light";})&&
+          uiprefs::readDocument(ui,preferences)&&!preferences.contains("colorTheme")&&preferences["favorites"].toArray().contains("Ace")&&preferences["theme"]=="light",
           "recovered preferences retain other settings and drop the obsolete theme key");
     const QByteArray malformed="{broken preferences";
     check(write(ui,malformed)&&!uiprefs::update(path,[](QJsonObject& root){root["colorTheme"]="original";})&&read(ui)==malformed,

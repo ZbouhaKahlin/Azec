@@ -47,10 +47,10 @@ Profile edits apply in memory immediately. Click **Save**, press **Ctrl+S**, or 
 Use a phone browser on the same local network as the PC. Keep Azec running on the PC.
 
 1. Open **Settings → Phone control** on the desktop.
-2. Open the displayed PC address in your phone browser and enter the six-digit pairing code. Alternatively, reveal and scan the QR code or open the link from **Copy link**.
+2. Open the displayed PC address in your phone browser. Tap **Scan QR code** and photograph the revealed PC QR, or enter the six-digit pairing code. You can also scan the QR with your phone’s camera app or open the link from **Copy link**.
 3. Select an operator and weapon profile on the phone, adjust settings, and tap **Save changes** to persist the edits.
 
-The first phone card, **Output**, controls live **Recoil active** and the active weapon profile's **Rapid fire active** setting. Desktop and phone edit the same profiles.
+The first phone card, **Output**, controls live **Recoil active**. The active weapon profile's **Rapid fire active** switch sits above its Rapid fire section. Shot delay stays on one line, and **− / +** adjust it by five milliseconds. Desktop and phone edit the same profiles and share the **Feedback sound** preference. QR photos are read on the phone and never uploaded; the LAN page opens the camera/photo picker rather than a live camera stream.
 
 **Copy code** copies just the six digits. **Copy link** includes session access, so keep it private. **New code** rotates access and disconnects previously paired phones; restarting Azec also creates a new session. QR starts concealed and hides again when you leave Phone control or hide the app.
 
@@ -66,13 +66,13 @@ Phone access can be disabled in Settings. The page uses system fonts and bundled
 
 Choose **Dark** or **Light** in **Settings → General → Theme**. Both follow the [monocode](https://github.com/hardbeat920/monocode) design language, with quiet hairlines and one blue accent. Both themes use a translucent window over system blur. Light pairs a pale gray shell with a white content panel. Your choice saves automatically, and the connected phone follows it. Changing the theme does not save or discard profile edits.
 
-The sidebar remembers whether it is expanded or collapsed. Right-click an operator to add or remove a favorite. Favorites appear once, above the remaining operators. Search works in either sidebar state; selecting the compact search icon expands and focuses it.
+The sidebar stays expanded on the main page and in Settings. Right-click an operator to add or remove a favorite. Favorites appear once, above the remaining operators, with search above the roster.
 
 Settings groups options into **General**, **Shortcuts**, **Phone control**, and **Profile backup**. Language and feedback sound are available in General.
 
 ## Profile backups
 
-Open **Settings → Profile backup**. **Export backup** saves your profiles and supported settings to one file. Under **Import backup**, choose a backup file, review the summary, and confirm the import. Backups include favorites, sidebar state, the named profile library, and numeric sensitivity settings, and omit the machine-specific game-settings path.
+Open **Settings → Profile backup**. **Export backup** saves your profiles and supported settings to one file. Under **Import backup**, choose a backup file, review the summary, and confirm the import. Backups include favorites, the named profile library, and numeric sensitivity settings, and omit the machine-specific game-settings path.
 
 Older backups preserve operators that were not included in them. Imported settings remain pending until **Save changes**; closing with **Discard** keeps the previously saved configuration.
 

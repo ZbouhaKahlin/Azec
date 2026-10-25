@@ -9,7 +9,7 @@ function client(fetch) {
   const elements = { pair: { hidden: true }, controls: { hidden: false } };
   const removed = [];
   const context = vm.createContext({ fetch, AbortController, setTimeout, clearTimeout,
-    token: 'fixture-token', connectionNotice: false, history: { replaceState() {} },
+    token: 'fixture-token', phoneErrorKind: '', clearPhoneError() {}, history: { replaceState() {} },
     location: { pathname: '/', search: '' },
     $: id => elements[id], sessionStorage: { removeItem: key => removed.push(key) } });
   vm.runInContext(api, context);

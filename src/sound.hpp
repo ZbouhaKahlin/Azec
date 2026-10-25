@@ -136,6 +136,11 @@ inline void playToggle() {
     static const Recipe recipe{0.4,{},{{"bandpass",2200,1.6,0,0.001,0.016,0.12},{"bandpass",3800,1.6,0.024,0.001,0.02,0.1}},{}};
     static const auto wav=makeWav(recipe);play(wav);
 }
+// A short, rounded tap for Settings, without a pitch sweep or noise layer.
+inline void playSettings() {
+    static const Recipe recipe{0.35,{{"sine",392,0,0,0,0,0.004,0.055,0.055},{"sine",784,0,0,0,0,0.003,0.02,0.006}},{},{}};
+    static const auto wav=makeWav(recipe);play(wav);
+}
 // A fast three-step locator tone for copy actions and small confirmations.
 inline void playCopy() {
     static const Recipe recipe{0.4,{{"sine",740,0,0,0,0,0.002,0.055,0.05},{"sine",1110,0,0,0,0.045,0.002,0.055,0.045},{"sine",1665,0,0,0,0.09,0.002,0.07,0.04}},{},Shimmer{0.065,0.16,0.1,4200}};

@@ -67,8 +67,7 @@ inline QString applicationStyle(const QColor& accent){
         QWidget#settingsSurface QComboBox:disabled,QWidget#settingsSurface QLineEdit:disabled,
         QWidget#settingsSurface QDoubleSpinBox:disabled,QWidget#settingsSurface QSpinBox:disabled { color:$muted; }
 
-        QLineEdit#search { background:$card; color:$ink; border:1px solid $outline; border-radius:8px; padding:8px 10px; font-size:13px; }
-        QLineEdit#search:focus { border-color:%1; background:$soft; }
+        QLineEdit#search { background:transparent; color:$ink; border:0; border-radius:0; padding:8px 10px; font-size:13px; }
 
         QMenu { background:$surface; color:$ink; border:1px solid $outline; border-radius:10px; padding:5px; font-size:13px; }
         QMenu::item { padding:6px 10px 6px 7px; border-radius:6px; background:transparent; }

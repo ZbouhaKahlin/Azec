@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^\d+(\.\d+){3}$')]
-    [string]$Version
+    [string]$Version,
+    [string]$ResumeDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,18 +38,37 @@ if ($asset.digest -notmatch '^sha256:([0-9a-fA-F]{64})$') { throw 'GitHub asset 
 $publishedHash = $Matches[1].ToLowerInvariant()
 if ($publishedHash -cne $localHash) { throw 'GitHub asset digest differs from dist/Azec.exe.' }
 
-$fixture = Join-Path $PSScriptRoot ('.build\verification\published-' + [guid]::NewGuid().ToString('N'))
+$verificationRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '.build\verification'))
+if ($ResumeDirectory) {
+    $fixture = [IO.Path]::GetFullPath($ResumeDirectory)
+    if (-not $fixture.StartsWith($verificationRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Release verification downloads must stay under .build/verification.'
+    }
+} else {
+    $fixture = Join-Path $verificationRoot ('published-' + [guid]::NewGuid().ToString('N'))
+}
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
+Write-Host "Release verification downloads: $fixture"
 $taggedExe = Join-Path $fixture 'tagged.exe'
 $stableExe = Join-Path $fixture 'latest.exe'
 # These requests deliberately carry no GitHub token: friends use anonymous downloads.
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$repo/releases/download/$tag/Azec.exe" -OutFile $taggedExe -TimeoutSec 180 | Out-Null
+function Download-AnonymousRelease([string]$Uri, [string]$Destination) {
+    if (Test-Path -LiteralPath $Destination) {
+        $length = (Get-Item -LiteralPath $Destination).Length
+        if ($length -eq $asset.size -and (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $publishedHash) { return }
+        if ($length -ge $asset.size) { throw 'Existing verification download is invalid; retry in a fresh directory.' }
+    }
+    # Bound connection and transfer time separately; ignore local curl credentials/config.
+    & curl.exe --disable --fail --location --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 600 --continue-at - --output $Destination -- $Uri
+    if ($LASTEXITCODE -ne 0) { throw "Anonymous release download failed (curl exit $LASTEXITCODE)." }
+}
+Download-AnonymousRelease "https://github.com/$repo/releases/download/$tag/Azec.exe" $taggedExe
 if ((Get-FileHash -LiteralPath $taggedExe -Algorithm SHA256).Hash.ToLowerInvariant() -cne $publishedHash) {
     throw 'Downloaded tagged EXE differs from the asset digest.'
 }
 $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -Headers $headers -TimeoutSec 30
 if ($latest.tag_name -cne $tag) { throw 'The stable latest release points to another version.' }
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$repo/releases/latest/download/Azec.exe" -OutFile $stableExe -TimeoutSec 180 | Out-Null
+Download-AnonymousRelease "https://github.com/$repo/releases/latest/download/Azec.exe" $stableExe
 if ((Get-FileHash -LiteralPath $stableExe -Algorithm SHA256).Hash.ToLowerInvariant() -cne $publishedHash) {
     throw 'The anonymous stable download differs from the published EXE.'
 }

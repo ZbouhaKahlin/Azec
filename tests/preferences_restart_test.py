@@ -52,7 +52,7 @@ def run(parent):
             checks[phase + '_restores_extension_selection'] = state['operatorId'] == 71 and state['profile']['vertical'] == 31.5
             checks[phase + '_keeps_single_dark_look'] = state['appearance']['scheme'] == 'dark' and 'id' not in state['appearance'] and state['appearance']['colors']['paper'] == '#171717'
             restored_ui = json.loads(ui_path.read_text())
-            checks[phase + '_preserves_preferences'] = restored_ui['favorites'] == ['Ash'] and restored_ui['sidebarCollapsed'] is True
+            checks[phase + '_preserves_preferences'] = restored_ui['favorites'] == ['Ash'] and 'sidebarCollapsed' not in restored_ui
             checks[phase + '_drops_obsolete_choices'] = 'interface' not in restored_ui and 'colorTheme' not in restored_ui
             stop(process)
             process = None

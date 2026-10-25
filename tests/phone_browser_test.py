@@ -9,7 +9,57 @@ from playwright.sync_api import sync_playwright
 from run_checks import ROOT, start, stop
 
 
-def run(full=False):
+def check_interaction_motion(page):
+    checks = {}
+    page.locator('#save').click()
+    page.wait_for_function("()=>document.getElementById('save').classList.contains('saved-confirm')")
+    page.wait_for_function("()=>document.getElementById('save').classList.contains('save-returning')")
+    middle = page.evaluate("""()=>{
+        const save=document.getElementById('save');
+        for(const animation of save.getAnimations({subtree:true})){animation.pause();animation.currentTime=90}
+        return {arrow:Number(getComputedStyle(save.querySelector('.save-arrow')).opacity),
+                check:Number(getComputedStyle(save.querySelector('.save-check')).opacity),dirty:state.dirty}
+    }""")
+    checks['save_return_crossfades_check_and_arrow'] = .2 < middle['arrow'] < .8 and .2 < middle['check'] < .8
+    checks['save_confirmation_keeps_configuration_saved'] = not middle['dirty']
+    page.wait_for_function("()=>!document.getElementById('save').classList.contains('save-returning')")
+    checks['save_returns_to_the_resting_arrow'] = page.evaluate("""()=>{
+        const save=document.getElementById('save');return getComputedStyle(save.querySelector('.save-arrow')).opacity==='1'
+            &&getComputedStyle(save.querySelector('.save-check')).opacity==='0'
+    }""")
+    checks['switch_has_gentle_intermediate_travel'] = page.evaluate("""async()=>{
+        const input=document.getElementById('recoilActive'),track=input.nextElementSibling;
+        input.checked=false;getComputedStyle(track,'::before').transform;
+        input.checked=true;getComputedStyle(track,'::before').transform;
+        await new Promise(requestAnimationFrame);
+        const transitions=track.getAnimations({subtree:true}).filter(a=>a.transitionProperty==='transform');
+        for(const animation of transitions){animation.pause();animation.currentTime=32}
+        const x=new DOMMatrixReadOnly(getComputedStyle(track,'::before').transform).m41;
+        for(const animation of transitions)animation.finish();input.checked=false;
+        return transitions.length>0&&x>0&&x<16*.6
+    }""")
+    page.evaluate('()=>{confirmPhoneSave();returnPhoneSave()}')
+    page.wait_for_timeout(60)
+    page.evaluate('confirmPhoneSave()')
+    page.wait_for_timeout(150)
+    checks['repeated_saves_cancel_the_previous_return_timer'] = page.evaluate("document.getElementById('save').classList.contains('saved-confirm')")
+    page.evaluate("()=>mutate({action:'setGlobal',values:{sound:false}})")
+    page.wait_for_function('()=>state.dirty&&pending===0')
+    checks['new_edits_cancel_all_save_confirmation_frames'] = page.evaluate("!document.getElementById('save').classList.contains('saved-confirm')&&!document.getElementById('save').classList.contains('save-returning')&&document.getElementById('save').classList.contains('dirty')")
+    page.emulate_media(reduced_motion='reduce')
+    checks['rapid_picker_reopen_keeps_its_source_and_focus'] = page.evaluate("""async()=>{
+        const picker=document.getElementById('picker'),trigger=document.getElementById('operatorPicker');
+        openPicker(document.getElementById('operator'),trigger);closePicker();
+        openPicker(document.getElementById('operator'),trigger);
+        await new Promise(requestAnimationFrame);
+        const valid=picker.open&&pickerSource===document.getElementById('operator')&&trigger.getAttribute('aria-expanded')==='true';
+        closePicker();return valid&&!picker.open&&document.activeElement===trigger;
+    }""")
+    page.emulate_media(reduced_motion='no-preference')
+    return checks
+
+
+def run(full=False, interaction_motion=False):
     (ROOT / '.build' / 'verification').mkdir(parents=True, exist_ok=True)
     folder = Path(tempfile.mkdtemp(prefix='phone-browser-goofy-', dir=ROOT / '.build' / 'verification'))
     process = None
@@ -17,7 +67,7 @@ def run(full=False):
     try:
         process, info = start(folder)
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(channel='chrome', headless=True)
+            browser = playwright.chromium.launch(channel='chrome', headless=True, args=['--mute-audio'])
             context = browser.new_context(viewport={'width': 390, 'height': 844}, locale='pt-BR', is_mobile=True, has_touch=True)
             page = context.new_page()
             errors = []
@@ -27,6 +77,14 @@ def run(full=False):
             page.locator('#code').fill(info['code'])
             page.get_by_role('button', name='Connect', exact=True).click()
             page.wait_for_selector('#controls:not([hidden])')
+            if interaction_motion:
+                checks.update(check_interaction_motion(page))
+                checks['no_javascript_errors'] = not errors
+                report = {'passed': all(checks.values()), 'checks': checks, 'errors': errors}
+                (folder / 'browser-verification.json').write_text(json.dumps(report, indent=2))
+                print(json.dumps(report, indent=2))
+                browser.close()
+                return report['passed']
             checks['pairing_opens_controls_in_english'] = page.locator('html').get_attribute('lang') == 'en'
             checks['page_uses_system_fonts'] = page.evaluate("getComputedStyle(document.body).fontFamily").lower().find('system-ui') >= 0
             checks['accent_text_is_readable'] = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim().toLowerCase()") == page.evaluate("state.appearance.colors['accent-ink'].toLowerCase()")
@@ -64,11 +122,13 @@ def run(full=False):
             page.locator('#pickerSearch').fill('Insert')
             page.get_by_role('option', name='Insert', exact=True).click()
             page.wait_for_function('()=>pending===0')
-            checks['collision_restores_binding_without_disconnect'] = page.evaluate("state.keys[4].value===118 && document.getElementById('connection').classList.contains('connected') && document.getElementById('notice').classList.contains('error')")
+            checks['collision_restores_binding_without_disconnect'] = page.evaluate("state.keys[4].value===118 && document.getElementById('connection').classList.contains('connected') && !document.getElementById('saveError').hidden&&document.getElementById('saveError').textContent.length>0&&!document.querySelector('#notice')")
+            page.wait_for_function("()=>!document.getElementById('picker').open")
             page.locator('#key4Picker').click()
             page.locator('#pickerSearch').fill('F1')
             page.screenshot(path=str(folder / 'phone-hotkeys.png'))
             page.keyboard.press('Escape')
+            page.wait_for_function("()=>!document.getElementById('picker').open")
             checks['picker_escape_restores_focus'] = page.evaluate("!document.getElementById('picker').open && document.activeElement.id==='key4Picker'")
             page.locator('#languagePicker').click()
             page.get_by_role('option', name='🇺🇸 English (US)', exact=True).click()
@@ -88,6 +148,7 @@ def run(full=False):
             page.get_by_role('option', name='Ash', exact=True).click()
             page.wait_for_function('()=>state.operatorId===4 && pending===0')
             checks['operator_picker_selects_profile'] = page.locator('#operatorName').inner_text() == 'Ash'
+            page.wait_for_function("()=>!document.getElementById('picker').open")
             checks['operator_selection_returns_focus_without_keyboard'] = page.evaluate("document.activeElement.tagName!=='INPUT'")
             page.request.post(info['address'] + '/api/update', headers={'Authorization': 'Bearer ' + info['token']}, data={'action': 'setFavorite', 'operator': 4, 'enabled': True})
             page.wait_for_function("()=>state.operators.find(o=>o.id===4).favorite && pending===0")
@@ -156,9 +217,11 @@ def run(full=False):
                     page.evaluate('(language)=>mutate({action:"setGlobal",values:{language}})', language)
                     layout_ok &= page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                     page.locator('#languagePicker').click()
+                    page.wait_for_function("()=>!document.getElementById('picker').getAnimations().some(a=>a.playState==='running')")
                     dialogs_fit &= page.evaluate("(()=>{const r=document.getElementById('picker').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()")
                     page.keyboard.press('Escape')
                     page.locator('#operatorPicker').click()
+                    page.wait_for_function("()=>!document.getElementById('picker').getAnimations().some(a=>a.playState==='running')")
                     dialogs_fit &= page.evaluate("(()=>{const r=document.getElementById('picker').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()")
                     page.keyboard.press('Escape')
             checks['selected_languages_fit_selected_widths'] = layout_ok
@@ -223,5 +286,6 @@ def run(full=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--full', action='store_true', help='Check all nine languages at four widths')
+    parser.add_argument('--interaction-motion-only', action='store_true', help='Check switch and save-return animation frames only')
     args = parser.parse_args()
-    raise SystemExit(0 if run(args.full) else 1)
+    raise SystemExit(0 if run(args.full, args.interaction_motion_only) else 1)

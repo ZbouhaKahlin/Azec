@@ -11,7 +11,7 @@ void MainWindow::exportProfiles(){
     const auto path=QFileDialog::getSaveFileName(this,text(UiText::ExportBackup),"azec-backup.json","JSON (*.json)",nullptr,QFileDialog::DontUseNativeDialog);
     if(path.isEmpty())return;
     const auto bytes=QJsonDocument(makeBackup(engine_.snapshot(),favorites_,engine_.game_focus_only.load(),
-        sidebar_collapsed_,engine_.ads_only.load())).toJson(QJsonDocument::Compact);QSaveFile file(path);
+        engine_.ads_only.load())).toJson(QJsonDocument::Compact);QSaveFile file(path);
     if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){
         diagnostic("export profiles",file.errorString());showNotice(text(UiText::CouldNotExportProfilesCheckTheDestinationPermissions),true,true);
     }else showNotice(text(UiText::ProfilesExported));
@@ -33,7 +33,6 @@ bool MainWindow::applyBackup(const QByteArray& bytes){
     if(options.gameFocusOnly)engine_.game_focus_only=*options.gameFocusOnly;
     if(options.adsOnly)engine_.ads_only=*options.adsOnly;
     if(config.phone_enabled)phone_->start();else phone_->stop();
-    if(options.sidebarCollapsed)setSidebarCollapsed(*options.sidebarCollapsed,false);
     search_->clear();refreshFavorites();buildPreferences();buildSettings();updateLanguage();applyStyle();syncSidebarSelection();dirty();return true;
 }
 void MainWindow::importProfiles(){

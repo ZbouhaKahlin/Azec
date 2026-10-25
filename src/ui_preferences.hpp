@@ -19,12 +19,11 @@ inline bool readDocument(const QString& path,QJsonObject& root){
     root=document.object();return !root.contains("version")||root["version"].toInt(-1)==1;
 }
 
-inline bool sidebarCollapsed(const std::filesystem::path& configuration){QJsonObject root;return readDocument(filePath(configuration),root)&&root["sidebarCollapsed"].toBool(false);}
 inline bool lightTheme(const std::filesystem::path& configuration){QJsonObject root;return readDocument(filePath(configuration),root)&&root["theme"].toString()=="light";}
 inline bool update(const std::filesystem::path& configuration,const std::function<void(QJsonObject&)>& change){
     QJsonObject root;const auto path=filePath(configuration);
     if(!readDocument(path,root)){diagnostic("save UI preferences","Unreadable or invalid file; existing preferences retained");return false;}
-    change(root);root.remove("interface");root.remove("colorTheme");root["version"]=1;const auto bytes=QJsonDocument(root).toJson();QSaveFile file(path);
+    change(root);root.remove("interface");root.remove("colorTheme");root.remove("sidebarCollapsed");root["version"]=1;const auto bytes=QJsonDocument(root).toJson();QSaveFile file(path);
     const bool ok=file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();
     if(!ok)diagnostic("save UI preferences",file.errorString());return ok;
 }

@@ -51,7 +51,7 @@ int main(int argc,char** argv){
     bool focus=true,ads=false;r6::Config readBack;check(write(weaponFile(path),weaponProfilesBytes(config,focus,ads)),"save sidecar fixture");
     readWeaponProfiles(readBack,focus,ads,path);
     check(readBack.sensitivity.dpi==1600&&sensitivity::sameGame(readBack.sensitivity,next)&&readBack.secondary[0].vertical==24&&readBack.operators.back().vertical==14,"sidecar reload preserves calibration and both profile stores");
-    const auto backup=makeBackup(config,QSet<QString>{"Ace"},true,"charcoal",false);r6::Config imported;QSet<QString> favorites;BackupOptions options;
+    const auto backup=makeBackup(config,QSet<QString>{"Ace"},true,false);r6::Config imported;QSet<QString> favorites;BackupOptions options;
     const auto exportedSetup=backup["settings"].toObject()["sensitivity"].toObject();
     check(!exportedSetup.contains("source")&&parseBackup(backup,imported,favorites,options)&&imported.sensitivity.source.empty()&&sensitivity::sameGame(imported.sensitivity,next)&&favorites.contains("Ace"),"backup preserves numeric reference and excludes machine paths");
     auto legacy=backup;auto legacySettings=legacy["settings"].toObject();legacySettings.remove("sensitivity");legacy["settings"]=legacySettings;
@@ -62,7 +62,7 @@ int main(int argc,char** argv){
     r6::Engine restored(true);check(restored.load(path)&&restored.snapshot().sensitivity.dpi==1600&&restored.snapshot().operators[0].horizontal==-2.3f&&restored.snapshot().secondary[0].vertical==24,"Engine restart retains scaled profiles and reference together");
     check(QFileInfo(QString::fromStdWString(path.wstring())).size()==3734,"reference never extends binary configuration");
     check(uiprefs::update(path,[](QJsonObject& root){root["favorites"]=QJsonArray{"Ace"};root["colorTheme"]="rose";root["sidebarCollapsed"]=true;}),"create isolated UI preferences");
-    check(uiprefs::update(path,[](QJsonObject& root){root["sidebarCollapsed"]=false;}),"update isolated sidebar preference");
-    QJsonObject prefs;check(uiprefs::readDocument(uiprefs::filePath(path),prefs)&&prefs["favorites"].toArray().contains("Ace")&&!prefs.contains("colorTheme")&&!prefs["sidebarCollapsed"].toBool(),"sidebar changes preserve favorites and drop the obsolete theme key");
+    check(uiprefs::update(path,[](QJsonObject& root){root["theme"]="light";}),"update isolated theme preference");
+    QJsonObject prefs;check(uiprefs::readDocument(uiprefs::filePath(path),prefs)&&prefs["favorites"].toArray().contains("Ace")&&!prefs.contains("colorTheme")&&!prefs.contains("sidebarCollapsed")&&prefs["theme"]=="light","theme changes preserve favorites and drop obsolete preference keys");
     std::cout<<checks<<" console checks: "<<(ok?"PASS":"FAIL")<<'\n';return ok?0:1;
 }
