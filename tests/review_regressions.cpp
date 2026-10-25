@@ -35,10 +35,11 @@ int main(int argc,char** argv){
           "link-local adapters are not advertised");
 
     const auto source=fixture+"/manual/library/x64/interception.dll";
-    check(write(source,"MZ-first")&&driver_setup::place(source)&&read(driver_setup::dllTarget())=="MZ-first",
-          "driver is placed in isolated persistent storage");
-    check(write(source,"MZ-other")&&driver_setup::place(source)&&read(driver_setup::dllTarget())=="MZ-other",
-          "same-size different DLL contents are replaced");
+    check(write(source,"MZ-first")&&!driver_setup::place(source)&&!QFileInfo::exists(driver_setup::dllTarget()),
+          "unverified driver is rejected before persistent storage is created");
+    check(write(driver_setup::dllTarget(),"retained driver")&&write(source,"MZ-other")&&
+          !driver_setup::place(source)&&read(driver_setup::dllTarget())=="retained driver",
+          "unverified replacement preserves existing driver contents");
     const auto dll=read(driver_setup::dllTarget());
     check(!driver_setup::place(fixture+"/missing.dll")&&read(driver_setup::dllTarget())==dll,
           "missing source preserves existing driver DLL");

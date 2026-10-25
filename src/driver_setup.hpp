@@ -2,6 +2,7 @@
 #include <QtCore>
 #include <windows.h>
 #include <iterator>
+#include <vector>
 #include "app_paths.hpp"
 
 // One-click Interception setup used by the Settings guide.
@@ -17,6 +18,76 @@ inline QByteArray sha256(){return QByteArray::fromHex("ad038963d6413055765128b0b
 inline bool verify(const QByteArray& data){
     return !data.isEmpty()&&QCryptographicHash::hash(data,QCryptographicHash::Sha256)==sha256();
 }
+// Hashes of the x64 DLL and installer inside the pinned, verified v1.0.1 ZIP.
+// Never learn these values from a local file or an unsigned sidecar.
+inline QByteArray dllSha256(){return QByteArray::fromHex("ab88164c11b1b48488772d4c3bfaa4509d5b0ae9dbc5a691dc4f96f0260443c8");}
+inline QByteArray installerSha256(){return QByteArray::fromHex("e137863a79da797f08e7a137280ff2a123809044a888fd75ce9c973198915abe");}
+inline bool verifyDll(const QByteArray& data){
+    return !data.isEmpty()&&QCryptographicHash::hash(data,QCryptographicHash::Sha256)==dllSha256();
+}
+
+// Keep the file immutable from hashing through LoadLibrary. Pin every directory
+// in its resolved local path too, so a directory rename or junction swap cannot
+// redirect the loader after verification. Failure always leaves output disabled.
+class VerifiedFile final {
+    HANDLE file_=INVALID_HANDLE_VALUE;
+    std::vector<HANDLE> directories_;
+    QString path_;
+public:
+    VerifiedFile()=default;
+    VerifiedFile(const VerifiedFile&)=delete;
+    VerifiedFile& operator=(const VerifiedFile&)=delete;
+    ~VerifiedFile(){
+        if(file_!=INVALID_HANDLE_VALUE)CloseHandle(file_);
+        for(auto it=directories_.rbegin();it!=directories_.rend();++it)CloseHandle(*it);
+    }
+    bool open(const QString& source,const QByteArray& expected){
+        if(file_!=INVALID_HANDLE_VALUE)return false;
+        const auto native=QDir::toNativeSeparators(QFileInfo(source).absoluteFilePath());
+        file_=CreateFileW(reinterpret_cast<LPCWSTR>(native.utf16()),GENERIC_READ,FILE_SHARE_READ,
+                          nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(file_==INVALID_HANDLE_VALUE)return false;
+        wchar_t resolved[32768]{};
+        const auto length=GetFinalPathNameByHandleW(file_,resolved,DWORD(std::size(resolved)),FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+        if(!length||length>=std::size(resolved))return false;
+        path_=QString::fromWCharArray(resolved,int(length));
+        const auto local=QDir::fromNativeSeparators(path_);
+        // Only local drive paths are supported for executable driver files.
+        if(!local.startsWith("//?/")||local.size()<7||!local[4].isLetter()||local.mid(5,2)!=":/")return false;
+        const auto parent=local.left(qMax(qsizetype(7),local.lastIndexOf('/')));
+        for(int end=7;end<=parent.size();){
+            const auto directory=QDir::toNativeSeparators(parent.left(end));
+            const HANDLE handle=CreateFileW(reinterpret_cast<LPCWSTR>(directory.utf16()),FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+            if(handle==INVALID_HANDLE_VALUE)return false;
+            directories_.push_back(handle);
+            BY_HANDLE_FILE_INFORMATION info{};
+            if(!GetFileInformationByHandle(handle,&info)||!(info.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)||
+               (info.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT))return false;
+            if(end==parent.size())break;
+            const auto next=parent.indexOf('/',end+1);end=next<0?int(parent.size()):int(next);
+        }
+        // The resolved path must still name the exact open file after the
+        // directory guards were acquired, including when a rename raced open().
+        const HANDLE same=CreateFileW(reinterpret_cast<LPCWSTR>(path_.utf16()),GENERIC_READ,FILE_SHARE_READ,
+                                     nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(same==INVALID_HANDLE_VALUE)return false;
+        BY_HANDLE_FILE_INFORMATION original{},reopened{};
+        const bool identical=GetFileInformationByHandle(file_,&original)&&GetFileInformationByHandle(same,&reopened)&&
+            original.dwVolumeSerialNumber==reopened.dwVolumeSerialNumber&&original.nFileIndexHigh==reopened.nFileIndexHigh&&
+            original.nFileIndexLow==reopened.nFileIndexLow;
+        CloseHandle(same);
+        LARGE_INTEGER size{};
+        if(!identical||!GetFileSizeEx(file_,&size)||size.QuadPart<=0||size.QuadPart>16*1024*1024)return false;
+        QCryptographicHash hash(QCryptographicHash::Sha256);char buffer[64*1024];DWORD count=0;qint64 read=0;
+        do{
+            if(!ReadFile(file_,buffer,sizeof(buffer),&count,nullptr))return false;
+            hash.addData(QByteArrayView(buffer,count));read+=count;
+        }while(count);
+        return read==size.QuadPart&&hash.result()==expected;
+    }
+    const QString& path() const{return path_;}
+};
 
 // Everything the helper writes lives under the app's local data folder.
 inline QString workRoot(){
@@ -35,7 +106,7 @@ inline QString findDll(const QString& root,int depth=4){
     const QDir dir(root);
     if(!dir.exists())return {};
     const auto direct=dir.filePath(QStringLiteral("library/x64/interception.dll"));
-    if(QFileInfo::exists(direct))return direct;
+    {VerifiedFile file;if(file.open(direct,dllSha256()))return direct;}
     const auto children=dir.entryList(QDir::Dirs|QDir::NoDotAndDotDot,QDir::Name);
     for(const auto& child:children){
         if(child.startsWith(QLatin1Char('.')))continue;
@@ -71,7 +142,10 @@ inline bool place(const QString& source,QString* error=nullptr){
         return false;
     }
     const auto bytes=input.readAll();
-    if(input.error()!=QFile::NoError||bytes.size()!=input.size())return false;
+    if(input.error()!=QFile::NoError||bytes.size()!=input.size()||!verifyDll(bytes)){
+        if(error)*error=QStringLiteral("Interception DLL checksum mismatch; use Download and place");
+        return false;
+    }
     input.close();
     QFile existing(target);
     if(existing.open(QIODevice::ReadOnly)&&existing.size()==bytes.size()&&existing.readAll()==bytes)return true;
@@ -91,13 +165,13 @@ inline QString installerFolder(const QString& dllFile){
     QDir directory=QFileInfo(dllFile).absoluteDir();
     directory.cdUp();directory.cdUp();
     const auto folder=directory.filePath(QStringLiteral("command line installer"));
-    return QFileInfo::exists(directory.filePath(QStringLiteral("command line installer/install-interception.exe")))
-        ?folder:QString();
+    VerifiedFile installer;
+    return installer.open(directory.filePath(QStringLiteral("command line installer/install-interception.exe")),installerSha256())?folder:QString();
 }
 
 inline QString installCommand(const QString& folder){
-    if(folder.isEmpty())return QStringLiteral("install-interception.exe /install");
-    return QStringLiteral("cd \"")+QDir::toNativeSeparators(folder)+QStringLiteral("\"\ninstall-interception.exe /install");
+    if(folder.isEmpty())return {};
+    return QLatin1Char('"')+QDir::toNativeSeparators(QDir(folder).filePath(QStringLiteral("install-interception.exe")))+QStringLiteral("\" /install");
 }
 
 // Shared by the normal tar path and the PowerShell fallback. Neither opens a console.

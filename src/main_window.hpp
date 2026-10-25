@@ -59,32 +59,8 @@ inline void roundWindow(QWidget* window){
 class MainWindow final : public QWidget {
     r6::Engine& engine_;
     std::filesystem::path config_path_;
-    QPointer<Section> mouse_setup_;QPointer<QSpinBox> mouse_dpi_;
-    QPointer<QDoubleSpinBox> mouse_horizontal_,mouse_vertical_,mouse_multiplier_;
-    QPointer<QLabel> mouse_setup_status_;QPointer<QPushButton> mouse_rescale_,mouse_save_;
-    std::optional<r6::SensitivitySetup> mouse_draft_;QString mouse_source_;bool mouse_setup_dirty_=false;
-    QPointer<QSpinBox> converter_dpi_;
-    QPointer<QDoubleSpinBox> converter_horizontal_,converter_vertical_,converter_multiplier_;
-    QPointer<QComboBox> profile_sets_;
-    QPointer<QLineEdit> converter_name_;
-    QPointer<QLabel> converter_validation_;
-    std::optional<r6::SensitivitySetup> converter_draft_;
-    std::optional<r6::Config> converter_import_;
-    QString converter_import_name_,converter_name_draft_;
-    r6::SensitivitySetup converterSourceInput() const;
-    void importForConversion();
-    void resetConverter();
-    void manageProfileSet(int action);
-    QString askProfileSetName(const QString& initial,const QString& action);
+    void buildDesktopLayout(QVBoxLayout* layout);
     bool confirmProfileAction(const QString& title,const QString& body,const QString& action);
-    void buildMouseSetup(QVBoxLayout* column);
-    r6::SensitivitySetup mouseSetupInput() const;
-    void updateMouseSetupControls();
-    void readGameSensitivity(bool chooseFile=false);
-    bool saveMouseSetup();
-    void rescaleMouseProfiles();
-    void checkMouseSensitivityChange();
-    void buildGoofyLayout(QVBoxLayout* layout);
     QListWidget* operators_=nullptr;QListWidget* favorites_list_=nullptr;QLineEdit* search_=nullptr;
     QLabel *favorites_title_=nullptr,*preferences_title_=nullptr;QWidget* favorites_group_=nullptr;
     IconButton* back_=nullptr;QSet<QString> favorites_;bool imported_ui_pending_=false;
@@ -92,7 +68,7 @@ class MainWindow final : public QWidget {
     RaisedPanel* panel_=nullptr;QScrollArea* sidebar_scroll_=nullptr;
     QWidget *sidebar_=nullptr,*favorites_header_=nullptr,*favorites_heading_=nullptr,*operators_header_=nullptr,*sidebar_search_box_=nullptr,*settings_nav_=nullptr;
     QVector<SettingsNavButton*> settings_nav_buttons_;bool settings_sidebar_=false;
-    IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;StickerStarButton* sidebar_favorites_=nullptr;
+    IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;FavoriteStarButton* sidebar_favorites_=nullptr;
     QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false,sidebar_animating_=false,favorites_shown_=false;
     QVector<QWidget*> preference_categories_;int preference_category_=0;
     bool glass_active_=false,glass_applied_=false,glass_lightweight_=false;
@@ -537,7 +513,10 @@ class MainWindow final : public QWidget {
     void resolveInstaller(){
         const auto found=engine_.dry_run()?QString():driver_setup::locate();
         driver_installer_=driver_setup::installerFolder(found);
-        if(driver_code_)driver_code_->setText(driver_setup::installCommand(driver_installer_));
+        if(driver_code_){
+            driver_code_->setText(driver_installer_.isEmpty()?text(UiText::DriverStepFilesBody):driver_setup::installCommand(driver_installer_));
+            driver_code_->setEnabled(!driver_installer_.isEmpty());
+        }
     }
     void checkDriver(){
         driver_input::retryInitialization();
@@ -580,7 +559,8 @@ class MainWindow final : public QWidget {
                 showNotice(text(UiText::DriverDownloadFailed),true,true);return;
             }
             file.close();
-            if(!driver_setup::extract(archive,root,&error)){
+            driver_setup::VerifiedFile verifiedArchive;
+            if(!verifiedArchive.open(archive,driver_setup::sha256())||!driver_setup::extract(archive,root,&error)){
                 diagnostic("driver extract",error);
                 showNotice(text(UiText::DriverDownloadFailed),true,true);return;
             }
@@ -837,7 +817,6 @@ class MainWindow final : public QWidget {
         }
         const bool saved=!save_blocked_&&engine_.save(config_path_,uiBytes);
         if(saved){
-            mouse_setup_dirty_=false;
             imported_ui_pending_=false;
             updateSavePresentation("saved");save_feedback_.start();
             if(celebrate&&engine_.snapshot().sound)sound::playSuccess();
@@ -1042,7 +1021,7 @@ public:
         notice_close_=new MonoButton;notice_close_->setObjectName("secondary");notice_close_->setMinimumHeight(40);
         connect(notice_close_,&QPushButton::clicked,this,[this]{notice_timer_.stop();notice_bar_->hide();});
         noticeLayout->addWidget(notice_close_);auto* noticeShadow=new QGraphicsDropShadowEffect(notice_bar_);noticeShadow->setBlurRadius(0);noticeShadow->setOffset(3,4);notice_bar_->setGraphicsEffect(noticeShadow);notice_bar_->hide();
-        buildGoofyLayout(layout);
+        buildDesktopLayout(layout);
         const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);item->setToolTip(name);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+operatorAssetName(name)+".svg");if(!renderer.isValid())icon_failures_<<name;}
         operators_->setCurrentRow(c.selected);
         favorites_=readFavorites();refreshFavorites();

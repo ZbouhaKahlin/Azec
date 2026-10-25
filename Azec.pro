@@ -4,7 +4,7 @@ CONFIG -= debug debug_and_release
 TEMPLATE = app
 TARGET = Azec
 DESTDIR = $$OUT_PWD/release
-SOURCES += src/app.cpp src/phone_bridge.cpp src/profile_transfer.cpp src/mouse_setup.cpp src/engine.cpp src/core.cpp third_party/qrcodegen/qrcodegen.cpp
+SOURCES += src/app.cpp src/phone_bridge.cpp src/profile_transfer.cpp src/engine.cpp src/core.cpp third_party/qrcodegen/qrcodegen.cpp
 HEADERS += src/mono_controls.hpp src/engine.hpp src/core.hpp src/ui_widgets.hpp src/profile_store.hpp src/phone_server.hpp src/main_window.hpp src/app_style.hpp src/theme.hpp src/startup.hpp src/diagnostics.hpp src/pairing_qr.hpp src/hotkeys.hpp src/game_focus.hpp src/sound.hpp
 HEADERS += src/version.hpp src/update_check.hpp src/strings.hpp src/flags.hpp src/lang_en.hpp src/lang_pt.hpp src/lang_fr.hpp src/lang_es.hpp src/lang_de.hpp src/lang_ar.hpp src/lang_he.hpp src/lang_zh.hpp src/lang_ja.hpp src/profile_transfer.hpp third_party/qrcodegen/qrcodegen.hpp
 contains(CONFIG, verification) {

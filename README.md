@@ -1,6 +1,6 @@
 # Azec
 
-This is the **MonoCode** branch: the desktop redesign with Dark and Light themes. The original Goofy interface remains on main; the download below is the published release.
+Azec uses the **MonoCode** design with Dark and Light themes. The redesign lives on `main`; the original interface is retained on the `goofy` branch.
 
 A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 operators, independent primary and secondary weapon settings, and a companion phone interface on your local network.
 
@@ -10,7 +10,7 @@ A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 op
 | --- | --- |
 | ![Azec Dark theme](docs/ui-dark.png) | ![Azec Light theme](docs/ui-light.png) |
 
-Current MonoCode desktop, captured with example profiles. The download above is the published release; these screenshots show this branch.
+Current MonoCode desktop, captured with example profiles. The download above is the published release; these screenshots show the current design.
 
 ## Get started
 
@@ -27,8 +27,8 @@ Azec uses **Interception** for relative mouse movement and rapid-fire output. Se
 
 Open **Settings → General → Interception driver** and follow the guide:
 
-1. **Download and place** downloads the pinned official archive, verifies its SHA-256, and places the DLL in Azec's persistent data folder. **Manual download** opens the upstream release if you prefer to download it yourself.
-2. **Copy command** copies the installer command with the correct local path. Run it in an Administrator command prompt, then restart Windows.
+1. **Download and place** downloads the pinned official archive, verifies its SHA-256, and places the DLL in Azec's persistent data folder. Azec also verifies the DLL before copying or loading it, including manually downloaded and legacy copies. **Manual download** opens the upstream release if you prefer to download it yourself.
+2. **Copy command** becomes available once Azec finds the verified installer and copies its command with the correct local path. Run it in an Administrator command prompt, then restart Windows.
 3. **Restart as administrator** relaunches Azec with the access required by the driver.
 4. **Check driver** refreshes its status. **Test driver** sends a short cursor movement to the right and back, allowing you to check output before opening the game.
 
@@ -62,7 +62,7 @@ If the page does not open:
 - Check that both devices can reach one another on the local network, and allow Azec on the Windows private-network firewall prompt.
 - If the desktop reports that the server could not start, use **Retry**. The displayed address includes the actual selected port.
 
-Phone access can be disabled in Settings. The page bundles its fonts and assets and does not require a separate phone app. Browser Add to Home Screen may provide a convenient shortcut; installation behavior depends on the browser. Phone images in this README are browser captures placed in device mockups.
+Phone access can be disabled in Settings. The page uses system fonts and bundled assets and does not require a separate phone app. Browser Add to Home Screen may provide a convenient shortcut; installation behavior depends on the browser.
 
 ## Personalize your workspace
 

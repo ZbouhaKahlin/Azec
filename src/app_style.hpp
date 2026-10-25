@@ -4,12 +4,11 @@
 
 // Monocode materials (github.com/hardbeat920/monocode, MIT): hairline
 // separators, translucent content fills, small radii, one blue accent and a
-// quiet motion language. Placeholders: %1 accent hex, %2 text on accent;
+// quiet motion language. Placeholder: %1 accent hex;
 // material tokens follow below and carry their alpha.
 inline QString applicationStyle(const QColor& accent){
 
     const QString accentHex=accent.name();
-    const QString onAccent=kbtheme::readableOn(accent).name();
     QString style=QString::fromUtf8(R"CSS(
         QWidget { color:$ink; font-family:'Segoe UI'; font-size:13px; font-weight:400; }
         QWidget#mainWindow { background:transparent; }
@@ -119,8 +118,8 @@ inline QString applicationStyle(const QColor& accent){
         QLabel#bindingHint[invalid="true"] { color:$danger; }
         QLabel#palestineArabic { color:$ink; font-size:24px; font-weight:600; }
         QToolTip { background:$surface; color:$ink; border:1px solid $outline; border-radius:6px; padding:6px 8px; font-size:12px; }
-    )CSS").arg(accentHex,onAccent);
-    const std::pair<const char*,QColor> tokens[]={{"$dialog",kbtheme::dialog},{"$sliderThumb",kbtheme::sliderThumb},{"$successInk",kbtheme::successInk},{"$scrollbarHover",kbtheme::content(.36)},{"$scrollbar",kbtheme::content(.22)},{"$ink",kbtheme::ink},{"$paper",kbtheme::paper},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$lime",kbtheme::lime},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$chipInk",kbtheme::chipInk},{"$danger",kbtheme::danger}};
+    )CSS").arg(accentHex);
+    const std::pair<const char*,QColor> tokens[]={{"$dialog",kbtheme::dialog},{"$sliderThumb",kbtheme::sliderThumb},{"$successInk",kbtheme::successInk},{"$scrollbarHover",kbtheme::content(.36)},{"$scrollbar",kbtheme::content(.22)},{"$ink",kbtheme::ink},{"$surface",kbtheme::surface},{"$yellow",kbtheme::yellow},{"$muted",kbtheme::muted},{"$soft",kbtheme::lavender},{"$outline",kbtheme::outline},{"$card",kbtheme::card},{"$danger",kbtheme::danger}};
     for(const auto& token:tokens)style.replace(QLatin1String(token.first),kbtheme::css(token.second));
     return style;
 }

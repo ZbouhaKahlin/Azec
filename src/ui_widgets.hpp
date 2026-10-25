@@ -208,7 +208,7 @@ protected:
 };
 
 // Quiet monochrome section icons: a plain stroke, accent while selected.
-enum class SettingsGlyph{General,Shortcuts,Phone,Profile,Mouse};
+enum class SettingsGlyph{General,Shortcuts,Phone,Profile};
 
 inline QPainterPath settingsGlyphShape(SettingsGlyph glyph){
     QPainterPath shape;
@@ -223,12 +223,6 @@ inline QPainterPath settingsGlyphShape(SettingsGlyph glyph){
     case SettingsGlyph::Profile:
         shape.addRoundedRect(QRectF(-9,-8,18,5),1.5,1.5);
         shape.moveTo(-7,-3);shape.lineTo(-7,8);shape.lineTo(7,8);shape.lineTo(7,-3);
-        break;
-    case SettingsGlyph::Mouse:
-        shape.moveTo(-9,-5);shape.lineTo(9,-5);shape.lineTo(5,-9);
-        shape.moveTo(9,-5);shape.lineTo(5,-1);
-        shape.moveTo(9,5);shape.lineTo(-9,5);shape.lineTo(-5,1);
-        shape.moveTo(-9,5);shape.lineTo(-5,9);
         break;
     }
     return shape;
@@ -254,11 +248,10 @@ inline void paintSettingsGlyphDetails(QPainter& painter,SettingsGlyph glyph,cons
     case SettingsGlyph::Profile:
         painter.drawLine(QPointF(-2,1),QPointF(2,1));
         break;
-    case SettingsGlyph::Mouse:break;
     }
 }
 
-inline void paintStickerGlyph(QPainter& painter,const QRectF& box,SettingsGlyph glyph,bool active){
+inline void paintSettingsGlyph(QPainter& painter,const QRectF& box,SettingsGlyph glyph,bool active){
     const QColor stroke=active?kbtheme::ink:kbtheme::content(.5);
     const QPainterPath shape=settingsGlyphShape(glyph);
     const qreal scale=box.width()/24.0;
@@ -268,7 +261,7 @@ inline void paintStickerGlyph(QPainter& painter,const QRectF& box,SettingsGlyph 
     painter.restore();
 }
 
-inline QPainterPath stickerStarShape(){
+inline QPainterPath favoriteStarShape(){
     constexpr qreal pi=3.14159265358979323846;QPainterPath path;
     for(int point=0;point<10;++point){
         const qreal radius=point%2?4.8:10.4,angle=-pi/2+point*pi/5;
@@ -278,15 +271,15 @@ inline QPainterPath stickerStarShape(){
     path.closeSubpath();return path;
 }
 
-class StickerStarButton final : public QAbstractButton {
+class FavoriteStarButton final : public QAbstractButton {
 public:
-    explicit StickerStarButton(QWidget* parent=nullptr):QAbstractButton(parent){
+    explicit FavoriteStarButton(QWidget* parent=nullptr):QAbstractButton(parent){
         setFixedSize(34,34);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);
     }
 protected:
     void paintEvent(QPaintEvent*) override{
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
-        const QPainterPath shape=stickerStarShape();
+        const QPainterPath shape=favoriteStarShape();
         painter.save();painter.translate((width()-26)/2.0,(height()-26)/2.0);painter.scale(26.0/24.0,26.0/24.0);painter.translate(12,12);
         painter.setPen(QPen(isDown()?kbtheme::ink:kbtheme::muted,1.7,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));painter.setBrush(Qt::NoBrush);painter.drawPath(shape);
         painter.restore();
@@ -321,7 +314,7 @@ protected:
         const int art=22;const qreal compactX=(width()-art)/2.0,iconX=compactX+(16-compactX)*progress;
         const bool rtl=QApplication::layoutDirection()==Qt::RightToLeft;
         const QRectF iconRect(rtl?width()-iconX-art:iconX,(height()-art)/2.0,art,art);
-        paintStickerGlyph(painter,iconRect,glyph_,isChecked());
+        paintSettingsGlyph(painter,iconRect,glyph_,isChecked());
         if(progress>0.01){
             QFont nameFont=font();nameFont.setPixelSize(13);nameFont.setWeight(QFont::Medium);
             QFont hintFont=font();hintFont.setPixelSize(11);hintFont.setWeight(QFont::Normal);
@@ -340,7 +333,7 @@ protected:
     }
 };
 
-// Monocode switch: a quiet pill whose white knob travels between a 10% well
+// Monocode switch: a quiet pill whose white knob travels between a 20% well
 // and the accent fill. No faces, no outlines — the state is the fill itself.
 class Toggle final : public QAbstractButton {
     QVariantAnimation motion_;
@@ -523,14 +516,14 @@ public:
         qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(iconX,r.top()+4,operatorIconSize,operatorIconSize));
         QFont f=option.font;f.setFamily("Segoe UI");f.setPixelSize(13);f.setWeight(QFont::Normal);p->setFont(f);p->setPen(kbtheme::ink);
         p->setClipRect(r);p->setOpacity(std::clamp((r.width()-58.0)/116.0,0.0,1.0));
+        const int nameWidth=qMax(0,visibleRight-r.left()-73);
+        const QFontMetrics metrics(f);
+        const auto name=metrics.elidedText(index.data().toString(),Qt::ElideRight,nameWidth);
         if(rtl){
-            // Qt mirrors rect alignments with the layout direction, so the
-            // mirrored column places its text explicitly instead.
-            const QString label=index.data().toString();const QFontMetrics metrics(f);
-            p->drawText(QPoint(qMax(r.left(),visibleRight-65-metrics.horizontalAdvance(label)),r.top()+(r.height()+metrics.ascent()-metrics.descent())/2),label);
+            // Place mirrored text explicitly, retaining the original baseline.
+            p->drawText(QPoint(qMax(r.left(),visibleRight-65-metrics.horizontalAdvance(name)),r.top()+(r.height()+metrics.ascent()-metrics.descent())/2),name);
         }else{
-            const QRect textRect(r.left()+65,r.top(),127,r.height());
-            p->drawText(textRect,Qt::AlignVCenter|Qt::AlignLeft,index.data().toString());
+            p->drawText(QRect(r.left()+65,r.top(),nameWidth,r.height()),Qt::AlignVCenter|Qt::AlignLeft,name);
         }
         if(selected&&(option.state&QStyle::State_HasFocus)){
             p->setOpacity(1);p->setBrush(Qt::NoBrush);p->setPen(QPen(accent_(),1.5));p->drawRoundedRect(pill.adjusted(2,2,-2,-2),9,9);
@@ -781,18 +774,18 @@ protected:
 };
 
 // Plain section heading: quiet, uppercase-free, no chip and no tilt.
-class StickerLabel final : public QLabel {
+class SectionHeading final : public QLabel {
 public:
-    StickerLabel(const QString& text,const QColor& color,QWidget* parent=nullptr):QLabel(parent){Q_UNUSED(color);setText(text);setObjectName("sticker");setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Fixed);}
-    QSize sizeHint() const override {const QFontMetrics metrics(stickerFont());return {metrics.horizontalAdvance(text())+2,26};}
-    // Long translations must never widen the 200 px sidebar: the chip elides instead.
+    SectionHeading(const QString& text,QWidget* parent=nullptr):QLabel(parent){setText(text);setObjectName("sectionHeading");setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Fixed);}
+    QSize sizeHint() const override {const QFontMetrics metrics(headingFont());return {metrics.horizontalAdvance(text())+2,26};}
+    // Long translations must never widen the 200 px sidebar: the heading elides instead.
     QSize minimumSizeHint() const override {return {qMin(sizeHint().width(),150),26};}
-    static QFont stickerFont(){QFont font=QApplication::font();font.setPixelSize(13);font.setWeight(QFont::DemiBold);return font;}
+    static QFont headingFont(){QFont font=QApplication::font();font.setPixelSize(13);font.setWeight(QFont::DemiBold);return font;}
 protected:
     void paintEvent(QPaintEvent*) override {
 
         QPainter painter(this);painter.setRenderHint(QPainter::TextAntialiasing);
-        const QFontMetrics metrics(stickerFont());painter.setFont(stickerFont());painter.setPen(kbtheme::ink);
+        const QFontMetrics metrics(headingFont());painter.setFont(headingFont());painter.setPen(kbtheme::ink);
         painter.drawText(QRectF(rect()),Qt::AlignVCenter|Qt::AlignLeft,metrics.elidedText(text(),Qt::ElideRight,qMax(8.0,width()-2.0)));
     }
 };

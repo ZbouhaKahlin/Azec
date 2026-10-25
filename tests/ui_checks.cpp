@@ -446,21 +446,6 @@ QJsonObject MainWindow::selfTest(const QString& output){
         invalidUi.open(QIODevice::WriteOnly|QIODevice::Truncate);invalidUi.write("{\"version\":1,\"interface\":\"retired\",\"favorites\":[\"Ash\"],\"colorTheme\":\"deep-sea\",\"sidebarCollapsed\":true}");invalidUi.close();
         uiprefs::update(uiFixture,[](QJsonObject& root){root["sidebarCollapsed"]=false;});QJsonObject migratedUi;uiprefs::readDocument(uiprefs::filePath(uiFixture),migratedUi);
         checks["obsolete_keys_removed_without_losing_preferences"]=!migratedUi.contains("interface")&&!migratedUi.contains("colorTheme")&&migratedUi["favorites"].toArray().contains("Ash")&&!uiprefs::sidebarCollapsed(uiFixture);
-        // Mouse setup uses the production handlers with an isolated INI file.
-        if(pages_->currentWidget()!=preferences_)showPreferences();chooseSettingsCategory(mouse_setup_category_);wait(220);
-        checks["mouse_setup_rejects_incomplete_values"]=mouse_save_&&!mouse_save_->isEnabled()&&mouse_rescale_&&!mouse_rescale_->isEnabled();
-        const auto iniPath=QString::fromStdWString((config_path_.parent_path()/L"GameSettings-fixture.ini").wstring());
-        const QByteArray iniBytes="[INPUT]\nMouseSensitivityHorizontal=50\nMouseSensitivityVertical=50\nMouseSensitivityMultiplierUnit=0.02\n";
-        {QFile ini(iniPath);ini.open(QIODevice::WriteOnly);ini.write(iniBytes);}
-        mouse_dpi_->setValue(800);mouse_source_=iniPath;readGameSensitivity();
-        const auto beforeSetup=engine_.snapshot().bytes();
-        checks["mouse_setup_reads_fixture_without_changing_profiles"]=mouse_horizontal_->value()==50&&mouse_vertical_->value()==50&&mouse_save_->isEnabled()&&engine_.snapshot().bytes()==beforeSetup;
-        {r6::Engine restored(true);checks["mouse_setup_save_persists_without_rescaling"]=saveMouseSetup()&&restored.load(config_path_)&&restored.snapshot().sensitivity.valid()&&restored.snapshot().sensitivity.dpi==800&&restored.snapshot().bytes()==beforeSetup;}
-        const auto beforeRescale=engine_.snapshot();mouse_horizontal_->setValue(100);mouse_vertical_->setValue(100);
-        QTimer::singleShot(40,this,[]{if(auto* dialog=qobject_cast<QDialog*>(QApplication::activeModalWidget()))dialog->accept();});
-        rescaleMouseProfiles();
-        checks["mouse_setup_confirmed_rescale_changes_profiles_and_marks_dirty"]=unsaved_&&qAbs(engine_.snapshot().operators[0].vertical-beforeRescale.operators[0].vertical*.5f)<.001f;
-        {QFile ini(iniPath);ini.open(QIODevice::ReadOnly);checks["mouse_setup_never_writes_game_ini"]=ini.readAll()==iniBytes;}
         testDriver();checks["dry_run_driver_test_never_injects_input"]=engine_.injected_events==0;
         QJsonObject report;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("monocode");report["checks"]=checks;report["rounding_method"]=QStringLiteral("painted antialiased corners (per-pixel alpha over the system blur)");report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="Interception (suppressed in dry-run)";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }

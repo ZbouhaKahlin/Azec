@@ -71,7 +71,7 @@ Input and output behaviour is only partially automatic. The fixtures run with `-
 Available automated coverage:
 
 - The Recoil switch updates live and starts off on launch; per-profile Rapid fire persists and reloads. Removed Master enable settings are rejected by the phone API.
-- The game-focus gate recognises the explicit Rainbow Six executable names and rejects unrelated processes, including the BattlEye helper. Window titles never authorize output.
+- The game-focus gate recognises executable names beginning with `RainbowSix`, excluding names containing `_BE`, with a fallback for window titles containing “Rainbow Six”. This is a focus heuristic, not process authentication.
 - Non-panic bindings accept any supported key; panic retains the stricter safe-key filter, and conflicting assignments are rejected.
 - Browsing the roster does not mark the profile dirty, and the wheel over a number field does not change a value.
 - The pairing code chip, copy actions, new-code rotation, and the server-failure retry path are exercised in the desktop and browser suites.
@@ -91,7 +91,7 @@ Only when visible manual inspection is explicitly requested, launch the absolute
 
 Automated browser checks are emulation, not physical iPhone or in-game testing. State actual checks and limitations in delivery notes.
 
-## Console checks for mouse setup
+## Console checks for stored sensitivity compatibility
 
 `tests/sensitivity_checks.pro` builds `Azec-sensitivity-checks.exe` with Qt Core only, without opening the desktop app. Build it using the pinned Qt qmake and nmake in `.build/sensitivity-checks`. Run `release/Azec-sensitivity-checks.exe <fresh-empty-fixture>` with the Qt kit's `bin` on PATH and an absolute, newly created fixture directory under `.build/verification`.
 

@@ -50,7 +50,7 @@ An explicit screenshot request authorizes the requested captures, not a test sui
 - **Profiles and output:** `src/core.hpp` / `src/core.cpp` own binary compatibility and movement arithmetic. `src/engine.hpp` / `src/engine.cpp` synchronize configuration and run input workers. `src/profile_store.hpp`, `src/ui_preferences.hpp`, and `src/profile_transfer.*` own JSON preferences and backups.
 - **Driver:** `src/driver_input.hpp` dynamically loads Interception. `src/driver_setup.hpp` and `src/driver_download.hpp` own download, verification, and file placement.
 - **Phone:** `src/phone_bridge.cpp` maps requests to application state. `src/phone_server.hpp` validates and serves requests; `src/lan_address.hpp` selects the PC address. `assets/phone.html` is the self-contained client, embedded through `assets/operators.qrc`.
-- **Converter and profile sets:** `src/mouse_setup.cpp`, `src/sensitivity.hpp`, and `src/profile_sets.hpp` own Settings conversion, game-settings discovery, and named weapon-profile sets.
+- **Stored sensitivity and profile sets:** `src/sensitivity.hpp` and `src/profile_sets.hpp` retain sensitivity metadata, conversion arithmetic, and named weapon-profile compatibility for saved data and backups. The converter UI is removed.
 - **Language and assets:** `src/strings.hpp`, `src/lang_*.hpp`, and `src/flags.hpp` own localization. Icons, flags, and phone assets are bundled; the design/sound reference notices live in `licenses/`.
 - **Verification:** `tests/` contains separate checks and isolation helpers. Verification executables and fixture DLLs never belong in a release.
 
@@ -64,8 +64,8 @@ Compatibility is a product requirement. Preserve the existing **3,734-byte** `r6
 - Keep save staging, atomic replacement, and rollback across configuration files. A failure must retain unsaved edits and show a persistent error. Never replace, commit, or package personal configuration as defaults.
 - A secondary profile copies primary settings only on first enable. Disabling preserves its edits. Selecting an operator starts on primary and persists only the selection, without marking profiles dirty or saving unrelated edits.
 - Accept backups containing 71–78 operators, matching records by name and preserving operators absent from an older backup. Imported profiles and UI preferences remain pending until Save; Discard retains the previously saved files.
-- Named sets live in the weapon sidecar and backups; switching preserves pending edits through the shared Engine. Converter imports never apply app preferences and create a separate converted set while preserving current and original profiles. Library changes use the existing Save/Discard path. The Converter & profiles management page is removed; preserve existing library data and backup compatibility. Phone edits operate on the same active set.
-- Mouse DPI is reference metadata. Rescale recoil using old/new game sensitivity and multiplier per axis, preview the change, and reject the entire operation if any affected profile exceeds its range. Backups include numeric setup values, not the local INI path. Dry-run instances skip automatic game-settings discovery.
+- Named sets live in the weapon sidecar and backups. The Converter & profiles management page and its unused handlers are removed; preserve existing library data, active-set edits, and backup compatibility. Phone edits operate on the same active set.
+- Mouse DPI remains reference metadata in stored sensitivity values. Retain the conversion arithmetic for compatibility; there is no sensitivity-converter UI or automatic game-settings discovery. Backups include numeric setup values, not the local INI path.
 
 ## Output and shortcuts
 
@@ -73,7 +73,7 @@ Recoil is a live output switch and starts off on launch. Rapid fire and shot del
 
 Preserve migration from legacy `rapidActive` onto every primary and secondary profile. New saves write `perProfileRapid` and per-profile flags, not a shared rapid-fire switch.
 
-- Interception sends relative mouse movement and left-button strokes. Load `interception.dll` at runtime; do not link or bundle the driver. Keep its files in the persistent data folder, preserve migration from adjacent DLLs, and verify the pinned setup archive's SHA-256 before extraction.
+- Interception sends relative mouse movement and left-button strokes. Load `interception.dll` at runtime; do not link or bundle the driver. Keep its files in the persistent data folder, preserve migration from adjacent DLLs, and verify the pinned setup archive's SHA-256 before extraction. Verify every DLL against the pinned x64 hash before copying or loading, and guard the file and resolved parent directories against replacement while loading. Only offer the installer command for the pinned installer.
 - **Only in Rainbow Six** is on by default and gates output and application shortcuts by the foreground game. Panic is also ignored while Azec is active. Preserve **Only while aiming**. These are focus/interaction rules; do not make anti-cheat guarantees.
 - Preserve fractional accumulation, recoil/fire timing, and stop behavior unless the request concerns them. Reset fractional movement when the active operator or weapon changes. Access worker configuration through Engine synchronization; keep widgets on the Qt GUI thread.
 - Default weapon bindings are `1` and `2`. Show/hide, recoil-toggle, and weapon bindings accept the user's chosen keys, including arrows, numpad, mouse side buttons, modifiers, and Windows keys. Reject duplicates with the visible “key already used” message. Panic keeps its stricter safe-key filter.

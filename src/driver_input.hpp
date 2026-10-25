@@ -9,7 +9,7 @@
 // The library is loaded at runtime and never linked or shipped with Azec: the
 // signed kernel driver stays the user's own installation, and `interception.dll`
 // is kept in Azec's persistent driver folder. Legacy adjacent/system copies
-// remain supported. Strokes produced here
+// remain supported after verification against the pinned upstream DLL. Strokes produced here
 // enter the mouse device stack below the "injected input" flag that the game
 // now filters, while SendInput and G HUB scripting both carry that flag.
 //
@@ -47,18 +47,28 @@ using IsMouse=int(*)(int);
 
 inline HMODULE loadModule(){
     const auto target=driver_setup::dllTarget();
-    if(!QFileInfo::exists(target)){
-        const auto adjacent=QDir(QCoreApplication::applicationDirPath()).filePath("interception.dll");
-        const auto source=QFileInfo::exists(adjacent)?adjacent:driver_setup::findDll(driver_setup::workRoot());
-        if(!source.isEmpty())driver_setup::place(source);
-    }
-    const auto load=[](const QString& path){return LoadLibraryExW(reinterpret_cast<LPCWSTR>(path.utf16()),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32);};
+    const auto load=[](const QString& path)->HMODULE{
+        driver_setup::VerifiedFile file;
+        if(!file.open(path,driver_setup::dllSha256()))return nullptr;
+        // The pinned DLL only needs Windows dependencies. Never search its
+        // writable directory for additional executable code.
+        return LoadLibraryExW(reinterpret_cast<LPCWSTR>(file.path().utf16()),nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
+    };
     if(const HMODULE module=load(target))return module;
-    if(const HMODULE module=load(QDir(QCoreApplication::applicationDirPath()).filePath("interception.dll")))return module;
+    {
+        const auto adjacent=QDir(QCoreApplication::applicationDirPath()).filePath("interception.dll");
+        if(driver_setup::place(adjacent)){
+            if(const HMODULE module=load(target))return module;
+        }
+        const auto source=driver_setup::findDll(driver_setup::workRoot());
+        if(!source.isEmpty()&&driver_setup::place(source)){
+            if(const HMODULE module=load(target))return module;
+        }
+        if(const HMODULE module=load(adjacent))return module;
+    }
     wchar_t directory[MAX_PATH]{};
     if(!GetSystemDirectoryW(directory,MAX_PATH))return nullptr;
-    std::wstring path(directory);path+=L"\\interception.dll";
-    return LoadLibraryW(path.c_str());
+    return load(QString::fromWCharArray(directory)+QStringLiteral("/interception.dll"));
 }
 
 struct Backend {

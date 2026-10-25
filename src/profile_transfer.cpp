@@ -1,6 +1,12 @@
 #include "main_window.hpp"
 #include "profile_transfer.hpp"
 
+bool MainWindow::confirmProfileAction(const QString& title,const QString& body,const QString& action){
+    QDialog dialog(this,Qt::Dialog|Qt::FramelessWindowHint);dialog.setObjectName("helpDialog");dialog.setAttribute(Qt::WA_StyledBackground);dialog.setWindowTitle(title);dialog.setFixedWidth(420);
+    auto* layout=new QVBoxLayout(&dialog);layout->setContentsMargins(24,20,24,22);layout->setSpacing(16);auto* heading=label(title,"cardTitle");heading->setWordWrap(true);layout->addWidget(heading);auto* description=label(body);description->setTextFormat(Qt::PlainText);description->setWordWrap(true);layout->addWidget(description);
+    auto* row=new QHBoxLayout;auto* cancel=new MonoButton(text(UiText::Cancel));cancel->setObjectName("secondary");auto* apply=new MonoButton(action);apply->setObjectName("save");row->addWidget(cancel);row->addWidget(apply);layout->addLayout(row);
+    connect(cancel,&QPushButton::clicked,&dialog,&QDialog::reject);connect(apply,&QPushButton::clicked,&dialog,&QDialog::accept);dialog.adjustSize();roundWindow(&dialog);dialog.move(frameGeometry().center()-dialog.rect().center());return dialog.exec()==QDialog::Accepted;
+}
 void MainWindow::exportProfiles(){
     const auto path=QFileDialog::getSaveFileName(this,text(UiText::ExportBackup),"azec-backup.json","JSON (*.json)",nullptr,QFileDialog::DontUseNativeDialog);
     if(path.isEmpty())return;
@@ -24,7 +30,6 @@ bool MainWindow::applyBackup(const QByteArray& bytes){
     }
     imported_ui_pending_=true;favorites_=favorites;
     engine_.edit([&](r6::Config& current){current=config;});
-    resetConverter();mouse_setup_dirty_=false;
     if(options.gameFocusOnly)engine_.game_focus_only=*options.gameFocusOnly;
     if(options.adsOnly)engine_.ads_only=*options.adsOnly;
     if(config.phone_enabled)phone_->start();else phone_->stop();
