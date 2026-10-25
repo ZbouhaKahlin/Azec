@@ -176,4 +176,10 @@ inline const char* const lang_fr[]={
     "Passez au profil secondaire distinct lorsqu’il est activé.",
     "Les paramètres endommagés ont été conservés dans %1. Les valeurs illisibles utilisent les valeurs par défaut ; vérifiez vos paramètres avant d’enregistrer.",
     "Impossible de conserver %1. L’enregistrement est bloqué pour protéger vos paramètres. Sauvegardez ce fichier et vérifiez ses autorisations.",
+    "Chargement des composants",
+    "Préparation des profils",
+    "Chargement des opérateurs",
+    "Préparation des commandes",
+    "Préparation de l’espace de travail",
+    "Prêt",
 };

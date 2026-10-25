@@ -34,9 +34,10 @@ int main(int argc,char** argv){
         if(!dryrun)QMessageBox::warning(nullptr,QStringLiteral("Azec"),uiText(UiText::StartupLockFailure,probe.language));
         return 3;
     }
-    r6::Engine engine(dryrun);const auto recovery=loadConfiguration(engine,configPath);DesktopTranslator translator([&]{return engine.snapshot().language;});app.installTranslator(&translator);engine.start();MainWindow window(engine,configPath);window.setStartupNotice(recovery.notice,recovery.blockSaving);instance.onActivate(&window);window.show();if(!phoneInfo.isEmpty())window.writePhoneInfo(phoneInfo);
     const auto captureFolder=azec_paths::argument("--capture-ui=");
-    if(dryrun&&!selftest&&!captureFolder.isEmpty())QTimer::singleShot(900,&window,[&window,captureFolder]{window.captureDocumentation(captureFolder);});
+    r6::Engine engine(dryrun);const auto recovery=loadConfiguration(engine,configPath);DesktopTranslator translator([&]{return engine.snapshot().language;});app.installTranslator(&translator);engine.start();MainWindow window(engine,configPath);window.setStartupNotice(recovery.notice,recovery.blockSaving);instance.onActivate(&window);
+    if(!selftest)window.prepareStartup([&window,captureFolder,dryrun]{if(dryrun&&!captureFolder.isEmpty())QTimer::singleShot(300,&window,[&window,captureFolder]{window.captureDocumentation(captureFolder);});});
+    window.show();if(!phoneInfo.isEmpty())window.writePhoneInfo(phoneInfo);
 #ifdef AZEC_UI_TESTS
     if(selftest)QTimer::singleShot(700,&window,[&]{const auto report=window.selfTest(output);QSaveFile file(output+"/ui-verification.json");const auto bytes=QJsonDocument(report).toJson();const bool written=file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();if(!written)diagnostic("verification report",file.errorString());testResult=written&&report["passed"].toBool()?0:2;QTimer::singleShot(150,&window,[&]{window.finishVerification();});});else
 #endif

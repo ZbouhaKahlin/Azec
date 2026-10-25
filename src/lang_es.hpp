@@ -176,4 +176,10 @@ inline const char* const lang_es[]={
     "Cambia al perfil secundario independiente cuando esté activado.",
     "Los ajustes dañados se conservaron en %1. Los valores que no se pudieron leer usan los predeterminados; revisa los ajustes antes de guardar.",
     "No se pudo conservar %1. El guardado está bloqueado para proteger tus ajustes. Haz una copia de este archivo y revisa sus permisos.",
+    "Cargando componentes",
+    "Preparando perfiles",
+    "Cargando operadores",
+    "Preparando controles",
+    "Preparando el espacio de trabajo",
+    "Listo",
 };

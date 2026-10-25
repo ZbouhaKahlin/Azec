@@ -599,10 +599,26 @@ public:
 class BrandLabel final : public QLabel {
 public:
     BrandLabel(){
-        setText("Azec");setObjectName("brand");setAccessibleName("Azec");setAlignment(Qt::AlignCenter);
-        QFont brand=QApplication::font();brand.setPixelSize(13);brand.setWeight(QFont::Medium);brand.setLetterSpacing(QFont::AbsoluteSpacing,0.4);
-        setFont(brand);setFixedHeight(36);
+        setText("zec");setObjectName("brand");setAccessibleName("Azec");setFixedSize(98,36);
     }
+    // The mark is the A. Loader and header paint the very same lockup.
+    static QPixmap artwork(qreal ratio){
+        const QString key=QString("azec/brand/%1/%2").arg(kbtheme::ink.name()).arg(ratio,0,'g',12);
+        QPixmap cached;if(QPixmapCache::find(key,&cached))return cached;
+        QPixmap mark(QSize(64,64)*ratio);mark.setDevicePixelRatio(ratio);mark.fill(Qt::transparent);
+        {QPainter p(&mark);QSvgRenderer svg(QStringLiteral(":/ui/logo.svg"));svg.render(&p,QRectF(0,0,64,64));p.setCompositionMode(QPainter::CompositionMode_SourceIn);p.fillRect(QRectF(0,0,64,64),kbtheme::ink);}
+        QFont font("Segoe UI Light");font.setPixelSize(60);font.setWeight(QFont::Light);font.setLetterSpacing(QFont::AbsoluteSpacing,8);
+        const int width=qCeil(64+QFontMetricsF(font).horizontalAdvance("zec"));
+        QPixmap result(QSize(width,64)*ratio);result.setDevicePixelRatio(ratio);result.fill(Qt::transparent);
+        {QPainter p(&result);p.setRenderHint(QPainter::TextAntialiasing);p.drawPixmap(0,0,mark);p.setFont(font);p.setPen(kbtheme::ink);p.drawText(QPointF(64,54),"zec");}
+        QPixmapCache::insert(key,result);return result;
+    }
+    static void draw(QPainter& painter,const QRectF& bounds,qreal ratio){
+        const auto image=artwork(ratio);QSizeF size=image.deviceIndependentSize();size.scale(bounds.size(),Qt::KeepAspectRatio);
+        painter.save();painter.setRenderHint(QPainter::SmoothPixmapTransform);painter.drawPixmap(QRectF(bounds.center()-QPointF(size.width()/2,size.height()/2),size),image,QRectF(image.rect()));painter.restore();
+    }
+protected:
+    void paintEvent(QPaintEvent*) override{QPainter painter(this);draw(painter,rect(),devicePixelRatioF());}
 };
 
 // The lists expand inside one sidebar scroll area; wheel events go to that area.

@@ -43,6 +43,8 @@ These commands run from the repository root in PowerShell. Desktop-backed runner
 | Switch motion, Save/Copy returns, and native corners after move/resize | `python tests/run_checks.py --interaction-motion-only` |
 | Phone switch and Save return motion | `python tests/phone_browser_test.py --interaction-motion-only` |
 | Desktop checks at 100% | `python tests/run_checks.py --ui-only` |
+| Startup loading, expansion, content reveal, and interruption captures | `python tests/run_checks.py --startup-only` |
+| Native startup frame timing without screenshot overhead | `python tests/run_checks.py --startup-timing-only` |
 | Phone browser checks | `python tests/phone_browser_test.py` |
 | Phone QR-photo pairing, delay layout, and sound scheduling | `python tests/phone_companion_test.py` |
 | Pairing expiry, including the real 61-second wait | `python tests/run_checks.py --slow` |

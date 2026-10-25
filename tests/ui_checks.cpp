@@ -6,6 +6,59 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
         // Pause global hotkey polling; fixture actions call production handlers directly.
         poll_.stop();
+        if(QCoreApplication::arguments().contains("--startup-only")){
+            const bool timingOnly=QCoreApplication::arguments().contains("--startup-timing-only");
+            QJsonObject checks;QJsonArray frames;const QRect finalGeometry=geometry();const QSize finalMinimum=minimumSize();const auto handle=winId();
+            const auto fingerprint=[&]{QJsonObject files;for(const auto* name:{"r6_config.bin","azec_weapons.json","azec_ui.json"}){QFile file(QString::fromStdWString((config_path_.parent_path()/name).wstring()));files[name]=file.open(QIODevice::ReadOnly)?QString::fromLatin1(QCryptographicHash::hash(file.readAll(),QCryptographicHash::Sha256).toHex()):QString();}return files;};
+            const auto filesBefore=fingerprint();const auto configBefore=engine_.snapshot();const QImage contentBefore=content_->grab().toImage();
+            QJsonObject timings;QPointer<StartupView> tracked;QElapsedTimer preparation;preparation.start();
+            int completed=0;prepareStartup([&]{if(tracked)timings=tracked->frameTimings();++completed;},true);tracked=startup_view_;const auto preparationMs=preparation.elapsed();
+            checks["starts_as_a_small_centered_rectangle"]=width()<=400&&height()<=232&&(geometry().center()-finalGeometry.center()).manhattanLength()<=2;
+            checks["live_controls_stay_hidden_during_intro"]=content_->isHidden();
+            checks["logo_replaces_the_A_in_the_wordmark"]=brand_->text()=="zec"&&brand_->accessibleName()=="Azec";
+            bool smoothGrowth=true,progressForward=true,sameHandle=true,centered=true;int lastWidth=width(),lastHeight=height(),frame=0;double lastProgress=0;QSet<int> steps;
+            QVector<QPair<QString,QImage>> captured;int lastFrame=-1;
+            const auto recordFrame=[&]{
+                if(!startup_view_||captured.size()>=360)return;const int time=startup_view_->elapsed();if(time==lastFrame)return;lastFrame=time;
+                const QImage image=grab().toImage();
+                const QString filename=QString("startup-%1.png").arg(frame++,3,10,QChar('0'));captured.append({filename,image});
+                frames.append(QJsonObject{{"file",filename},{"time",time},{"width",width()},{"height",height()}});
+            };
+            QTimer recording;recording.setTimerType(Qt::PreciseTimer);recording.setInterval(16);connect(&recording,&QTimer::timeout,this,recordFrame);
+            if(!timingOnly){recordFrame();recording.start();}
+            QElapsedTimer elapsed;elapsed.start();
+            while(startup_view_&&elapsed.elapsed()<8000){
+                auto* view=startup_view_.data();steps.insert(view->loadingStep());
+                smoothGrowth&=width()>=lastWidth&&height()>=lastHeight;lastWidth=width();lastHeight=height();
+                progressForward&=view->loadingProgress()>=lastProgress;lastProgress=view->loadingProgress();sameHandle&=winId()==handle;
+                centered&=(geometry().center()-finalGeometry.center()).manhattanLength()<=2;
+                wait(32);
+            }
+            recording.stop();for(const auto& image:captured)image.second.save(output+"/"+image.first);captured.clear();
+            checks["sequence_completes_and_calls_back_once"]=!startup_view_&&completed==1;
+            checks["all_six_loading_messages_are_shown"]=steps.size()==6;
+            checks["progress_and_expansion_only_move_forward"]=progressForward&&smoothGrowth;
+            checks["expands_on_the_same_native_window"]=sameHandle;
+            checks["window_keeps_its_center_while_expanding"]=centered;
+            checks["restores_original_size_and_minimum"]=geometry()==finalGeometry&&minimumSize()==finalMinimum;
+            checks["hands_off_to_the_original_live_interface"]=!content_->isHidden()&&content_->grab().toImage()==contentBefore;
+            wait(100);capture(output+"/startup-ready.png");
+            checks["temporary_animation_and_snapshots_are_removed"]=findChild<QWidget*>("startupPresentation")==nullptr;
+            hide();show();wait(80);checks["showing_the_window_again_does_not_replay_startup"]=!startup_view_&&geometry()==finalGeometry;
+            bool cancellation=true;
+            for(int time:{100,StartupView::loadingDuration+180}){prepareStartup({},true);wait(time);hide();wait(30);cancellation&=!startup_view_&&!content_->isHidden()&&geometry()==finalGeometry&&minimumSize()==finalMinimum&&!glass_lightweight_;show();wait(30);}
+            checks["hiding_during_loading_or_expansion_settles_cleanly"]=cancellation;
+            setStartupNotice("Startup recovery example",true);
+            prepareStartup({},true);wait(60);showNotice("Routine feedback");finishStartup();wait(30);
+            checks["persistent_startup_errors_survive_the_intro"]=notice_bar_->isVisible()&&notice_->text()=="Startup recovery example"&&notice_bar_->property("persistent").toBool()&&save_blocked_&&!save_->isEnabled();
+            notice_bar_->hide();save_blocked_=false;updateSavePresentation("clean");
+            search_->setText("Denari");wait(30);int visible=0;for(int i=0;i<operators_->count();++i)visible+=!operators_->item(i)->isHidden();
+            checks["search_is_interactive_after_the_handoff"]=visible==1;search_->clear();
+            wait(750);const int idlePaints=paint_count_;wait(250);checks["no_continuous_window_repaint_after_startup"]=paint_count_<=idlePaints+1;
+            checks["startup_does_not_save_or_change_profile_selection"]=fingerprint()==filesBefore&&engine_.snapshot().selected==configBefore.selected&&!unsaved_;
+            bool passed=true;for(const auto& check:checks)passed&=check.toBool();
+            return {{"passed",passed},{"checks",checks},{"frames",frames},{"elapsedMs",int(elapsed.elapsed())},{"timings",timings},{"preparationMs",preparationMs},{"timingOnly",timingOnly}};
+        }
         if(QCoreApplication::arguments().contains("--sidebar-paint-only")){
             showOperators();search_->clear();wait(220);
             QJsonArray samples;bool correct=true,available=true;int sample=0;
@@ -240,7 +293,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             motionChecks["phone_retarget_preserves_height"]=continuous;motionChecks["phone_switch_keeps_44px_row"]=stableControls;if(captureFrames)motionChecks["phone_background_stays_panel_color"]=stableBackground;
             return {{"passed",continuous&&stableControls&&stableBackground},{"checks",motionChecks},{"sequences",sequences}};
         }
-        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<(712)||size()==QSize(864,664);checks["layout_matches_interface"]=findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="Azec";checks["all_operators_listed"]=operators_->count()==r6::operator_count;checks["extension_operator_rows"]=operators_->item(r6::legacy_operator_count)->text()=="Noor"&&operators_->item(operators_->count()-1)->text()=="Denari";checks["all_svg_icons_valid"]=icon_failures_.empty();checks["scroll_content_has_no_obscuring_overlays"]=sidebar_scroll_->findChildren<QWidget*>("scrollFade").isEmpty()&&scroll_->findChildren<QWidget*>("scrollFade").isEmpty()&&preferences_scroll_->findChildren<QWidget*>("scrollFade").isEmpty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
+        QJsonObject checks;const auto available=QGuiApplication::primaryScreen()->availableGeometry();checks["window_fits_available_screen"]=width()<=available.width()&&height()<=available.height();checks["compact_default_when_screen_allows"]=available.width()<912||available.height()<(712)||size()==QSize(864,664);checks["layout_matches_interface"]=findChild<QWidget*>("operatorSidebar")->width()==200;auto* brand=findChild<QLabel*>("brand");checks["azec_branding"]=windowTitle()=="Azec"&&brand->accessibleName()=="Azec"&&brand->text()=="zec";checks["all_operators_listed"]=operators_->count()==r6::operator_count;checks["extension_operator_rows"]=operators_->item(r6::legacy_operator_count)->text()=="Noor"&&operators_->item(operators_->count()-1)->text()=="Denari";checks["all_svg_icons_valid"]=icon_failures_.empty();checks["scroll_content_has_no_obscuring_overlays"]=sidebar_scroll_->findChildren<QWidget*>("scrollFade").isEmpty()&&scroll_->findChildren<QWidget*>("scrollFade").isEmpty()&&preferences_scroll_->findChildren<QWidget*>("scrollFade").isEmpty();checks["actual_native_window_not_fullscreen"]=!isFullScreen();
 
         checks["only_single_layout_constructed"]=findChild<QWidget*>("operatorSidebar")&&!findChild<QWidget*>("operatorRoster")&&!findChild<QPushButton*>("operatorPicker");
         checks["game_process_names"]=r6::isGameProcessName("C:\\Games\\RainbowSix.exe")&&r6::isGameProcessName("RainbowSix_DX12.exe")&&!r6::isGameProcessName("chrome.exe")&&!r6::isGameProcessName("RainbowSix_BE.exe");
@@ -426,7 +479,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto beforeHelp=engine_.snapshot().bytes();QTimer::singleShot(80,this,[=]{auto* modal=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(modal){modal->grab().save(output+"/help.png");modal->reject();}});help();checks["help_dialog_preserves_settings"]=engine_.snapshot().bytes()==beforeHelp;
         // New reliability/UI behavior uses the same production paths as the real window.
         showPreferences();wait(220);buildPreferences();chooseSettingsCategory(2);QApplication::processEvents();
-        checks["brand_logo_asset_valid"]=QSvgRenderer(QStringLiteral(":/ui/logo.svg")).isValid()&&(bool(findChild<QLabel*>("brandLogo")));
+        checks["brand_logo_asset_valid"]=QSvgRenderer(QStringLiteral(":/ui/logo.svg")).isValid()&&brand_&&!BrandLabel::artwork(devicePixelRatioF()).isNull();
         checks["qr_is_obscured_by_default"]=pairing_qr_&&!pairing_qr_->revealed();
         if(pairing_qr_){
             checks["qr_keeps_full_scannable_size"]=pairing_qr_->size()==QSize(184,208);

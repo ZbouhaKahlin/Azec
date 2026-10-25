@@ -18,6 +18,7 @@
 #include "version.hpp"
 #include "update_check.hpp"
 #include "app_paths.hpp"
+#include "startup_view.hpp"
 #include <windows.h>
 #include <shellapi.h>
 #include <dwmapi.h>
@@ -102,7 +103,12 @@ class MainWindow final : public QWidget {
     QPointer<QPushButton> update_button_;QNetworkAccessManager* network_=nullptr;bool update_in_progress_=false;
     QWidget* notice_bar_=nullptr;QLabel *notice_=nullptr,*notice_title_=nullptr,*notice_badge_=nullptr;QPushButton* notice_close_=nullptr;QScrollArea* notice_scroll_=nullptr;
     QPointer<QComboBox> theme_choice_;
-    QLabel* brand_logo_=nullptr;
+    BrandLabel* brand_=nullptr;
+    QWidget* content_=nullptr;
+    QPointer<StartupView> startup_view_;
+    QRect startup_geometry_;QSize startup_minimum_;
+    std::function<void()> startup_finished_;
+    bool capturing_startup_=false;
     QSystemTrayIcon* tray_=nullptr;
     QMenu* tray_menu_=nullptr;
     QAction *tray_window_=nullptr,*tray_recoil_=nullptr,*tray_rapid_=nullptr,*tray_exit_=nullptr;
@@ -279,11 +285,7 @@ class MainWindow final : public QWidget {
     }
     void applyStyle(){
         pages_->settle();qApp->setPalette(kbtheme::palette());setStyleSheet(applicationStyle(accent()));setPalette(kbtheme::palette());
-        if(brand_logo_){
-            QPixmap mark=QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF());
-            QPainter tint(&mark);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(mark.rect(),kbtheme::ink);tint.end();
-            brand_logo_->setPixmap(mark);
-        }
+        if(brand_)brand_->update();
         styleNotice();
         layoutNotice();
         for(auto* child:findChildren<QWidget*>())child->update();update();
@@ -776,6 +778,7 @@ class MainWindow final : public QWidget {
         if(menu&&!was_menu_){if(isVisible()&&!isMinimized())hide();else{showNormal();raise();activateWindow();}engine_.menu_visible=isVisible();}
         if(recoil&&!was_recoil_)toggleRecoil();
         was_menu_=menu;was_recoil_=recoil;
+        if(startup_view_)return;
         auto* focused=QApplication::focusWidget();
         const auto modifierKey=[](int key){return key==VK_CONTROL||key==VK_MENU||key==VK_LWIN||key==VK_RWIN||key==VK_LCONTROL||key==VK_RCONTROL||key==VK_LMENU||key==VK_RMENU;};
         const bool modifierHeld=keyDown(VK_CONTROL)||keyDown(VK_MENU)||keyDown(VK_LWIN)||keyDown(VK_RWIN);
@@ -873,7 +876,8 @@ protected:
         // A Qt mask also clips the HWND's blur and child surfaces on Windows 10.
         QRegion region;
         if(!isMaximized()&&!isFullScreen()){
-            QPainterPath shape;shape.addRoundedRect(QRectF(rect()),16,16);
+            const qreal radius=startup_view_?startup_view_->cornerRadius():16;
+            QPainterPath shape;shape.addRoundedRect(QRectF(rect()),radius,radius);
             region=QRegion(shape.toFillPolygon().toPolygon());
         }
         setMask(region);
@@ -882,10 +886,10 @@ protected:
         if(auto* native=windowHandle())native->setMask(region);
     }
     void paintEvent(QPaintEvent*) override {
-
+        if(capturing_startup_)return;
         ++paint_count_;QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
         // Match the native window mask; no acrylic may extend into the notches.
-        const qreal radius=isMaximized()?0:16;
+        const qreal radius=isMaximized()?0:startup_view_?startup_view_->cornerRadius():16;
         QPainterPath shape;shape.addRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),radius,radius);
         p.fillPath(shape,glass_active_?kbtheme::windowGlass:kbtheme::paper);
         if(glass_active_){
@@ -925,6 +929,7 @@ protected:
         updateWindowShape();
     }
     void hideEvent(QHideEvent* event) override {
+        finishStartup();
         settleThemeTransition();
         if(glass_lightweight_)applyWindowGlass(false);
         if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);
@@ -951,9 +956,9 @@ protected:
             if(!close_recoil_changed_)engine_.recoil_active=recoil;close_prompt_=false;
             if(choice==0||(choice==2&&!save(true))){event->ignore();return;}
         }
-        if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
+        finishStartup();if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
-    void resizeEvent(QResizeEvent* event) override {settleThemeTransition();QWidget::resizeEvent(event);updateWindowShape();layoutNotice();}
+    void resizeEvent(QResizeEvent* event) override {settleThemeTransition();QWidget::resizeEvent(event);updateWindowShape();if(startup_view_)startup_view_->setGeometry(rect());else layoutNotice();}
     void changeEvent(QEvent* event) override {
         QWidget::changeEvent(event);
         if(event->type()==QEvent::WindowStateChange)updateWindowShape();
@@ -1009,7 +1014,7 @@ protected:
             QTimer::singleShot(0,this,[this]{updateWindowShape();});
         }
         if(msg->message==WM_NCCALCSIZE&&msg->wParam){*result=0;return true;}
-        if(msg->message==WM_NCHITTEST){RECT r;GetWindowRect(HWND(winId()),&r);const int x=short(LOWORD(msg->lParam)),y=short(HIWORD(msg->lParam)),edge=qRound(6*devicePixelRatioF());const bool left=x<r.left+edge,right=x>=r.right-edge,top=y<r.top+edge,bottom=y>=r.bottom-edge;
+        if(msg->message==WM_NCHITTEST){if(startup_view_){*result=HTCLIENT;return true;}RECT r;GetWindowRect(HWND(winId()),&r);const int x=short(LOWORD(msg->lParam)),y=short(HIWORD(msg->lParam)),edge=qRound(6*devicePixelRatioF());const bool left=x<r.left+edge,right=x>=r.right-edge,top=y<r.top+edge,bottom=y>=r.bottom-edge;
             if(top&&left)*result=HTTOPLEFT;else if(top&&right)*result=HTTOPRIGHT;else if(bottom&&left)*result=HTBOTTOMLEFT;else if(bottom&&right)*result=HTBOTTOMRIGHT;else if(left)*result=HTLEFT;else if(right)*result=HTRIGHT;else if(top)*result=HTTOP;else if(bottom)*result=HTBOTTOM;else return QWidget::nativeEvent(type,message,result);return true;}return QWidget::nativeEvent(type,message,result);
     }
 public:
@@ -1019,9 +1024,9 @@ public:
         connect(&theme_motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){if(theme_snapshot_)theme_snapshot_->setProgress(value.toReal());});
         connect(&theme_motion_,&QVariantAnimation::finished,this,[this]{settleThemeTransition();});
         setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setAttribute(Qt::WA_TranslucentBackground);setWindowIcon(QIcon(":/ui/app-icon.svg"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(664,area.height()-48));move(area.center()-rect().center());
-        auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(52);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,20,0);top->setSpacing(5);
-        auto* logo=new QLabel;brand_logo_=logo;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));top->addWidget(logo);top->addSpacing(5);
-        top->addWidget(new BrandLabel);
+        auto* shell=new QVBoxLayout(this);shell->setContentsMargins(0,0,0,0);shell->setSpacing(0);content_=new QWidget;content_->setObjectName("desktopContent");shell->addWidget(content_);
+        auto* layout=new QVBoxLayout(content_);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(52);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,20,0);top->setSpacing(5);
+        brand_=new BrandLabel;top->addWidget(brand_);
         top->addStretch();status_=new MonoButton;status_->setObjectName("status");status_->setInteractionIcon(InteractionIcon::Recoil);status_->setFixedHeight(32);status_->setCursor(Qt::PointingHandCursor);status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
         rapid_status_=new MonoButton;rapid_status_->setObjectName("statusRapid");rapid_status_->setInteractionIcon(InteractionIcon::Rapid);rapid_status_->setFixedHeight(32);rapid_status_->setCursor(Qt::PointingHandCursor);rapid_status_->setToolTip(text(UiText::RapidFire));top->addWidget(rapid_status_);connect(rapid_status_,&QPushButton::clicked,this,[this]{toggleRapid();});
         save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addSpacing(7);top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save(true);});
@@ -1058,6 +1063,52 @@ public:
     }
 
     void capture(const QString& file){grab().save(file);}
+    void prepareStartup(std::function<void()> finished={},bool forceMotion=false){
+        if(startup_view_)return;
+        BOOL animations=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&animations,0);
+        if(!forceMotion&&!animations){if(finished)QTimer::singleShot(0,this,std::move(finished));return;}
+        startup_finished_=std::move(finished);startup_geometry_=geometry();startup_minimum_=minimumSize();
+        ensurePolished();layout()->activate();content_->resize(size());
+        // Rendering before hiding resolves all nested layout requests without
+        // ever presenting the full-size window ahead of the loader.
+        content_->grab();
+        QPixmap frame(size()*devicePixelRatioF());frame.setDevicePixelRatio(devicePixelRatioF());frame.fill(Qt::transparent);
+        capturing_startup_=true;content_->render(&frame,QPoint(),QRegion(),QWidget::DrawChildren);capturing_startup_=false;
+        const auto bounds=[this](QWidget* widget){return QRect(widget->mapTo(content_,QPoint()),widget->size());};
+        QVector<StartupView::PieceSpec> pieces;
+        pieces.append({bounds(findChild<QWidget*>("titleBar")),0,380,true});
+        pieces.append({bounds(sidebar_search_box_),0,460});
+        int rowDelay=80;
+        const QRect rosterClip=bounds(sidebar_scroll_->viewport());
+        for(auto* list:{favorites_list_,operators_}){
+            if(list->isHidden()||list->parentWidget()->isHidden())continue;
+            QWidget* heading=list==favorites_list_?favorites_title_->parentWidget():operators_header_;
+            const auto headingRect=bounds(heading).intersected(rosterClip);
+            if(!headingRect.isEmpty())pieces.append({headingRect,qMax(20,rowDelay-40),480});
+            for(int i=0;i<list->count();++i){
+                if(list->item(i)->isHidden())continue;
+                const QRect row=list->visualItemRect(list->item(i)).translated(list->viewport()->mapTo(content_,QPoint()));
+                const QRect visible=row.intersected(rosterClip).intersected(bounds(list->viewport()));
+                if(!visible.isEmpty()){pieces.append({visible,rowDelay,540});rowDelay+=42;}
+            }
+        }
+        pieces.append({bounds(panel_),rowDelay+70,600});
+        const QSize compactSize(qMin(400,width()),qMin(232,height()));const QRect compact(startup_geometry_.center()-QPoint(compactSize.width()/2,compactSize.height()/2),compactSize);
+        startup_view_=new StartupView(frame,pieces,compact,startup_geometry_,bounds(brand_),engine_.snapshot().language,this,
+            [this](const QRect& rectangle){if(geometry()!=rectangle)setGeometry(rectangle);},[this]{finishStartup();});
+        layout()->setEnabled(false);content_->hide();notice_bar_->setProperty("startupVisible",!notice_bar_->isHidden());notice_bar_->hide();
+        setMinimumSize(0,0);setGeometry(compact);startup_view_->setGeometry(rect());startup_view_->show();startup_view_->raise();
+        QTimer::singleShot(0,startup_view_,[view=startup_view_]{if(view)view->start();});
+    }
+    void finishStartup(){
+        if(!startup_view_)return;
+        auto* view=startup_view_.data();startup_view_=nullptr;view->stop();
+        setUpdatesEnabled(false);setGeometry(startup_geometry_);setMinimumSize(startup_minimum_);layout()->setEnabled(true);content_->show();layout()->activate();
+        view->hide();view->deleteLater();layoutNotice();updateWindowShape();
+        if(notice_bar_->property("startupVisible").toBool()){notice_bar_->show();notice_bar_->raise();}notice_bar_->setProperty("startupVisible",false);
+        setUpdatesEnabled(true);update();
+        auto finished=std::move(startup_finished_);startup_finished_={};if(finished)finished();
+    }
     void captureDocumentation(const QString& folder){
         if(!engine_.dry_run()||!QDir().mkpath(folder))return;
         capture(folder+"/desktop.png");showPreferences();chooseSettingsCategory(0);
@@ -1068,11 +1119,12 @@ public:
     void showNotice(const QString& message,bool error=false,bool persistent=false){
         if(!notice_bar_||!notice_)return;
         // Routine feedback must not erase a recovery notice or unresolved error.
-        if(!error&&notice_bar_->isVisible()&&notice_bar_->property("persistent").toBool())return;
+        if(!error&&(!notice_bar_->isHidden()||notice_bar_->property("startupVisible").toBool())&&notice_bar_->property("persistent").toBool())return;
         notice_bar_->setProperty("saveError",false);notice_bar_->setProperty("phoneError",false);
         notice_bar_->setProperty("persistent",persistent||error);
         notice_bar_->setProperty("error",error);notice_->setText(message);styleNotice();
-        notice_timer_.stop();layoutNotice();notice_scroll_->verticalScrollBar()->setValue(0);notice_bar_->show();notice_bar_->raise();
+        notice_timer_.stop();layoutNotice();notice_scroll_->verticalScrollBar()->setValue(0);
+        if(startup_view_){notice_bar_->setProperty("startupVisible",true);notice_bar_->hide();}else{notice_bar_->show();notice_bar_->raise();}
         if(!persistent&&!error){notice_timer_.setInterval(5000);notice_timer_.start();}
     }
     // A nonmodal card stays centered inside Azec without taking keyboard focus.
