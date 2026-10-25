@@ -66,4 +66,6 @@ jobs:
             !.build/verification/**/qr-revealing.png
             !.build/verification/**/qr-concealing.png
             !.build/verification/**/phone-branded.png
+            !.build/verification/**/phone-enabled.png
+            !.build/verification/**/phone-collapsing.png
           if-no-files-found: ignore

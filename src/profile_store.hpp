@@ -85,3 +85,46 @@ inline bool persistSelection(const std::filesystem::path& base,int selected){
     const auto bytes=QJsonDocument(root).toJson();QSaveFile file(weaponFile(base));
     return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();
 }
+// Shortcut changes persist immediately, but they are not profile edits. Replace
+// only the binding fields in the saved files so every pending profile value
+// stays unsaved, and stage the sidecar before the binary as a normal save does.
+inline bool persistHotkeys(const std::filesystem::path& base,int menu,int recoil,int panic,int primary,int secondary){
+    const QString binaryPath=QString::fromStdWString(base.wstring());
+    r6::Config saved;
+    if(!saved.load(base)){
+        if(QFile::exists(binaryPath)){diagnostic("save shortcuts","The saved configuration could not be read");return false;}
+        saved=r6::Config();
+    }
+    saved.menu_key=menu;saved.recoil_key=recoil;saved.panic_key=panic;
+    const QString sidecarPath=weaponFile(base);QJsonObject root;
+    {
+        QFile existing(sidecarPath);
+        if(existing.exists()){
+            if(!existing.open(QIODevice::ReadOnly)||existing.size()>1024*1024)return false;
+            QJsonParseError error;const auto document=QJsonDocument::fromJson(existing.readAll(),&error);
+            if(error.error!=QJsonParseError::NoError||!document.isObject()||document.object()["version"].toInt()!=1)return false;
+            root=document.object();
+        }
+    }
+    root["version"]=1;root["primaryKey"]=primary;root["secondaryKey"]=secondary;
+    const auto bytes=QJsonDocument(root).toJson();
+    if(bytes.size()>1024*1024)return false;
+    QSaveFile sidecar(sidecarPath);
+    if(!sidecar.open(QIODevice::WriteOnly)||sidecar.write(bytes)!=bytes.size()){diagnostic("save shortcuts",sidecar.errorString());return false;}
+    QByteArray previous;const bool existed=QFile::exists(binaryPath);
+    if(existed){
+        QFile file(binaryPath);
+        if(!file.open(QIODevice::ReadOnly)||file.size()>1024*1024)return false;
+        previous=file.readAll();if(file.error()!=QFile::NoError)return false;
+    }
+    // Windows cannot replace a file that is still open, so both handles above
+    // are closed before the binary is rewritten.
+    if(!saved.save(base)){diagnostic("save shortcuts","Atomic replacement of the binary failed");return false;}
+    if(!sidecar.commit()){
+        QSaveFile restore(binaryPath);
+        const bool rolledBack=existed?restore.open(QIODevice::WriteOnly)&&restore.write(previous)==previous.size()&&restore.commit():QFile::remove(binaryPath);
+        diagnostic("save shortcuts",sidecar.errorString()+(rolledBack?"; previous binary restored":"; rollback failed"));
+        return false;
+    }
+    return true;
+}

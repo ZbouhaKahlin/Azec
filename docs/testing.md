@@ -1,8 +1,8 @@
-# Optional testing for Azec
+# Testing Azec
 
-Tests run only when the user explicitly requests them. Normal edits, bug reports, builds, and releases do not authorize them. This document lists available tools; it is not an instruction to run them. The shared policy is in [AGENTS.md](../AGENTS.md).
+Tests run whenever a check answers a real question; no separate permission is needed. Keep the isolation rules below so a check never disturbs the visible desktop. The shared policy is in [AGENTS.md](../AGENTS.md).
 
-When testing is requested, choose checks relevant to the problem and stop after they pass. Extra scales, languages, expiry waits, and matrices require an explicit request. Tests must not open visible windows, steal focus, move the cursor, or play sounds. Desktop-backed Python runners use `hidden_process.py`: each GUI fixture runs on a noninteractive Windows station with its own desktop and a cleanup job covering descendants. The station has no access to your visible desktop or clipboard. Isolation failure stops the launch; there is no visible fallback.
+Choose checks relevant to the problem and stop after they pass. Extra scales, languages, expiry waits, and matrices are separate coverage; run them when that coverage is the question. Tests must not open visible windows, steal focus, move the cursor, or play sounds. Desktop-backed Python runners use `hidden_process.py`: each GUI fixture runs on a noninteractive Windows station with its own desktop and a cleanup job covering descendants. The station has no access to your visible desktop or clipboard. Isolation failure stops the launch; there is no visible fallback.
 
 ## What the test files are
 
@@ -25,18 +25,18 @@ The files in `tests/` are development tools. They do not run when a user opens A
 | `hidden_process.py`, `desktop_isolation_test.py` | Noninteractive GUI launch, fail-closed behavior, and complete fixture-process cleanup | Native probe only, isolated |
 | `phone_api_test.cjs` | Phone request/error handling and translation coverage using Node, without a browser or app | No |
 
-Every file has an active caller, build target, or documented standalone command. Keeping these optional tools preserves useful diagnostics. Their presence does not make testing mandatory.
+The shared core checks run through the sensitivity verifier. `core_test.cpp` is a separate standalone entry point, not built by `build.cmd`. Keeping these optional tools preserves useful diagnostics. Their presence does not make testing mandatory.
 
 ## Commands
 
-These commands are explicit opt-ins, run from the repository root in PowerShell. Desktop-backed runners use a noninteractive Windows station, including native Windows rendering; this is separate from Qt offscreen emulation. `--dry-run` suppresses input and sounds. Running the application directly bypasses the isolation wrapper and can show a window, so use the documented Python/build commands for invisible checks.
+These commands run from the repository root in PowerShell. Desktop-backed runners use a noninteractive Windows station, including native Windows rendering; this is separate from Qt offscreen emulation. `--dry-run` suppresses input and sounds. Running the application directly bypasses the isolation wrapper and can show a window, so use the documented Python/build commands for invisible checks.
 
 | Purpose | Command |
 | --- | --- |
 | Build and deploy, no tests | `.\build.cmd` |
 | Build app + verifier, no tests | `.\build.cmd checks` |
 | Build app + all verifiers; console, HTTP, recovery, restart checks | `.\build.cmd test` |
-| Complete default suite: console, behavior, desktop UI and headless phone browser | `.\build.cmd test --suite` |
+| Complete suite: console, behavior, desktop UI and headless phone browser | `.\build.cmd test --suite` |
 | Repeat the complete suite against current binaries | `python tests/run_checks.py --suite` |
 | Repeat behavior checks against an already current build | `python tests/run_checks.py` |
 | Desktop checks at 100% | `python tests/run_checks.py --ui-only` |
@@ -44,25 +44,25 @@ These commands are explicit opt-ins, run from the repository root in PowerShell.
 | Pairing expiry, including the real 61-second wait | `python tests/run_checks.py --slow` |
 | Extended desktop matrix | `python tests/run_checks.py --ui-only --full` |
 | Extended phone browser matrix | `python tests/phone_browser_test.py --full` |
-| Behavior + extended desktop matrix | `python tests/run_checks.py --ui --full` |
+| Behavior + extended desktop matrix + real pairing expiry | `python tests/run_checks.py --ui --full` |
 | Decode rendered desktop QR images | `python tests/run_checks.py --ui-only --full --qr-scan` |
-| Build a runnable package | `.\package-release.ps1` |
+| Package the current build as a portable ZIP | `.\package-release.ps1` |
 | Build the single-file installer, no tests | `.\share.cmd` |
-| Build and explicitly request installer smoke test | `.\share.cmd test` |
+| Build and run the installer smoke test | `.\share.cmd test` |
 
-`--full` expands requested checks; it does not implicitly enable desktop checks. `build.cmd test --slow` includes expiry during a build. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across representative pairing links and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
+`--full` expands requested checks; it does not implicitly enable desktop checks. In `run_checks.py`, it also enables the real pairing-expiry wait whenever HTTP behavior checks are included; `--ui-only --full` omits HTTP and that wait. `build.cmd test --slow` includes expiry during a build. The console group, including `build.cmd test`, requires Node.js with `node --test` support for `phone_api_test.cjs`. The browser runner requires `pip install playwright` and installed Google Chrome. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across representative pairing links and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
 
 Use `build.cmd checks` to prepare the desktop verifier and all console verifiers without running tests. Console binaries remain under `.build/checks-*/release`; only the desktop verifier goes in `runtime/Azec-checks.exe`. The test-only driver DLL is never copied into the app runtime. `build.cmd test` also builds it and explicitly runs behavior checks. Rebuild after changes to C++ or embedded assets; testing a stale executable does not validate source edits. The release app delegates `--ui-self-test` to the separate verification executable.
 
-## Coverage when explicitly requested
+## Choosing coverage
 
 The default HTTP suite still checks pairing rejection, lockout, authorized access during lockout, validation, host/origin checks, profile isolation, and persistence. Only the two checks after the real expiry wait are skipped, and the JSON report lists them explicitly. Production timeout behavior is unchanged.
 
 Default desktop checks use 100% scaling and omit exhaustive translated-layout sweeps. Focused English/Portuguese language-picker behavior remains covered. Default browser layout coverage is English at 390 CSS px; pairing, pickers, hotkey conflicts, persistence, and expired sessions remain checked. Browser reports record the selected layout matrix.
 
-The optional extended matrix checks desktop at 100% and 150%, and phone layout in nine languages at 320, 390, 430, and 768 CSS px. It can diagnose scaling, clipping, or translation problems, but a font/layout edit or release does not authorize it. Use it only when that coverage is specifically requested.
+The optional extended matrix checks desktop at 100% and 150%, and phone layout in nine languages at 320, 390, 430, and 768 CSS px. It can diagnose scaling, clipping, or translation problems. Use it when that coverage is the question.
 
-The Windows GitHub Actions workflow is manual only. Its default run explicitly requests behavior checks on the CI machine; desktop checks, the extended matrix, and the real expiry wait are separate input choices, all off by default. Extended desktop coverage also requires enabling desktop checks. The optional Chrome suite is separate. A focused run is not a claim that extended coverage passed.
+The Windows GitHub Actions workflow is manual only. Its default run applies behavior checks on the CI machine; desktop checks, the extended matrix, and the real expiry wait are separate input choices, all off by default. The `extended` input is ignored unless `desktop` is enabled. The optional Chrome suite is separate. A focused run is not a claim that extended coverage passed.
 
 ## What the checks cover today
 
@@ -81,13 +81,13 @@ Still manual or not covered: a physical iPhone, real in-game input, the audible 
 
 ## Fixtures and artifacts
 
-Python runners create fresh directories under `.build/verification`, run isolated dry-run instances, and stop their entire process trees, including installer descendants. Independent groups use at most two workers by default (`--jobs 1` runs sequentially); GUI fixtures run below normal priority. Console checks cover binary compatibility, sensitivity, updater integrity and the five reliability fixes. Suite JSON reports record group timings and failures. Core checks are included once through the sensitivity verifier, rather than repeated in the build root. Inspect JSON reports and relevant screenshots. Never run fixture checks against the user's configuration or from the project root: the native checks write settings into their working directory. Standalone `core-tests.exe` also needs a fresh fixture as its working directory; pass a filename within that fixture.
+Python runners create fresh directories under `.build/verification`, run isolated dry-run instances, and stop their entire process trees, including installer descendants. Independent groups use at most two workers by default (`--jobs 1` runs sequentially); native console verifiers run below normal priority, while GUI fixtures use normal priority. Console checks cover binary compatibility, sensitivity, updater integrity and the five reliability fixes. Suite JSON reports record group timings and failures. Core checks are included once through the sensitivity verifier, rather than repeated in the build root. Inspect JSON reports and relevant screenshots. Start the documented Python/build runners from the repository root; the app and native-check processes they launch must use fresh fixture working directories, because native checks write settings into their working directory. Never use the project root or personal configuration as a fixture.
 
-For explicitly requested documentation screenshots, launch `runtime/Azec.exe --dry-run --capture-ui=<absolute-output-folder>` through `HiddenProcess` in a fresh fixture. It captures the desktop and General settings, then closes without running checks. Choose the fixture’s theme with `{"version":1,"theme":"dark"}` or `{"version":1,"theme":"light"}` in its `azec_ui.json`. These captures use example profiles and never reveal Phone control credentials.
+For documentation captures, launch `runtime/Azec.exe --dry-run --capture-ui=<absolute-output-folder>` through `HiddenProcess` in a fresh fixture. It captures the desktop and General settings, then closes without running checks. Choose the fixture’s theme with `{"version":1,"theme":"dark"}` or `{"version":1,"theme":"light"}` in its `azec_ui.json`. These captures use example profiles and never reveal Phone control credentials.
 
-Only when visible manual inspection is explicitly requested, launch the absolute path to `runtime/Azec.exe` from a fresh fixture directory with `--dry-run`. For requested motion captures, run the verifier there with `--ui-self-test --motion-only`; add `--motion-timing-only` to omit frame capture. Fixture settings, pairing info, revealed QR images, and motion captures must remain local. CI excludes pairing-info files and revealed QR captures from uploads.
+Visible manual inspection is the exception: launch the absolute path to `runtime/Azec.exe` from a fresh fixture directory with `--dry-run`, and expect a window on your desktop. For motion captures, run the verifier there with `--ui-self-test --motion-only`; add `--motion-timing-only` to omit frame capture. Fixture settings, pairing info, revealed QR images, and motion captures must remain local. CI excludes pairing-info files, revealed QR captures, and full Phone control captures that can show the pairing code. Concealing the QR does not conceal the six-digit code.
 
-`share.cmd`, `share.cmd quick`, and `share.cmd publish` package without running tests. Add `test` to explicitly request `python tests/installation_test.py --smoke`; `AZEC_SKIP_TESTS=1` still overrides it. The full `python tests/installation_test.py` command is available for requested profile persistence, migration, repair, update handoff, and operation-after-download-deletion checks. Optional `--previous path/to/Azec.exe` checks migration from an old portable release; `--installed-previous path/to/Azec.exe` checks a version change from an older per-user build and prevents downgrades. All installer fixtures redirect Programs, data, and the Start menu with `AZEC_INSTALL_TEST_ROOT` plus `--dry-run`; their PATH excludes the development Qt kit. Never run an installation fixture without this redirection. `package-release.ps1` remains the optional portable zip packager and excludes verification executables, stale builds, and personal data.
+`share.cmd`, `share.cmd quick`, and `share.cmd publish` package without running tests. Add `test` to run `python tests/installation_test.py --smoke`; `AZEC_SKIP_TESTS=1` still overrides it. The full `python tests/installation_test.py` command covers profile persistence, migration, repair, update handoff, and operation-after-download-deletion checks. Optional `--previous path/to/Azec.exe` checks migration from an old portable release; `--installed-previous path/to/Azec.exe` checks a version change from an older per-user build and prevents downgrades. The Python runner sets `AZEC_INSTALL_TEST_ROOT` and passes `--dry-run` to every installed fixture executable; it takes no `--dry-run` Python option. The launcher honors the redirect only with that executable flag, so the variable alone is insufficient. Fixture PATH excludes the development Qt kit. Never run an installation fixture without both protections. `package-release.ps1` remains the optional portable zip packager and excludes verification executables, stale builds, and personal data.
 
 Automated browser checks are emulation, not physical iPhone or in-game testing. State actual checks and limitations in delivery notes.
 

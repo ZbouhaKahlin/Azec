@@ -2,19 +2,28 @@
 #include <QtWidgets>
 #include <algorithm>
 #include "theme.hpp"
+#include "interaction_icons.hpp"
 
 // Qt ports of MonoCode's SecondaryButton.tsx and SettingsView.tsx Row:
 // 12 px / 400 actions, content/70 ink, 10x4 padding, 6 px corners;
 // descriptions use content/45 with a 1.625 line height. MIT notice in licenses/monocode.
 class MonoButton : public QPushButton {
     QVariantAnimation hoverMotion_;
+    QVariantAnimation pressMotion_,feedbackMotion_;
+    QTimer feedbackHold_;
     qreal hover_=0;
+    qreal press_=0,feedback_=0;
+    InteractionIcon glyph_=InteractionIcon::None;
+    bool glyphActive_=false;
     void hoverTo(qreal target){
         QSignalBlocker block(&hoverMotion_);hoverMotion_.stop();
         hoverMotion_.setStartValue(hover_);hoverMotion_.setEndValue(target);
         hoverMotion_.setCurrentTime(0);block.unblock();hoverMotion_.start();
     }
     static QColor content(qreal opacity){QColor color=kbtheme::ink;color.setAlphaF(opacity);return color;}
+    void pressTo(qreal target){
+        QSignalBlocker blocked(&pressMotion_);pressMotion_.stop();pressMotion_.setDuration(target>press_?70:160);pressMotion_.setStartValue(press_);pressMotion_.setEndValue(target);pressMotion_.setCurrentTime(0);blocked.unblock();pressMotion_.start();
+    }
 public:
     explicit MonoButton(QWidget* parent=nullptr):QPushButton(parent){
         setCursor(Qt::PointingHandCursor);setAutoDefault(false);
@@ -22,14 +31,31 @@ public:
         QEasingCurve curve(QEasingCurve::BezierSpline);
         curve.addCubicBezierSegment(QPointF(.22,1),QPointF(.36,1),QPointF(1,1));
         hoverMotion_.setEasingCurve(curve);
+        pressMotion_.setEasingCurve(curve);
         connect(&hoverMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){hover_=value.toReal();update();});
+        connect(&pressMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){press_=value.toReal();update();});
+        connect(this,&QPushButton::pressed,this,[this]{if(glyph_!=InteractionIcon::None)pressTo(1);});connect(this,&QPushButton::released,this,[this]{if(glyph_!=InteractionIcon::None)pressTo(0);});
+        connect(&feedbackMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){feedback_=value.toReal();update();});
+        feedbackHold_.setSingleShot(true);feedbackHold_.setInterval(1400);
+        connect(&feedbackHold_,&QTimer::timeout,this,[this]{feedbackMotion_.stop();feedback_=0;update();});
     }
     explicit MonoButton(const QString& text,QWidget* parent=nullptr):MonoButton(parent){setText(text);}
     QSize sizeHint() const override{auto size=QPushButton::sizeHint();size.setHeight(qMax(26,size.height()));return size;}
+    void setInteractionIcon(InteractionIcon glyph){glyph_=glyph;setIcon(QIcon(interactionIconAsset(glyph)));setIconSize(QSize(14,14));updateGeometry();update();}
+    void confirmCopy(){
+        feedbackMotion_.stop();feedback_=0;
+        if(isVisible()){feedbackMotion_.setDuration(380);feedbackMotion_.setStartValue(0.0);feedbackMotion_.setEndValue(1.0);feedbackMotion_.start();feedbackHold_.start();}update();
+    }
+    void clearCopyFeedback(){feedbackHold_.stop();feedbackMotion_.stop();feedback_=0;setToolTip(QString());update();}
+    void setStatusActive(bool active){
+        setProperty("active",active);if(glyphActive_==active)return;glyphActive_=active;
+        feedbackMotion_.stop();feedback_=active?1:0;
+        if(active&&isVisible()){feedbackMotion_.setDuration(360);feedbackMotion_.setStartValue(0.0);feedbackMotion_.setEndValue(1.0);feedbackMotion_.start();}update();
+    }
 protected:
     void enterEvent(QEnterEvent* event) override{QPushButton::enterEvent(event);hoverTo(1);}
     void leaveEvent(QEvent* event) override{QPushButton::leaveEvent(event);hoverTo(0);}
-    void hideEvent(QHideEvent* event) override{hoverMotion_.stop();hover_=0;QPushButton::hideEvent(event);}
+    void hideEvent(QHideEvent* event) override{hoverMotion_.stop();pressMotion_.stop();feedbackMotion_.stop();feedbackHold_.stop();hover_=press_=0;feedback_=glyphActive_?1:0;QPushButton::hideEvent(event);}
     void paintEvent(QPaintEvent*) override{
         const auto role=objectName();
         const bool status=role=="status"||role=="statusRapid";
@@ -44,6 +70,8 @@ protected:
         QColor ink=content(.7+feedback*.3);
         if(primary){fill=isDown()?kbtheme::defaultAccent.darker(112):kbtheme::defaultAccent.lighter(100+qRound(feedback*8));ink=kbtheme::readableOn(fill);}
         if(status&&active){fill=kbtheme::defaultAccent;fill.setAlphaF(feedback*.06);ink=kbtheme::activeInk;}
+        if(status)fill=Qt::transparent;
+        if(glyph_==InteractionIcon::Copy&&feedback_>0)ink=kbtheme::activeInk;
         if(danger){ink=kbtheme::danger;if(feedback>0){fill=kbtheme::pink;fill.setAlphaF(feedback*.12);}}
         QPainter painter(this);painter.setRenderHints(QPainter::Antialiasing|QPainter::TextAntialiasing);
         if(!isEnabled())painter.setOpacity(.4);
@@ -61,8 +89,13 @@ protected:
             const int size=14,gap=6;
             const int textWidth=fontMetrics().horizontalAdvance(text());
             const int left=(width()-size-gap-textWidth)/2;
-            icon().paint(&painter,QRect(left,(height()-size)/2,size,size));
-            label.setLeft(left+size+gap);
+            const bool rtl=layoutDirection()==Qt::RightToLeft;
+            const QRectF iconArea(rtl?left+textWidth+gap:left,(height()-size)/2.0,size,size);
+            if(glyph_!=InteractionIcon::None){
+                painter.save();painter.translate(iconArea.center());painter.scale(1-.06*press_,1-.06*press_);painter.translate(-iconArea.center());
+                paintInteractionIcon(painter,iconArea,glyph_,ink,status?(active?feedback_:1):feedback_);painter.restore();
+            }else icon().paint(&painter,iconArea.toRect());
+            label=QRect(rtl?left:left+size+gap,0,textWidth,height());
         }
         if(step){
             painter.setPen(QPen(ink,1.4,Qt::SolidLine,Qt::RoundCap));

@@ -58,7 +58,7 @@ public:
 // Monospace command box with its own copy action, used by setup guides.
 class CodeBlock final : public QWidget {
     WrappingCommandText* code_;
-    QPushButton* copy_;
+    MonoButton* copy_;
     QString copyLabel_,copiedLabel_;
     std::function<void()> copyFeedback_;
     bool sized_=false;
@@ -72,28 +72,27 @@ public:
         code_->setFont(font);
         layout->addWidget(code_,1);
         copy_=new MonoButton(copyLabel_);copy_->setObjectName("secondary");
+        copy_->setInteractionIcon(InteractionIcon::Copy);
         copy_->setAccessibleName(copyLabel_);
         layout->addWidget(copy_,0,Qt::AlignTop);
         connect(copy_,&QPushButton::clicked,this,[this]{
             QApplication::clipboard()->setText(code_->toPlainText());
             if(copyFeedback_)copyFeedback_();
-            copy_->setText(copiedLabel_);
-            QTimer::singleShot(1400,copy_,[this]{if(copy_)copy_->setText(copyLabel_);});
+            copy_->setToolTip(copiedLabel_);
+            copy_->confirmCopy();
         });
     }
-    void setText(const QString& text){code_->setPlainText(text);code_->updateGeometry();updateGeometry();}
+    void setText(const QString& text){if(code_->toPlainText()!=text)copy_->clearCopyFeedback();code_->setPlainText(text);code_->updateGeometry();updateGeometry();}
     void setCopyFeedback(std::function<void()> feedback){copyFeedback_=std::move(feedback);}
     QString text() const{return code_->toPlainText();}
 protected:
-    // Reserve the wider of the two labels once the themed font is applied, so
-    // swapping to "Copied" cannot shrink the button and flash the layout.
+    // The icon confirms copying while the label and hit target stay fixed.
     void showEvent(QShowEvent* event) override{
         QWidget::showEvent(event);
         if(sized_)return;
         sized_=true;
         const auto metrics=copy_->fontMetrics();
-        const int width=qMax(metrics.horizontalAdvance(copyLabel_),metrics.horizontalAdvance(copiedLabel_));
-        copy_->setFixedWidth(width+20);
+        copy_->setFixedWidth(metrics.horizontalAdvance(copyLabel_)+40);
     }
 };
 
@@ -177,31 +176,57 @@ class IconButton final : public QPushButton {
     std::function<QColor()> accent_;
     QPixmap mask_;
     qreal maskRatio_=0;
-    QVariantAnimation hoverMotion_;
-    qreal hover_=0;
+    QVariantAnimation hoverMotion_,pressMotion_,glyphMotion_,sidebarMotion_;
+    qreal hover_=0,press_=0,glyphProgress_=0,sidebarProgress_=0;
+    InteractionIcon glyph_=InteractionIcon::None;
 public:
     IconButton(const QString& path,std::function<QColor()> accent,QWidget* parent=nullptr):QPushButton(parent),renderer_(path),accent_(std::move(accent)){
         setIcon(QIcon(path));setIconSize(QSize(20,20));setFixedSize(34,34);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);
         hoverMotion_.setEasingCurve(monoEase());
+        pressMotion_.setEasingCurve(monoEase());sidebarMotion_.setEasingCurve(monoEase());
+        if(path==QStringLiteral(":/ui/save.svg"))glyph_=InteractionIcon::Save;
+        else if(path==QStringLiteral(":/ui/settings.svg"))glyph_=InteractionIcon::Settings;
+        else if(path==QStringLiteral(":/ui/sidebar-toggle.svg"))glyph_=InteractionIcon::Sidebar;
         connect(&hoverMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){hover_=value.toReal();update();});
+        connect(&pressMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){press_=value.toReal();update();});
+        connect(&glyphMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){glyphProgress_=value.toReal();update();});
+        connect(&sidebarMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){sidebarProgress_=value.toReal();update();});
+        connect(this,&QPushButton::pressed,this,[this]{retargetAnimation(pressMotion_,press_,1,70);});
+        connect(this,&QPushButton::released,this,[this]{retargetAnimation(pressMotion_,press_,0,160);});
+        connect(this,&QPushButton::clicked,this,[this]{if(glyph_==InteractionIcon::Settings){glyphProgress_=0;retargetAnimation(glyphMotion_,0,1,500);}});
+        connect(this,&QPushButton::toggled,this,[this](bool checked){if(glyph_==InteractionIcon::Sidebar){if(isVisible())retargetAnimation(sidebarMotion_,sidebarProgress_,checked?1:0,180);else{sidebarMotion_.stop();sidebarProgress_=checked?1:0;update();}}});
+    }
+    void setSaveState(const QString& state,bool animate=false){
+        setProperty("saveState",state);
+        if(state!="saved"){glyphMotion_.stop();glyphProgress_=0;}
+        else if(animate&&isVisible()){glyphProgress_=0;retargetAnimation(glyphMotion_,0,1,520);}
+        else if(glyphMotion_.state()!=QAbstractAnimation::Running)glyphProgress_=1;
+        update();
     }
 protected:
     void enterEvent(QEnterEvent* event) override{QPushButton::enterEvent(event);if(property("sidebarAction").toBool())retargetAnimation(hoverMotion_,hover_,1,120);}
     void leaveEvent(QEvent* event) override{QPushButton::leaveEvent(event);if(property("sidebarAction").toBool())retargetAnimation(hoverMotion_,hover_,0,120);}
-    void hideEvent(QHideEvent* event) override{hoverMotion_.stop();hover_=0;QPushButton::hideEvent(event);}
+    void hideEvent(QHideEvent* event) override{hoverMotion_.stop();pressMotion_.stop();glyphMotion_.stop();sidebarMotion_.stop();hover_=press_=0;sidebarProgress_=isChecked()?1:0;glyphProgress_=glyph_==InteractionIcon::Save&&property("saveState").toString()=="saved"?1:0;QPushButton::hideEvent(event);}
     void paintEvent(QPaintEvent*) override {
         const qreal ratio=devicePixelRatioF();
-        if(mask_.isNull()||maskRatio_!=ratio){maskRatio_=ratio;mask_=QPixmap(QSize(20,20)*ratio);mask_.setDevicePixelRatio(ratio);mask_.fill(Qt::transparent);QPainter maskPainter(&mask_);renderer_.render(&maskPainter,QRectF(0,0,20,20));}
+        if(glyph_==InteractionIcon::None&&(mask_.isNull()||maskRatio_!=ratio)){maskRatio_=ratio;mask_=QPixmap(QSize(20,20)*ratio);mask_.setDevicePixelRatio(ratio);mask_.fill(Qt::transparent);QPainter maskPainter(&mask_);renderer_.render(&maskPainter,QRectF(0,0,20,20));}
         const auto state=property("saveState").toString();
         const bool unsaved=state=="dirty"||property("unsaved").toBool();
-        QColor color=unsaved||property("activePage").toBool()?accent_():state=="error"?kbtheme::danger:kbtheme::muted;
+        QColor color=unsaved||state=="saved"||property("activePage").toBool()?accent_():state=="error"?kbtheme::danger:kbtheme::muted;
         if(isDown())color=mixColor(color,kbtheme::ink,.25);
-        QPixmap ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);tint.end();
+        QPixmap ink;
+        if(glyph_==InteractionIcon::None){ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);}
         QPainter painter(this);if(!isEnabled())painter.setOpacity(.35);
         const bool sidebarAction=property("sidebarAction").toBool();
         if(sidebarAction){painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);painter.setBrush(kbtheme::content(.05*hover_));painter.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),8,8);}
         const bool rtl=layoutDirection()==Qt::RightToLeft;
-        painter.drawPixmap(QPointF(sidebarAction?(rtl?width()-42:22):(width()-20)/2.0,(height()-20)/2.0),ink);
+        const QRectF glyphArea(sidebarAction?(rtl?width()-42:22):(width()-20)/2.0,(height()-20)/2.0,20,20);
+        painter.save();painter.translate(glyphArea.center());painter.scale(1-.08*press_,1-.08*press_);painter.translate(-glyphArea.center());
+        if(glyph_!=InteractionIcon::None){
+            if(glyph_==InteractionIcon::Sidebar&&rtl){painter.translate(2*glyphArea.center().x(),0);painter.scale(-1,1);}
+            paintInteractionIcon(painter,glyphArea,glyph_,color,glyph_==InteractionIcon::Sidebar?sidebarProgress_:glyphProgress_);
+        }else painter.drawPixmap(glyphArea.topLeft(),ink);
+        painter.restore();
         if(sidebarAction&&!text().isEmpty()){
             painter.setOpacity(std::clamp((width()-64.0)/124.0,0.0,1.0));painter.setPen(color);
             painter.drawText(rtl?QRect(0,0,width()-64,height()):QRect(64,0,width()-64,height()),Qt::AlignAbsolute|Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft),text());painter.setOpacity(1);
@@ -339,14 +364,18 @@ protected:
 // Monocode switch: a quiet pill whose white knob travels between a 20% well
 // and the accent fill. No faces, no outlines — the state is the fill itself.
 class Toggle final : public QAbstractButton {
-    QVariantAnimation motion_;
-    qreal position_=0;
+    QVariantAnimation motion_,pressMotion_;
+    qreal position_=0,press_=0;
     std::function<QColor()> accent_;
 public:
     explicit Toggle(std::function<QColor()> accent,QWidget* parent=nullptr):QAbstractButton(parent),accent_(std::move(accent)){
         setCheckable(true);setFixedSize(48,28);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);
         motion_.setEasingCurve(monoEase());
+        pressMotion_.setEasingCurve(monoEase());
         connect(&motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){position_=value.toReal();update();});
+        connect(&pressMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){press_=value.toReal();update();});
+        connect(this,&QAbstractButton::pressed,this,[this]{retargetAnimation(pressMotion_,press_,1,70);});
+        connect(this,&QAbstractButton::released,this,[this]{retargetAnimation(pressMotion_,press_,0,120);});
         connect(this,&QAbstractButton::toggled,this,[this](bool checked){
             if(!isVisible()){motion_.stop();position_=checked?1:0;update();return;}
             retargetAnimation(motion_,position_,checked?1:0,160);
@@ -357,7 +386,7 @@ public:
         QSignalBlocker block(this);motion_.stop();position_=checked?1:0;setChecked(checked);update();
     }
 protected:
-    void hideEvent(QHideEvent* event) override{motion_.stop();position_=isChecked()?1:0;QAbstractButton::hideEvent(event);}
+    void hideEvent(QHideEvent* event) override{motion_.stop();pressMotion_.stop();press_=0;position_=isChecked()?1:0;QAbstractButton::hideEvent(event);}
     void paintEvent(QPaintEvent*) override{
         QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
         const qreal position=motion_.state()==QAbstractAnimation::Running?position_:(isChecked()?1.0:0.0);
@@ -368,8 +397,8 @@ protected:
         // A 20% content well when off; the accent fill fades in when on.
         const QColor fill=mixColor(kbtheme::content(.2),accent,clamped);
         p.setPen(Qt::NoPen);p.setBrush(fill);p.drawRoundedRect(track,10,10);
-        const qreal knobX=16.0+16.0*clamped;
-        p.setBrush(Qt::white);p.drawEllipse(QPointF(knobX,14),8,8);
+        const qreal stretch=3*press_,knobX=8.0+16.0*clamped-stretch*clamped;
+        p.setBrush(Qt::white);p.drawRoundedRect(QRectF(knobX,6,16+stretch,16),8,8);
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){p.setBrush(Qt::NoBrush);p.setPen(QPen(accent,1.5));p.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),11,11);}
 
     }
@@ -442,6 +471,33 @@ protected:
     void hideEvent(QHideEvent* event) override{settle();QWidget::hideEvent(event);}
 };
 
+class WeaponTabs final : public QWidget {
+    QVariantAnimation motion_;
+    QRectF indicator_;
+    QPointer<QWidget> selected_;
+    QRectF destination() const{return selected_?QRectF(selected_->x()+12,height()-2,qMax(0,selected_->width()-24),2):QRectF();}
+public:
+    explicit WeaponTabs(QWidget* parent=nullptr):QWidget(parent){
+        motion_.setEasingCurve(monoEase());
+        connect(&motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){indicator_=value.toRectF();update();});
+    }
+    void choose(QWidget* button,bool animate){
+        if(selected_!=button){if(selected_)selected_->removeEventFilter(this);selected_=button;selected_->installEventFilter(this);}
+        const auto target=destination();
+        if(!animate||indicator_.isEmpty()){motion_.stop();indicator_=target;update();return;}
+        if(indicator_==target)return;
+        {QSignalBlocker blocked(&motion_);motion_.stop();motion_.setDuration(240);motion_.setStartValue(indicator_);motion_.setEndValue(target);motion_.setCurrentTime(0);}motion_.start();
+    }
+protected:
+    bool eventFilter(QObject* watched,QEvent* event) override{
+        if(watched==selected_&&(event->type()==QEvent::Move||event->type()==QEvent::Resize)){motion_.stop();indicator_=destination();update();}
+        return QWidget::eventFilter(watched,event);
+    }
+    void resizeEvent(QResizeEvent* event) override{motion_.stop();indicator_=destination();QWidget::resizeEvent(event);}
+    void hideEvent(QHideEvent* event) override{motion_.stop();indicator_=destination();QWidget::hideEvent(event);}
+    void paintEvent(QPaintEvent*) override{if(indicator_.isEmpty())return;QPainter painter(this);painter.fillRect(indicator_,kbtheme::defaultAccent);}
+};
+
 class WeaponButton final : public QPushButton {
     QVariantAnimation motion_;
     qreal amount_=0;
@@ -456,6 +512,7 @@ public:
         if(initialized_&&chosen_==chosen)return;
         const bool animate=initialized_&&isVisible();initialized_=true;chosen_=chosen;
         setProperty("chosen",chosen);{QSignalBlocker blocked(this);setChecked(chosen);}
+        if(chosen)if(auto* tabs=dynamic_cast<WeaponTabs*>(parentWidget()))tabs->choose(this,animate);
         if(animate)retargetAnimation(motion_,amount_,chosen?1:0,140);
         else{motion_.stop();amount_=chosen?1:0;update();}
     }
@@ -467,10 +524,7 @@ protected:
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);if(!isEnabled())painter.setOpacity(.4);
         const QRectF pill=QRectF(rect()).adjusted(1,1,-1,-1);
         const qreal amount=std::clamp(amount_,0.0,1.0);
-        // Compact tabs share a hairline baseline; only the selection has color.
-        QColor underline=accent_();underline.setAlphaF(amount);
-        painter.setPen(QPen(underline,2,Qt::SolidLine,Qt::FlatCap));
-        painter.drawLine(QPointF(12,height()-1),QPointF(width()-12,height()-1));
+        // The parent owns one traveling underline shared by both tabs.
         QColor ink=mixColor(kbtheme::content(.7),kbtheme::ink,amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
         painter.setFont(font());painter.setPen(ink);painter.drawText(rect().adjusted(0,0,0,-4),Qt::AlignCenter,text());
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),1.5));painter.drawRoundedRect(pill,8,8);}

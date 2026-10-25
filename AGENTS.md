@@ -9,12 +9,14 @@ This file is the shared working agreement for coding agents; `CLAUDE.md` imports
 - Understand the current source before changing behavior. Follow existing patterns and choose the smallest change that handles the real constraint. Do not preserve unnecessary complexity or add machinery for hypothetical needs.
 - Preserve unrelated work, including staged changes. Never reset, stash, revert, stage, or commit another task's edits. Never blanket-stage or force-push.
 - The person directing development does not write code. Explain changes, problems, and actual checks in plain English. Avoid jargon, code snippets, file paths, and line numbers unless requested or needed to identify a problem. Address them as "you"; never use their personal name. Keep routine updates short and report incomplete work directly.
-- Requirements below protect saved data, the running app, and delivery. Design and implementation preferences guide choices within those requirements. An explicit user instruction changing a project rule takes precedence over this file; carry out already authorized work without asking again. If an unresolved conflict would require exceeding that authorization, explain the specific conflict and ask before proceeding with that part.
+- Requirements below protect saved data, the running app, and delivery. Design and implementation preferences guide choices within those requirements. An explicit user instruction changing a project rule takes precedence over this file, including a request to replace a protected implementation choice; carry out already authorized work without asking again. Ask only about unresolved scope or consequences beyond that authorization.
+- Requirements describe intended behavior, not proof that the current source meets them. Report implementation discrepancies with evidence. A documentation audit may correct descriptive text, but must not weaken protective requirements or silently change application behavior to reconcile a mismatch.
+- When delegating, pass the task scope, relevant project rules, execution scope, and known unrelated changes. Delegation does not expand permission to publish or touch personal data. Require evidence and check findings before acting on them; the delegating agent owns the final result.
 - Do not create a pull request unless asked.
 
 ## The ways to hurt yourself
 
-1. **Running behavior uninvited.** Never run tests unless the user explicitly asks. A bug report, code change, build, or release does not authorize tests. This includes unit tests, UI self-checks, browser checks, installer smoke tests, and ad-hoc scripts that exercise behavior. Source review, diff review, and checking syntax, links, or file references are allowed. See [Verification](#verification) for authorized execution.
+1. **Running behavior in someone else's session.** Run tests, checks, builds, and the app whenever a check answers a real question; no separate permission is needed. A build or a review is not enough on its own to claim behavior, so actually run what the claim depends on. Keep desktop-backed runs isolated and invisible as described in [Verification](#verification), and stop every process you start.
 2. **Stopping the running app.** Azec may be running on this machine with the driver loaded. Never kill processes by name, window title, or path match. Stop only processes and process trees started by your work, using captured process IDs. Do not stop the user's app or alter personal settings to make a build succeed.
 3. **Writing to live data.** `%LOCALAPPDATA%\Azec` contains real profiles, logs, and the lock. Never use it as a test fixture or clean it up. Portable configuration beside a build or in its working folder may also be live; do not treat `runtime/` as disposable. Never replace, commit, or package personal configuration as defaults.
 4. **Leaking credentials.** Pairing codes, token-bearing links, and revealed QR images are credentials. Keep them local and out of logs, Git, documentation images, shared captures, and release assets.
@@ -33,7 +35,7 @@ This file is the shared working agreement for coding agents; `CLAUDE.md` imports
 
 ## Hit every surface
 
-For a relevant behavior change, review these areas before calling work done. Briefly report the applicable areas and what was actually checked; this review does not authorize running tests.
+For a relevant behavior change, review these areas before calling work done. Briefly report the applicable areas and what was actually checked.
 
 - **Surfaces:** changes to profiles, output switches, themes, language, or saving need a decision for the desktop, tray where applicable, and phone. Keep shared behavior in the existing Engine and persistence paths.
 - **Both weapons:** primary and secondary are independent. Rapid fire and shot delay belong to the active weapon profile.
@@ -51,34 +53,39 @@ Use PowerShell from the project root. The toolchain is Visual Studio 2022 C++ to
 - `.\setup-qt.ps1` installs the pinned Qt kit; `NEON_QT_ROOT` selects another compatible installation.
 - `.\build.cmd` builds the application without running tests.
 - `.\build.cmd checks` also builds the separate verification executable without running it.
-- `.\share.cmd` builds the single-file installer without tests; `quick` repackages the existing share build without recompiling.
+- `.\share.cmd` builds the single-file installer without tests; `quick` reuses the compiled application, rewrites `src/version.hpp` to that build's version, and rebuilds the installer wrapper.
 - `.\share.cmd publish` builds, packages, publishes, and verifies the EXE; see [Releasing](#releasing).
 
 Build intermediates belong in `.build/`, deployed files in `runtime/`, and distributable packages in `dist/`. The project uses qmake through `Azec.pro`.
 
+If deployment into `runtime/` fails because files are in use, report the incomplete deployment. Do not stop the user's app to finish the build.
+
 ## Verification
 
-Read [docs/testing.md](docs/testing.md) before choosing a verification command. Its command reference does not grant permission to run tests.
+Read [docs/testing.md](docs/testing.md) before choosing a verification command.
 
-- `build.cmd test`, `build.cmd test --suite`, and the `test` argument to `share.cmd` execute tests. `AZEC_SKIP_TESTS=1` overrides installer-test requests. Keep CI testing manual and its broader coverage separately opt-in.
+- `.\build.cmd test` runs the default suite and `.\build.cmd test --suite` runs the complete one. Match the scope to the question; a focused check is usually enough.
+- `build.cmd test`, `build.cmd test --suite`, and the `test` argument to `share.cmd` execute tests. `AZEC_SKIP_TESTS=1` skips only the `share.cmd` installer smoke test; it does not suppress `build.cmd test`. Keep CI testing manual.
 - Desktop-backed checks must use `tests/hidden_process.py` isolation on a noninteractive Windows station. Never open visible test windows, steal focus, move the cursor, or play sounds. Hiding a console alone does not isolate a GUI. If isolation fails, stop; there is no visible fallback.
-- Use a fresh fixture under `.build/verification`, never the project root or personal configuration. Use `--dry-run` to suppress mouse output and sounds. Installer fixtures also require `AZEC_INSTALL_TEST_ROOT` to redirect Programs, data, and shortcut paths. Stop the complete process trees started by your work.
-- Choose checks relevant to the request. Do not expand into scale/language matrices, real-time expiry, or extra suites without authorization. Stop after the relevant check passes; repeat only after a relevant fix or new evidence.
-- An explicit screenshot request authorizes the requested captures, not a test suite. Use isolated dry-run data and exclude pairing credentials. Browser emulation is not a physical-phone test.
+- Use a fresh fixture under `.build/verification`, never the project root or personal configuration. Use `--dry-run` to suppress mouse output and sounds. Installed fixture executables honor `AZEC_INSTALL_TEST_ROOT` only together with `--dry-run`; without that flag the environment variable does not redirect Programs, data, or shortcuts. The installer Python runner supplies both itself. Stop the complete process trees started by your work.
+- Choose checks relevant to the request. Do not expand into scale/language matrices, real-time expiry, or extra suites unless that coverage is the question being answered. Stop after the relevant check passes; repeat only after a relevant fix or new evidence.
+- A screenshot request asks for captures, not a test suite. Use isolated dry-run data and exclude pairing credentials. Browser emulation is not a physical-phone test.
 - Explain what was actually checked. A successful build does not establish runtime behavior. Never claim physical-phone, driver, or in-game verification without performing it.
 
 ## Releasing
 
-"Build and push," "ship a release," "publish an update," and "release a new version" authorize both the source commit/push and public EXE publication. Complete both without asking again. Honor restrictions such as build-only, source-only, no push, or no publishing. An ordinary edit is not a release request. Releases do not authorize tests; the artifact, version, and hash verification below is required delivery verification.
+"Build and push," "ship a release," "publish an update," and "release a new version" authorize both the source commit/push and public EXE publication. Complete both without asking again. Honor restrictions such as build-only, source-only, no push, or no publishing. An ordinary edit is not a release request. Publishing does not require tests; the artifact, version, and hash verification below is required delivery verification.
 
-1. Review the working tree and include only this task's changes. Confirm the source destination is private `Azec-Zuckerberg/Azec` and the binary destination is public `Azec-Zuckerberg/Azec-releases`. Preserve unrelated and staged work.
-2. Follow the test rule and resolve failures from any separately authorized checks. Do not stop the user's app or alter personal settings.
-3. Run `.\share.cmd publish`. It stamps `src/version.hpp`, rebuilds, packages, publishes **only `Azec.exe`**, and invokes `verify-release.ps1`. Do not substitute `quick`, a local build, or a source push. Add `test` only when the isolated installer smoke test was explicitly requested.
+Source-only delivery does not require installer version stamping or public-asset verification. If a release stops partway through, inspect the existing tag, local artifact, verification results, and source commit before resuming. After a successful upload, retry `verify-release.ps1` with `-Version` set to that release's numeric version; do not rerun `share.cmd publish`, which stamps a new version. If no release was created, fix the failure and restart publication normally. Do not create a new release or replace a published asset just to bypass a verification failure.
+
+1. Review the full working tree, not only staged files: packaging compiles the working files. Keep unrelated application source or embedded-asset edits out of the EXE, using a separate checkout with the intended task changes when necessary. Confirm the source destination is private `Azec-Zuckerberg/Azec` and the binary destination is public `Azec-Zuckerberg/Azec-releases`. Preserve unrelated and staged work.
+2. Resolve failures from your checks. Do not stop the user's app or alter personal settings.
+3. Run `.\share.cmd publish`. It stamps `src/version.hpp`, rebuilds, packages, publishes **only `Azec.exe`**, and invokes `verify-release.ps1`. Do not substitute `quick`, a local build, or a source push. Add `test` to include the isolated installer smoke test.
 4. Confirm the published tag matches `src/version.hpp`. Download that exact release into a fresh `.build/verification` directory. Its SHA-256 must match both GitHub's asset `digest` and local `dist/Azec.exe`; a missing digest or mismatch is a failure. Confirm the stable latest-download URL serves the new release anonymously.
 5. Commit and push this task's source changes, including the generated version, to the intended branch (normally `main`). Never blanket-stage or force-push. Verify the remote contains the source commit.
 6. Report the version, source commit, checks performed/skipped, and [stable EXE download](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe). Existing users update through **Settings → General → Updates → Check for updates**, with AppData profiles preserved.
 
-Only the clean EXE belongs in uploaded public assets: no checksum file, private source, profiles, logs, credentials, or verifier. The updater uses GitHub's asset digest. GitHub's automatic source archives cannot be removed through the release-assets API; the separate public release repository must contain only its release README/scaffolding. If publication, digest verification, authentication, or source push fails, report the exact incomplete step instead of calling the release complete.
+Only the clean EXE belongs in uploaded public assets: no checksum file, private source, profiles, logs, credentials, or verifier. The updater uses GitHub's asset digest. GitHub's automatic source archives cannot be removed through the release-assets API; the separate public release repository must contain only its release README/scaffolding. Publication makes the EXE public before verification runs; a verification failure leaves it available. If publication, digest verification, authentication, or source push fails, report the exact incomplete step and public state instead of calling the release complete.
 
 ## How it works
 
@@ -125,13 +132,20 @@ The reference is [monocode](https://github.com/hardbeat920/monocode) (MIT; notic
 Consult [Appearance and settings](docs/reference.md#appearance-and-settings) and the overview in that document before changing presentation. They retain the detailed glass, motion, scrollbar, sizing, and sidebar requirements. Color tokens in `src/theme.hpp` are authoritative; the phone follows them through `appearance.colors`.
 
 - General offers only Dark and Light; default Dark. No palette picker, interface selector, free accent picker, radius slider, glass preference, or Appearance category. Settings categories remain General, Shortcuts, Phone control, and Profile backup. Do not restore the Converter tab.
-- Use translucent content fills over window glass, 1 px hairline separators, borderless action buttons, a single blue accent, system fonts (Segoe UI with Consolas numerics), 6–10 px control corners, fully rounded header status buttons, and soft shadows only on floating surfaces. No gradients, glow, chunky outlines, hard offset shadows, sticker headings, face toggles, or bundled display fonts.
+- Use translucent content fills over window glass, 1 px hairline separators, borderless action buttons, a single blue accent, system fonts (Segoe UI with Consolas numerics), 6–10 px control corners, and soft shadows only on floating surfaces. Recoil and Rapid fire in the header are flat icon-and-label controls with no background boxes, including on hover or press; retain their hit targets and keyboard focus outline. No gradients, glow, chunky outlines, hard offset shadows, sticker headings, face toggles, or bundled display fonts.
 - Theme changes save atomically in UI preferences, preserve other preferences and pending profile edits, and leave the prior theme selected with a persistent error if saving fails. Preserve native glass in both themes and the established theme/move/resize transitions.
 - Keep the compact window, custom window controls, raised right panel, seamless header, existing hit targets, and legibility. Long names and translations must fit without widening the sidebar.
 - Keyboard focus uses an accent outline. Mouse clicks on switches must not add that ring.
-- Save stays flat with unchanged artwork and readable text: neutral ink when saved, accent when dirty. Success uses the tooltip; failure uses a persistent banner. Temporary feedback never clears dirty state. Preserve Save/Discard/Cancel and the consistent hotkey, close-confirmation, and Quick Guide dialogs.
+- Save uses the approved A arrow-and-tray SVG, staying flat and transparent: neutral ink when saved, accent when dirty. Only a successful save triggers the arrow landing and drawn-check confirmation, then returns to neutral; new edits cancel that confirmation. Keep the tooltip and persistent failure banner. Temporary feedback never clears dirty state or conceals a failed save. Preserve Save/Discard/Cancel and the consistent hotkey, close-confirmation, and Quick Guide dialogs.
 - Generate feedback sounds inside the app as ported cuelume recipes and honor the sound preference: mechanical toggle cues, scan cues for copy actions, success cues for explicit saves, and calm refusal cues for leaving with unsaved changes. Never use a Windows error beep or console bell.
 - Avoid continuous repainting and unbounded image caches. Preserve shared motion timing and rapid changes settling on the last selection.
+
+### Azec UX preferences
+
+- Aim for clean, Apple-like polish through precise button design, consistent SVG icons, immediate click feedback, and subtle, satisfying motion. Keep Azec's own identity, compact layout, and Windows presentation; refine the existing controls in place.
+- The approved direction includes animated Settings sliders, Copy icons that draw a check while their labels stay still, one traveling weapon-tab underline, a switch thumb that widens under pressure, and a directional sidebar chevron. Carry matching details to the phone where applicable.
+- Motion should explain the action and follow its real result. Keep it brief, smooth, reversible where appropriate, and confined to the control; preserve hit targets and scroll position. Settle on the latest state and stop animating at rest. Avoid decorative loops, bounce, glow, and extra containers.
+- For a new visual direction, show separate before-and-after variations with screenshots and replayable animations before changing the app. Once a variation and its accompanying details are approved, implement the full approved set without asking for the same approval again.
 
 ## Phone
 

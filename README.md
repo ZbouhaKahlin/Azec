@@ -38,7 +38,7 @@ Each operator has a primary profile and an optional secondary profile. Enabling 
 
 **Recoil** is a live switch shared by the desktop header, tray menu, and phone. It starts off when Azec opens. **Rapid fire** is saved per weapon profile, together with its shot delay. Switching weapons updates the displayed Rapid fire state. Shot delay ranges from 30 to 150 ms, with a slider and 5 ms adjustment buttons.
 
-**Only in Rainbow Six** is enabled by default. It limits mouse output and application shortcuts to when the game is focused. **Only while aiming** adds the aiming requirement to output. The panic shortcut is ignored while Azec is active.
+**Only in Rainbow Six** is enabled by default. It limits mouse output to when the game is focused. **Only while aiming** adds the aiming requirement to output. The panic shortcut is ignored while Azec is active.
 
 Profile edits apply in memory immediately. Click **Save**, press **Ctrl+S**, or tap **Save changes** on the phone to keep them after restarting. Browsing operators does not mark profiles as edited. If saving fails, a persistent message explains the problem and your edits stay unsaved. Ordinary closing offers **Save / Discard / Cancel** when needed.
 
@@ -89,9 +89,9 @@ Older backups preserve operators that were not included in them. Imported settin
 | Ctrl+F | Focus operator search |
 | Esc | Leave Settings or clear search |
 
-With the default game-focus preference enabled, show/hide, Recoil, weapon selection, and panic shortcuts require Rainbow Six to be focused. Local editing shortcuts work in Azec. Panic is ignored while Azec is active.
+With the default game-focus preference enabled, show/hide, Recoil, and weapon shortcuts currently work while Rainbow Six or Azec is focused. Panic requires Rainbow Six to be focused and is ignored while Azec is active. Local editing shortcuts work in Azec.
 
-Change bindings in **Settings → Shortcuts**. Show/hide, Recoil, and weapon bindings accept arrows, numpad, mouse side buttons, modifiers, and Windows keys. Duplicate bindings are rejected. Panic uses a more restricted key selection to avoid accidental exits.
+Change bindings in **Settings → Shortcuts**. Show/hide, Recoil, and weapon bindings accept arrows, numpad, mouse side buttons, modifiers, and Windows keys. Duplicate bindings are rejected. Panic uses a more restricted key selection to avoid accidental exits. Shortcut changes save immediately without saving pending profile edits.
 
 ## Installation and updates
 
@@ -112,7 +112,7 @@ Requires **Windows x64**, Visual Studio 2022 C++ tools, a Windows SDK, Python, a
 
 The setup script installs the pinned Qt kit in its standard location. Set `NEON_QT_ROOT` before building to select another compatible installation. The app uses qmake through `Azec.pro`. Build intermediates are written to `.build/`, with a root launcher and deployed files in `runtime/`.
 
-**Do not run tests unless the user explicitly requests them.** Ordinary changes, bug reports, builds, and releases do not grant that permission. `build.cmd checks` builds the separate verifier without executing it. Authorized diagnostic commands and isolation requirements are documented in [Testing](docs/testing.md); the permission rule in [AGENTS.md](AGENTS.md) takes precedence.
+`build.cmd checks` builds the separate verifier without executing it. Diagnostic commands and the isolation rules that keep desktop checks invisible are documented in [Testing](docs/testing.md).
 
 ### Package and publish
 
@@ -122,9 +122,9 @@ The setup script installs the pinned Qt kit in its standard location. Set `NEON_
 .\share.cmd publish  # Build, publish, and verify the public EXE
 ```
 
-These commands do not run tests by default. The optional `test` argument requires an explicit request; `AZEC_SKIP_TESTS=1` still skips installer tests.
+These commands do not run tests by default. The `test` argument includes the installer smoke test; `AZEC_SKIP_TESTS=1` still skips it.
 
-Publication uses the GitHub CLI, uploads only **Azec.exe** to [Azec-releases](https://github.com/Azec-Zuckerberg/Azec-releases), and runs `verify-release.ps1`. Verification matches the release version and GitHub asset digest with the local EXE and fresh anonymous downloads, including the stable download link. Source remains in the private Azec repository. Agents follow the complete [release workflow](AGENTS.md#releasing), including the source commit and push.
+Publication requires an authenticated GitHub CLI, uploads only **Azec.exe** to [Azec-releases](https://github.com/Azec-Zuckerberg/Azec-releases), and runs `verify-release.ps1`. Verification matches the release version and GitHub asset digest with the local EXE and fresh anonymous downloads, including the stable download link. Source remains in the private Azec repository. Agents follow the complete [release workflow](AGENTS.md#releasing), including the source commit and push.
 
 `package-release.ps1` creates the optional `dist/Azec-portable.zip` with an adjacent runtime. Both package formats exclude personal configuration, logs, pairing captures, stale executable backups, and verification executables.
 
@@ -132,7 +132,7 @@ Publication uses the GitHub CLI, uploads only **Azec.exe** to [Azec-releases](ht
 
 - [Application reference](docs/reference.md): detailed behavior, storage, and phone control.
 - [Agent instructions](AGENTS.md): project boundaries, compatibility, design, and delivery rules. [CLAUDE.md](CLAUDE.md) imports the same instructions.
-- [Testing](docs/testing.md): commands for explicitly authorized diagnostics.
+- [Testing](docs/testing.md): diagnostic commands and the isolation they use.
 
 The design reference is [monocode](https://github.com/hardbeat920/monocode), adapted from its web interface into Azec's native Qt controls. Azec's application-specific controls live in this repository.
 

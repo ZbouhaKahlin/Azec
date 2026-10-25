@@ -136,7 +136,13 @@ QJsonObject MainWindow::selfTest(const QString& output){
         operators_->setCurrentRow(0);checks["other_profile_preserved"]=vertical_->value()==10&&horizontal_->value()==0;operators_->setCurrentRow(4);const auto fixture=std::filesystem::path(output.toStdWString())/L"ui-test-config.bin";r6::Config readback;checks["3734_byte_compatible_settings"]=engine_.save(fixture)&&readback.load(fixture)&&readback.bytes()==engine_.snapshot().bytes();
         const auto saveIcon=save_->icon().cacheKey();save_->click();r6::Config saved;checks["save_button_writes_settings"]=saved.load(config_path_)&&saved.bytes()==engine_.snapshot().bytes();checks["save_icon_feedback"]=save_->property("saveState").toString()=="saved";
         wait(180);const auto saveAfterClick=save_->grab().toImage();capture(output+"/save-start.png");wait(1100);capture(output+"/save-feedback.png");
-        checks["save_has_no_glow_or_icon_swap"]=save_->grab().toImage()==saveAfterClick&&save_->icon().cacheKey()==saveIcon;
+        const auto saveConfirmed=save_->grab().toImage();
+        const qreal saveRatio=saveConfirmed.devicePixelRatio();
+        const QRectF saveGlyph((save_->width()-20)/2.0,(save_->height()-20)/2.0,20,20);
+        bool saveMotionConfined=true;
+        for(int y=0;y<saveConfirmed.height();++y)for(int x=0;x<saveConfirmed.width();++x)
+            if(!saveGlyph.adjusted(-1,-1,1,1).contains(QPointF(x/saveRatio,y/saveRatio))&&saveConfirmed.pixel(x,y)!=saveAfterClick.pixel(x,y))saveMotionConfined=false;
+        checks["save_confirmation_animates_inside_icon_only"]=saveConfirmed!=saveAfterClick&&saveMotionConfined&&save_->icon().cacheKey()==saveIcon&&!save_->graphicsEffect();
         const bool rapidBefore=engine_.rapid_active();rapid_active_->click();checks["profile_rapid_control"]=engine_.rapid_active()!=rapidBefore&&unsaved_;checks["rapid_status_matches_toggle"]=rapid_status_->text()==text(UiText::RapidFireOn);save();{r6::Engine restored(true);checks["rapid_profile_persists"]=restored.load(config_path_)&&restored.rapid_active()==engine_.rapid_active();}rapid_active_->click();save();
         const bool focusBefore=engine_.game_focus_only;game_focus_only_->click();checks["game_focus_control"]=engine_.game_focus_only.load()!=focusBefore&&unsaved_;save();{r6::Engine restored(true);checks["game_focus_preference_persists"]=restored.load(config_path_)&&restored.game_focus_only.load()==engine_.game_focus_only.load();}game_focus_only_->click();save();
         const bool adsBefore=engine_.ads_only;ads_only_->click();checks["ads_only_control"]=engine_.ads_only.load()!=adsBefore&&unsaved_;save();{r6::Engine restored(true);checks["ads_only_preference_persists"]=restored.load(config_path_)&&restored.ads_only.load()==engine_.ads_only.load();}ads_only_->click();save();
@@ -370,6 +376,18 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["phone_rejects_global_hotkey_collision"]=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key2",baseline.menu_key}}}}).contains("error");
         checks["phone_accepts_mouse_hotkeys"]=!mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",1}}}}).contains("error");
         mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",baseline.recoil_key}}}});
+        // A shortcut change persists the binding without committing a pending profile edit.
+        {
+            r6::Config diskBefore;diskBefore.load(config_path_);
+            const float savedVertical=diskBefore.operators[5].vertical;
+            engine_.edit([&](r6::Config& c){c.operators[5].vertical=savedVertical+9.4f;});dirty();
+            const bool keySaved=!mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key3",6}}}}).contains("error");
+            r6::Config diskAfter;const bool reread=diskAfter.load(config_path_);
+            QFile sidecar(weaponFile(config_path_));QJsonDocument sidecarJson;
+            if(sidecar.open(QIODevice::ReadOnly))sidecarJson=QJsonDocument::fromJson(sidecar.readAll());
+            checks["shortcut_change_keeps_profile_edits_pending"]=keySaved&&reread&&qAbs(diskAfter.operators[5].vertical-savedVertical)<0.001f&&sidecarJson.object()["primaryKey"].toInt()==6&&unsaved_;
+            mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key3",baseline.primary_key}}}});
+        }
         {r6::Operator slow;slow.delay=500;checks["stored_delay_above_ui_range_clamps_for_workers"]=r6::rapid_interval(slow)==150;}
         applyStyle();dirty();wait(180);
         // Count pixels painted in the live accent so the check covers both the
@@ -378,7 +396,9 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto accentInk=[standardAccent](const QImage& image){int count=0;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x){const auto color=image.pixelColor(x,y);if(qAbs(color.red()-standardAccent.red())<=24&&qAbs(color.green()-standardAccent.green())<=24&&qAbs(color.blue()-standardAccent.blue())<=24)++count;}return count;};
         checks["dirty_save_uses_the_standard_accent"]=unsaved_&&save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())>12;
         save_blocked_=true;save();checks["failed_save_retains_accent_and_dirty_state"]=unsaved_&&save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())>12;
-        save_blocked_=false;save();wait(180);save_->clearFocus();const int neutralAccentPixels=accentInk(save_->grab().toImage());checks["save_cleared_unsaved_flag"]=!unsaved_&&!save_->property("unsaved").toBool();checks["save_icon_has_no_accent_pixels"]=neutralAccentPixels==0;checks["successful_save_returns_to_neutral"]=!unsaved_&&!save_->property("unsaved").toBool()&&neutralAccentPixels==0;
+        save_blocked_=false;save();wait(180);save_->clearFocus();
+        checks["successful_save_shows_accent_confirmation"]=!unsaved_&&!save_->property("unsaved").toBool()&&accentInk(save_->grab().toImage())>12;
+        wait(1600);const int neutralAccentPixels=accentInk(save_->grab().toImage());checks["save_cleared_unsaved_flag"]=!unsaved_&&!save_->property("unsaved").toBool();checks["save_icon_has_no_accent_pixels"]=neutralAccentPixels==0;checks["successful_save_returns_to_neutral"]=!unsaved_&&!save_->property("unsaved").toBool()&&neutralAccentPixels==0;
         editOperator([](r6::Operator& op){op.vertical=13.1f;});
         QTimer::singleShot(80,this,[this,output]{if(auto* modal=QApplication::activeModalWidget()){modal->grab().save(output+"/unsaved-close.png");if(auto* cancel=modal->findChild<QPushButton*>("cancelClose"))cancel->click();}});
         close();checks["cancel_close_keeps_unsaved_app_running"]=isVisible()&&engine_.running&&unsaved_;

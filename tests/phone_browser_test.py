@@ -127,6 +127,11 @@ def run(full=False):
             page.locator('#primary').click()
             page.wait_for_function('()=>state.weaponSlot===0 && pending===0')
             checks['delay_profiles_are_independent'] = page.evaluate('state.profile.delay===150')
+            # An empty number field is unfinished input, not a zero.
+            blank_before = page.evaluate('state.profile.vertical')
+            page.locator('#vertical').fill('')
+            page.locator('#vertical').press('Tab')
+            checks['blank_vertical_keeps_the_saved_value'] = page.evaluate('state.profile.vertical') == blank_before and page.locator('#vertical').input_value() == f'{blank_before:.1f}' and page.evaluate('pending') == 0
             # Debounced slider edits must precede Save, even if Save is tapped immediately.
             page.evaluate("()=>{document.getElementById('delay').value=87;document.getElementById('delay').dispatchEvent(new Event('input'));return mutate({action:'save'})}")
             checks['save_flushes_slider_edit'] = page.evaluate('state.profile.delay===87 && !state.dirty')

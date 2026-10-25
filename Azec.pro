@@ -26,3 +26,4 @@ HEADERS += src/driver_setup.hpp
 HEADERS += src/driver_trust.hpp
 HEADERS += src/driver_download.hpp
 HEADERS += src/profile_sets.hpp
+HEADERS += src/interaction_icons.hpp

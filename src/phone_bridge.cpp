@@ -75,13 +75,13 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
                 auto& op=slot?next.secondary[id]:next.operators[id];
                 if((op.rapid!=0)!=rapid){op.rapid=rapid?1:0;rapidChanged=true;}
             }
-            const bool persistenceChanged=next.bytes()!=before.bytes()||next.primary_key!=before.primary_key||next.secondary_key!=before.secondary_key||
+            const bool persistenceChanged=next.sound!=before.sound||next.language!=before.language||
                 rapidChanged||focus!=engine_.game_focus_only||ads!=engine_.ads_only;
             engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_active=active;engine_.game_focus_only=focus;engine_.ads_only=ads;
             if(close_prompt_&&values.contains("recoilActive"))close_recoil_changed_=true;
             if(persistenceChanged)dirty();syncSelection();updateStatus();
             if(rebuild)QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});
-            if(keysChanged&&!save())return fail("Could not save configuration");
+            if(keysChanged&&!saveShortcuts())return fail("Could not save configuration");
             return mobileState();
         }
         return fail("Unknown action");

@@ -93,6 +93,25 @@ int main(int argc,char** argv){
           restored.snapshot().operators[0].vertical==37&&restored.snapshot().secondary[0].vertical==29,
           "successful import transaction persists UI and independent profiles together");
 
+    const auto savedBinary=read(binary),savedProfiles=read(profiles);
+    engine.edit([](r6::Config& config){config.operators[0].vertical=49;config.secondary[0].vertical=51;});
+    held=lock(binary);saved=persistHotkeys(path,VK_HOME,VK_F7,VK_END,'3','4');if(held!=INVALID_HANDLE_VALUE)CloseHandle(held);
+    check(held!=INVALID_HANDLE_VALUE&&!saved&&read(binary)==savedBinary&&read(profiles)==savedProfiles&&read(ui)==importedUi,
+          "locked binary rejects shortcut save without changing saved data");
+    held=lock(profiles);saved=persistHotkeys(path,VK_HOME,VK_F7,VK_END,'3','4');if(held!=INVALID_HANDLE_VALUE)CloseHandle(held);
+    check(held!=INVALID_HANDLE_VALUE&&!saved&&read(binary)==savedBinary&&read(profiles)==savedProfiles&&read(ui)==importedUi,
+          "locked sidecar rolls back shortcut binary write and preserves preferences");
+    check(persistHotkeys(path,VK_HOME,VK_F7,VK_END,'3','4')&&restored.load(path)&&
+          restored.snapshot().menu_key==VK_HOME&&restored.snapshot().recoil_key==VK_F7&&
+          restored.snapshot().primary_key=='3'&&restored.snapshot().secondary_key=='4'&&
+          restored.snapshot().operators[0].vertical==37&&restored.snapshot().secondary[0].vertical==29&&
+          engine.snapshot().operators[0].vertical==49&&engine.snapshot().secondary[0].vertical==51&&read(ui)==importedUi,
+          "shortcut save persists only bindings while both pending weapon edits remain in memory");
+    const auto hotkeyBinary=read(binary);
+    check(write(profiles,"broken sidecar")&&!persistHotkeys(path,VK_INSERT,VK_F6,VK_END,'1','2')&&
+          read(binary)==hotkeyBinary&&read(profiles)=="broken sidecar"&&write(profiles,savedProfiles),
+          "shortcut save rejects damaged sidecar without overwriting it or the binary");
+
     const auto root=std::filesystem::path(fixture.toStdWString())/L"installed";
     const auto payload=root/L"payload";
     const wchar_t* required[]={L"Azec.exe",L"Qt6Core.dll",L"Qt6Gui.dll",L"Qt6Widgets.dll",L"Qt6Network.dll",L"Qt6Svg.dll",L"platforms/qwindows.dll",L"tls/qschannelbackend.dll",L"vcruntime140.dll",L"vcruntime140_1.dll",L"msvcp140.dll",L"msvcp140_1.dll",L"msvcp140_2.dll"};
