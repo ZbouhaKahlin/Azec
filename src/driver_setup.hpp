@@ -52,7 +52,10 @@ public:
         const auto length=GetFinalPathNameByHandleW(file_,resolved,DWORD(std::size(resolved)),FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
         if(!length||length>=std::size(resolved))return false;
         path_=QString::fromWCharArray(resolved,int(length));
-        const auto local=QDir::fromNativeSeparators(path_);
+        // Qt's native-separator conversion removes the extended-path prefix.
+        // Keep it intact for the drive check and directory guards below.
+        auto local=path_;
+        local.replace(QLatin1Char('\\'),QLatin1Char('/'));
         // Only local drive paths are supported for executable driver files.
         if(!local.startsWith("//?/")||local.size()<7||!local[4].isLetter()||local.mid(5,2)!=":/")return false;
         const auto parent=local.left(qMax(qsizetype(7),local.lastIndexOf('/')));

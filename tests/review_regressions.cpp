@@ -34,6 +34,24 @@ int main(int argc,char** argv){
     check(lan::selectAddress({{QHostAddress("169.254.1.2"),true,true,false,1}}).isEmpty(),
           "link-local adapters are not advertised");
 
+    const auto verifiedPath=fixture+QString::fromUtf8("/friend's files \xc3\xa9 $value/verified.bin");
+    const QByteArray verifiedBytes("verified file contents");
+    const auto verifiedHash=QCryptographicHash::hash(verifiedBytes,QCryptographicHash::Sha256);
+    check(write(verifiedPath,verifiedBytes),"create file-verification fixture with a non-ASCII path");
+    {
+        driver_setup::VerifiedFile file;
+        check(file.open(verifiedPath,verifiedHash),
+              "resolved Windows drive path accepts a file with the expected checksum");
+        const HANDLE replacement=CreateFileW(reinterpret_cast<LPCWSTR>(verifiedPath.utf16()),GENERIC_WRITE,
+            FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        check(replacement==INVALID_HANDLE_VALUE,"verified file stays protected against replacement");
+        if(replacement!=INVALID_HANDLE_VALUE)CloseHandle(replacement);
+    }
+    {
+        driver_setup::VerifiedFile file;
+        check(!file.open(verifiedPath,QByteArray(32,'\0')),"resolved file still rejects a wrong checksum");
+    }
+
     const auto source=fixture+"/manual/library/x64/interception.dll";
     check(write(source,"MZ-first")&&!driver_setup::place(source)&&!QFileInfo::exists(driver_setup::dllTarget()),
           "unverified driver is rejected before persistent storage is created");
