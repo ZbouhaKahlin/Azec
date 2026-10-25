@@ -11,6 +11,8 @@
 /ui-verification.json
 /azec.log*
 /r6_config.corrupt-*.bin
+/azec_weapons.corrupt-*.json
+/azec_ui.corrupt-*.json
 /*.lock
 __pycache__/
 *.py[cod]

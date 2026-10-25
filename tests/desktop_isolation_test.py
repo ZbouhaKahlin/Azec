@@ -12,7 +12,7 @@ from unittest.mock import patch
 import hidden_process as hidden
 
 CHILD = r'''
-import ctypes,json,subprocess,sys,time
+import ctypes,json,pathlib,subprocess,sys,time
 from ctypes import wintypes as w
 u=ctypes.WinDLL('user32',use_last_error=True)
 u.GetProcessWindowStation.restype=w.HANDLE
@@ -30,7 +30,10 @@ window=u.CreateWindowExW(0,'STATIC','Azec isolated fixture',0xcf0000,0,0,320,200
 assert window
 u.ShowWindow(window,5)
 descendant=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],creationflags=subprocess.CREATE_NO_WINDOW)
-with open(sys.argv[1],'w') as f: json.dump({'noninteractive':True,'window_created':bool(window),'descendant':descendant.pid},f)
+report=pathlib.Path(sys.argv[1])
+pending=report.with_suffix('.tmp')
+pending.write_text(json.dumps({'noninteractive':True,'window_created':bool(window),'descendant':descendant.pid}))
+pending.replace(report)
 time.sleep(60)
 '''
 

@@ -6,11 +6,9 @@ A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 op
 
 [Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec-releases/releases) · [Application reference](docs/reference.md)
 
-| Dark | Light |
-| --- | --- |
-| ![Azec Dark theme](docs/ui-dark.png) | ![Azec Light theme](docs/ui-light.png) |
+![Azec desktop and connected phone interface showing the same Ash profile](docs/showcase-11J.png)
 
-Current MonoCode desktop, captured with example profiles. The download above is the published release; these screenshots show the current design.
+Current desktop and phone design, shown with example profiles. The download above is the published release; this image shows the current design.
 
 ## Get started
 
@@ -101,7 +99,7 @@ The download is a single-file installer. Program files normally live in `%LOCALA
 
 Open **Settings → General → Updates → Check for updates** to look for a newer release. Installation asks for confirmation, verifies the download's SHA-256, and preserves the data folder.
 
-For a first installation from a portable copy, put the new EXE beside the existing portable settings and run it after closing the old app. Settings are copied only when the installed store is empty; originals are retained. Use Profile backup for later transfers.
+For a first installation from a portable copy, put the new EXE beside the existing portable settings and `runtime` folder and run it after closing the old app. Settings are copied only when the installed store is empty; originals are retained. Use Profile backup for later transfers.
 
 ## Build from source
 
@@ -112,7 +110,7 @@ Requires **Windows x64**, Visual Studio 2022 C++ tools, a Windows SDK, Python, a
 .\build.cmd
 ```
 
-The setup script installs the pinned Qt kit. Set `NEON_QT_ROOT` to select another compatible installation. The app uses qmake through `Azec.pro`. Build intermediates are written to `.build/`, with a root launcher and deployed files in `runtime/`.
+The setup script installs the pinned Qt kit in its standard location. Set `NEON_QT_ROOT` before building to select another compatible installation. The app uses qmake through `Azec.pro`. Build intermediates are written to `.build/`, with a root launcher and deployed files in `runtime/`.
 
 **Do not run tests unless the user explicitly requests them.** Ordinary changes, bug reports, builds, and releases do not grant that permission. `build.cmd checks` builds the separate verifier without executing it. Authorized diagnostic commands and isolation requirements are documented in [Testing](docs/testing.md); the permission rule in [AGENTS.md](AGENTS.md) takes precedence.
 

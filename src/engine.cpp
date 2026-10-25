@@ -23,14 +23,15 @@ void Engine::edit(const std::function<void(Config&)>& change){std::lock_guard lo
 bool Engine::select_weapon(int slot){std::lock_guard lock(config_mutex_);if(slot<0||slot>1||(slot==1&&!config_.secondary_enabled[config_.selected]))return false;config_.weapon_slot=slot;return true;}
 bool Engine::rapid_active() const {std::lock_guard lock(config_mutex_);return config_.active_operator().rapid!=0;}
 void Engine::set_rapid_active(bool on){std::lock_guard lock(config_mutex_);config_.active_operator().rapid=on?1:0;}
-bool Engine::load(const std::filesystem::path& file){
+bool Engine::load(const std::filesystem::path& file,bool* weaponProfilesValid){
     std::lock_guard lock(config_mutex_);
     if(!config_.load(file))return false;
     // The accent and the background response radius are fixed materials now;
     // old custom values are normalized on load and on the next save.
     config_.neon[0]=114.0f/255;config_.neon[1]=72.0f/255;config_.neon[2]=215.0f/255;config_.radius=130;
     bool focusOnly=true,adsOnly=false;
-    readWeaponProfiles(config_,focusOnly,adsOnly,file);
+    const bool valid=readWeaponProfiles(config_,focusOnly,adsOnly,file);
+    if(weaponProfilesValid)*weaponProfilesValid=valid;
     game_focus_only=focusOnly;
     ads_only=adsOnly;
     return true;
@@ -112,6 +113,9 @@ void Engine::recoil_worker(){
 }
 void Engine::rapid_worker(){
     bool released=false;HWND releaseWindow=nullptr;
+    const auto permitted=[&](HWND window){
+        return running.load()&&input_allowed.load()&&!menu_visible.load()&&window&&GetForegroundWindow()==window;
+    };
     const auto handBack=[&]{
         // Restore only a release we sent, while output is still permitted.
         // Never restore a held press into the app or a changed foreground window.
@@ -129,9 +133,13 @@ void Engine::rapid_worker(){
             sleep(50);continue;
         }
         if((GetAsyncKeyState(VK_LBUTTON)&0x8000)&&!menu_visible){
-            releaseWindow=GetForegroundWindow();input(MOUSEEVENTF_LEFTUP);released=true;sleep(5);if(!running)break;
+            const HWND burstWindow=GetForegroundWindow();
+            if(!permitted(burstWindow)){sleep(4);continue;}
+            releaseWindow=burstWindow;input(MOUSEEVENTF_LEFTUP);released=true;sleep(5);if(!running)break;
+            if(!permitted(burstWindow)){released=false;continue;}
             input(MOUSEEVENTF_LEFTDOWN);released=false;sleep(25);if(!running)break;
-            releaseWindow=GetForegroundWindow();input(MOUSEEVENTF_LEFTUP);released=true;sleep(rapid_interval(op));
+            if(!permitted(burstWindow))continue;
+            releaseWindow=burstWindow;input(MOUSEEVENTF_LEFTUP);released=true;sleep(rapid_interval(op));
         }else sleep(4);
     }
     handBack();

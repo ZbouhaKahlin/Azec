@@ -178,4 +178,6 @@ inline const char* const lang_pt[]={
     "Feche o Azec com a tecla de saída de emergência.",
     "Alterne para o perfil primário do operador selecionado.",
     "Alterne para o perfil secundário separado quando ativado.",
+    "As configurações danificadas foram preservadas em %1. Os valores ilegíveis usam os padrões; revise as configurações antes de salvar.",
+    "Não foi possível preservar %1. O salvamento está bloqueado para proteger suas configurações. Faça uma cópia desse arquivo e verifique as permissões.",
 };

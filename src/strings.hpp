@@ -182,8 +182,10 @@ enum class UiText {
     ShortcutPanicHint,
     ShortcutPrimaryHint,
     ShortcutSecondaryHint,
+    AdditionalSettingsRecovered,
+    AdditionalSettingsBlocked,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::ShortcutSecondaryHint)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::AdditionalSettingsBlocked)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

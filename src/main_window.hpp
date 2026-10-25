@@ -77,7 +77,7 @@ class MainWindow final : public QWidget {
     QVariantAnimation operator_transition_;
     FadeLabel *name_opacity_=nullptr,*icon_opacity_=nullptr;
     QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr;
-    QPushButton* status_=nullptr;QPushButton* rapid_status_=nullptr;IconButton *save_=nullptr,*close_=nullptr,*gear_=nullptr;
+    QPushButton* status_=nullptr;QPushButton* rapid_status_=nullptr;IconButton *save_=nullptr,*close_=nullptr,*gear_=nullptr,*minimize_=nullptr;
     QWidget* preferences_=nullptr;QScrollArea* preferences_scroll_=nullptr;
     QWidget* profile_save_dock_=nullptr;QLabel* profile_save_hint_=nullptr;QPushButton* profile_save_button_=nullptr;
     QScrollArea* scroll_=nullptr;QWidget* settings_=nullptr;QVBoxLayout* cards_=nullptr;
@@ -107,7 +107,7 @@ class MainWindow final : public QWidget {
     QMenu* tray_menu_=nullptr;
     QAction *tray_window_=nullptr,*tray_recoil_=nullptr,*tray_rapid_=nullptr,*tray_exit_=nullptr;
     QDialog* close_alert_=nullptr;
-    bool unsaved_=false,force_close_=false,close_prompt_=false,save_blocked_=false;
+    bool unsaved_=false,force_close_=false,close_prompt_=false,save_blocked_=false,close_recoil_changed_=false;
     QPoint last_cursor_{-10000,-10000};
     QDoubleSpinBox *vertical_=nullptr,*horizontal_=nullptr;QSpinBox* delay_=nullptr;
     QSlider *vertical_slider_=nullptr,*horizontal_slider_=nullptr,*delay_slider_=nullptr;QWidget* delay_controls_=nullptr;StepButton *delay_minus_=nullptr,*delay_plus_=nullptr;QComboBox* language_=nullptr;QPointer<QDialog> palestine_popup_;
@@ -156,6 +156,7 @@ class MainWindow final : public QWidget {
         if(state=="saved")unsaved_=false;
         save_->setProperty("unsaved",unsaved_);
         save_->setProperty("saveState",state);
+        save_->setEnabled(!save_blocked_);
         save_->setToolTip(state=="dirty"?text(UiText::SaveConfigurationUnsavedChanges):state=="saved"?text(UiText::ConfigurationSaved):state=="error"?text(UiText::CouldNotSaveConfiguration):text(UiText::SaveConfiguration));
         save_->update();
         if(profile_save_button_){
@@ -163,7 +164,7 @@ class MainWindow final : public QWidget {
             profile_save_button_->setText(text(UiText::SaveChanges));profile_save_button_->setEnabled(unsaved_&&!save_blocked_);
         }
     }
-    void dirty(){if(!refreshing_){unsaved_=true;save_feedback_.stop();updateSavePresentation("dirty");update();}}
+    void dirty(){if(!refreshing_){unsaved_=true;save_feedback_.stop();updateSavePresentation("dirty");}}
     void editOperator(const std::function<void(r6::Operator&)>& change){engine_.edit([&](r6::Config& c){change(c.active_operator());});dirty();}
     std::filesystem::path favoritesPath() const{return config_path_.parent_path()/L"azec_ui.json";}
     QSet<QString> readFavorites() const {
@@ -447,6 +448,7 @@ class MainWindow final : public QWidget {
 
         auto* install=step(2,UiText::DriverStepInstall,UiText::DriverStepInstallBody);
         driver_code_=new CodeBlock(text(UiText::CopyCommand),text(UiText::Copied));
+        driver_code_->setCopyFeedback([this]{if(engine_.snapshot().sound)sound::playCopy();});
         driver_code_->layout()->setContentsMargins(0,8,0,8);
         install->addWidget(driver_code_);
 
@@ -677,6 +679,14 @@ class MainWindow final : public QWidget {
     // Both installed and older portable shared builds have a payload marker.
     bool packagedBuild() const{return QFileInfo(QCoreApplication::applicationDirPath()+"/version.txt").exists();}
     void setUpdating(bool busy){update_in_progress_=busy;if(update_button_)update_button_->setEnabled(!busy);}
+    void showSaveBeforeUpdate(){
+        auto message=text(UiText::SaveConfigurationUnsavedChanges);
+        if(notice_bar_->isVisible()&&notice_bar_->property("persistent").toBool()){
+            if(notice_->text().contains(message))return;
+            message=notice_->text()+"\n\n"+message;
+        }
+        showNotice(message,true,true);notice_bar_->setProperty("saveError",true);
+    }
     void checkForUpdates(){
         if(!update_button_||update_in_progress_)return;
         setUpdating(true);
@@ -703,7 +713,7 @@ class MainWindow final : public QWidget {
                 if(name==azec_update::assetName){asset=object["browser_download_url"].toString();digest=azec_update::validHash(object["digest"].toString().toLatin1());}
             }
             if(!packagedBuild()||asset.isEmpty()){QDesktopServices::openUrl(QUrl(azec_update::releasePage));return;}
-            if(unsaved_){showNotice(text(UiText::SaveConfigurationUnsavedChanges));return;}
+            if(unsaved_){showSaveBeforeUpdate();return;}
             if(QMessageBox::question(this,"Azec",text(UiText::UpdateAvailable)+"\n\nAzec "+current+"  ->  "+latest,QMessageBox::Yes|QMessageBox::No,QMessageBox::Yes)!=QMessageBox::Yes)return;
             downloadUpdate(asset,digest);
         });
@@ -721,7 +731,7 @@ class MainWindow final : public QWidget {
     }
     void applyDownloadedUpdate(const QString& file){
         // Edits may have arrived from the desktop or phone during the download.
-        if(unsaved_){showNotice(text(UiText::SaveConfigurationUnsavedChanges));return;}
+        if(unsaved_){showSaveBeforeUpdate();return;}
         const auto loader=azec_paths::launcher();
         auto* process=new QProcess(this);
         process->setProgram(file);
@@ -758,6 +768,8 @@ class MainWindow final : public QWidget {
         if(qApp->layoutDirection()!=direction){qApp->setLayoutDirection(direction);applyStyle();}
         operators_title_->setText(text(UiText::AllOperators));favorites_title_->setText(text(UiText::Favorites));search_->setPlaceholderText(text(UiText::SearchOperators));
         updateSettingsNavLabels();
+        if(minimize_){minimize_->setToolTip(text(UiText::Minimize));minimize_->setAccessibleName(text(UiText::Minimize));}
+        close_->setToolTip(text(UiText::Close));close_->setAccessibleName(text(UiText::Close));
         styleNotice();layoutNotice();
         updateSidebarControls();
         updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));status_->setToolTip(text(UiText::ToggleRecoilActivity));rapid_status_->setToolTip(text(UiText::RapidFire));filterOperators();syncSelection();updateStatus();
@@ -804,6 +816,7 @@ class MainWindow final : public QWidget {
         if(isVisible()&&isActiveWindow()&&pages_->currentWidget()==operator_page_&&!editing&&!qobject_cast<QSlider*>(focused)&&!qobject_cast<QAbstractItemView*>(focused)&&clock_.elapsed()-last_tune_>80){const float y=(keyDown(VK_UP)? .1f:0)-(keyDown(VK_DOWN)? .1f:0),x=(keyDown(VK_RIGHT)? .1f:0)-(keyDown(VK_LEFT)? .1f:0);if(x||y){editOperator([=](r6::Operator& op){op.vertical=std::clamp(op.vertical+y,0.f,100.f);op.horizontal=std::clamp(op.horizontal+x,-50.f,50.f);});syncSelection();last_tune_=clock_.elapsed();}}
     }
     bool save(bool celebrate=false){
+        if(save_blocked_)return false;
         QByteArray uiBytes;
         if(imported_ui_pending_){
             QJsonObject root;
@@ -877,12 +890,17 @@ class MainWindow final : public QWidget {
         connect(back,&QPushButton::clicked,&dialog,[&]{if(step)--step;refresh();});connect(next,&QPushButton::clicked,&dialog,[&]{if(step==4)dialog.accept();else{++step;refresh();}});refresh();roundWindow(&dialog);dialog.exec();
     }
 protected:
+    void updateWindowShape(){
+        if(isMaximized()||isFullScreen()){clearMask();return;}
+        // Painting a curve alone leaves the native acrylic rectangle behind it.
+        // A Qt mask also clips the HWND's blur and child surfaces on Windows 10.
+        QPainterPath shape;shape.addRoundedRect(QRectF(rect()),16,16);
+        setMask(QRegion(shape.toFillPolygon().toPolygon()));
+    }
     void paintEvent(QPaintEvent*) override {
 
         ++paint_count_;QPainter p(this);p.setRenderHint(QPainter::Antialiasing);
-        // The window shape is painted, not clipped: an antialiased rounded fill
-        // gives real smooth corners, and the acrylic blur shows through the
-        // rounded notches. Square corners while maximized.
+        // Match the native window mask; no acrylic may extend into the notches.
         const qreal radius=isMaximized()?0:16;
         QPainterPath shape;shape.addRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),radius,radius);
         p.fillPath(shape,glass_active_?kbtheme::windowGlass:kbtheme::paper);
@@ -919,6 +937,7 @@ protected:
         if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);const BOOL dark=!kbtheme::light;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));
             // The blur attaches after the first paint, like the reference.
             QTimer::singleShot(0,this,[this]{enableWindowGlass();});}
+        updateWindowShape();
     }
     void hideEvent(QHideEvent* event) override {
         settleThemeTransition();
@@ -928,7 +947,7 @@ protected:
     void closeEvent(QCloseEvent* event) override {
         if(close_prompt_){if(!isVisible())showNormal();raise();activateWindow();QApplication::alert(this,0);if(close_alert_&&close_alert_->isVisible()){close_alert_->raise();close_alert_->activateWindow();}event->ignore();return;}
         if(unsaved_&&!force_close_){
-            close_prompt_=true;const bool recoil=engine_.recoil_active.exchange(false);
+            close_prompt_=true;close_recoil_changed_=false;const bool recoil=engine_.recoil_active.exchange(false);
             if(!engine_.dry_run()&&engine_.snapshot().sound)sound::playUnsaved();
             if(!isVisible())showNormal();
             raise();activateWindow();QApplication::alert(this,0);
@@ -938,12 +957,16 @@ protected:
             auto* row=new QHBoxLayout;int choice=0;
             for(int i=0;i<3;++i){const QString titles[]={text(UiText::Cancel),text(UiText::Discard),text(UiText::Save)};auto* button=new MonoButton(titles[i]);button->setObjectName(i==2?"save":i==1?"discardChanges":"cancelClose");row->addWidget(button);connect(button,&QPushButton::clicked,&dialog,[&,i]{choice=i;dialog.accept();});}
             layout->addLayout(row);dialog.adjustSize();roundWindow(&dialog);close_alert_=&dialog;dialog.exec();close_alert_=nullptr;
-            engine_.recoil_active=recoil;close_prompt_=false;
+            if(!close_recoil_changed_)engine_.recoil_active=recoil;close_prompt_=false;
             if(choice==0||(choice==2&&!save(true))){event->ignore();return;}
         }
         if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
-    void resizeEvent(QResizeEvent* event) override {settleThemeTransition();QWidget::resizeEvent(event);layoutNotice();}
+    void resizeEvent(QResizeEvent* event) override {settleThemeTransition();QWidget::resizeEvent(event);updateWindowShape();layoutNotice();}
+    void changeEvent(QEvent* event) override {
+        QWidget::changeEvent(event);
+        if(event->type()==QEvent::WindowStateChange)updateWindowShape();
+    }
     bool eventFilter(QObject* object,QEvent* event) override {
         if(object==sidebar_search_box_&&event->type()==QEvent::Resize&&sidebar_search_)sidebar_search_->setFixedWidth(static_cast<QResizeEvent*>(event)->size().width());
         if(event->type()==QEvent::FocusIn||event->type()==QEvent::FocusOut||event->type()==QEvent::MouseButtonPress){
@@ -1011,7 +1034,7 @@ public:
         rapid_status_=new MonoButton;rapid_status_->setObjectName("statusRapid");rapid_status_->setFixedHeight(32);rapid_status_->setCursor(Qt::PointingHandCursor);rapid_status_->setToolTip(text(UiText::RapidFire));top->addWidget(rapid_status_);connect(rapid_status_,&QPushButton::clicked,this,[this]{toggleRapid();});
         save_=new IconButton(":/ui/save.svg",[this]{return accent();});save_->setObjectName("saveControl");save_->setAccessibleName(text(UiText::SaveConfiguration));top->addSpacing(7);top->addWidget(save_);connect(save_,&QPushButton::clicked,this,[this]{save(true);});
         save_feedback_.setSingleShot(true);save_feedback_.setInterval(1600);connect(&save_feedback_,&QTimer::timeout,this,[this]{updateSavePresentation("clean");});
-        gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});top->addSpacing(7);auto* minimize=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize->setObjectName("windowControl");minimize->setAccessibleName(text(UiText::Minimize));minimize->setToolTip(text(UiText::Minimize));top->addWidget(minimize);connect(minimize,&QPushButton::clicked,this,&QWidget::showMinimized);
+        gear_=new IconButton(":/ui/settings.svg",[this]{return accent();});gear_->setObjectName("windowControl");gear_->setAccessibleName(text(UiText::Settings));gear_->setToolTip(text(UiText::Settings));top->addWidget(gear_);connect(gear_,&QPushButton::clicked,this,[this]{showPreferences();});top->addSpacing(7);minimize_=new IconButton(":/ui/minimize.svg",[this]{return accent();});minimize_->setObjectName("windowControl");minimize_->setAccessibleName(text(UiText::Minimize));minimize_->setToolTip(text(UiText::Minimize));top->addWidget(minimize_);connect(minimize_,&QPushButton::clicked,this,&QWidget::showMinimized);
         close_=new IconButton(":/ui/close.svg",[this]{return accent();});close_->setObjectName("closeControl");close_->setAccessibleName(text(UiText::Close));close_->setToolTip(text(UiText::Close));top->addWidget(close_);connect(close_,&QPushButton::clicked,this,&QWidget::close);layout->addWidget(header);
         notice_bar_=new QWidget(this);notice_bar_->setObjectName("noticeBar");notice_bar_->setAttribute(Qt::WA_StyledBackground);auto* noticeLayout=new QVBoxLayout(notice_bar_);noticeLayout->setContentsMargins(24,22,24,22);noticeLayout->setSpacing(16);
         auto* noticeHeader=new QHBoxLayout;noticeHeader->setSpacing(12);notice_badge_=label({},"noticeBadge");notice_badge_->setFixedSize(34,34);notice_badge_->setAlignment(Qt::AlignCenter);noticeHeader->addWidget(notice_badge_);
@@ -1052,9 +1075,10 @@ public:
     void closeUsingControl(){close_->click();}
     void showNotice(const QString& message,bool error=false,bool persistent=false){
         if(!notice_bar_||!notice_)return;
-        // A routine success must not erase an unresolved save failure.
-        if(!error&&notice_bar_->isVisible()&&notice_bar_->property("saveError").toBool())return;
+        // Routine feedback must not erase a recovery notice or unresolved error.
+        if(!error&&notice_bar_->isVisible()&&notice_bar_->property("persistent").toBool())return;
         notice_bar_->setProperty("saveError",false);notice_bar_->setProperty("phoneError",false);
+        notice_bar_->setProperty("persistent",persistent||error);
         notice_bar_->setProperty("error",error);notice_->setText(message);styleNotice();
         notice_timer_.stop();layoutNotice();notice_scroll_->verticalScrollBar()->setValue(0);notice_bar_->show();notice_bar_->raise();
         if(!persistent&&!error){notice_timer_.setInterval(5000);notice_timer_.start();}

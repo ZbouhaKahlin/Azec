@@ -23,7 +23,7 @@ checks['page_removed_controls_and_has_quick_strip']=b'id="recoilMaster"' not in 
 checks['fresh_default_language_is_english']=json.loads(call('/api/state')[1])['globals']['language']==1
 initial=json.loads(call('/api/state')[1])
 appearance=initial['appearance']
-checks['phone_publishes_single_dark_look']=appearance.get('scheme')=='dark' and 'themes' not in appearance and 'id' not in appearance and appearance['colors']['paper']=='#171717' and appearance['colors']['accent']=='#459BF7'
+checks['phone_publishes_default_dark_theme']=appearance.get('scheme')=='dark' and 'themes' not in appearance and 'id' not in appearance and appearance['colors']['paper']=='#171717' and appearance['colors']['accent'].lower()=='#459bf7'
 checks['theme_updates_are_rejected']=call('/api/update',{'action':'setTheme','theme':'midnight'},auth=False)[0]==401 and call('/api/update',{'action':'setTheme','theme':'midnight'})[0]==400
 checks['appearance_change_preserves_profiles_and_dirty_state']=appearance['colors']['paper']==json.loads(call('/api/state')[1])['appearance']['colors']['paper'] and initial['operatorId']==json.loads(call('/api/state')[1])['operatorId']
 with urllib.request.urlopen(info['address']+'/',timeout=5) as response:
@@ -49,7 +49,8 @@ checks['selects_new_extension_operator']=json.loads(call('/api/update',{'action'
 checks['new_extension_profile_edits']=abs(json.loads(call('/api/update',{'action':'setProfile','operator':77,'slot':0,'values':{'vertical':22.5,'horizontal':1.5,'delay':70}})[1])['profile']['vertical']-22.5)<.001
 call('/api/update',{'action':'selectOperator','operator':71})
 checks['rejects_extension_boundary']=call('/api/update',{'action':'selectOperator','operator':78})[0]==400
-checks['rapid_active_roundtrip']=json.loads(call('/api/update',{'action':'setGlobal','values':{'rapidActive':True}})[1])['globals']['rapidActive']==True
+checks['rapid_active_requires_explicit_target']=call('/api/update',{'action':'setGlobal','values':{'rapidActive':True}})[0]==400
+checks['rapid_active_roundtrip']=json.loads(call('/api/update',{'action':'setGlobal','operator':71,'slot':0,'values':{'rapidActive':True}})[1])['globals']['rapidActive']==True
 checks['save_succeeds']=call('/api/update',{'action':'save'})[0]==200
 checks['legacy_layout_unchanged']=(folder/'r6_config.bin').stat().st_size==3734
 saved=json.loads((folder/'azec_weapons.json').read_text())
@@ -66,7 +67,7 @@ checks['rejects_wrong_host']=call('/api/state',extra={'Host':'unrelated.example:
 checks['unknown_authenticated_route']=call('/missing')[0]==404
 checks['manifest_available']=call('/manifest.webmanifest',auth=False)[0]==200
 manifest=json.loads(call('/manifest.webmanifest',auth=False)[1])
-checks['manifest_uses_single_look_colors']=manifest['theme_color']=='#459BF7' and manifest['background_color']=='#171717'
+checks['manifest_uses_default_dark_colors']=manifest['theme_color'].lower()=='#459bf7' and manifest['background_color']=='#171717'
 checks['home_screen_icon_available']=call('/app-icon.svg',auth=False)[0]==200
 checks['rejects_wrong_value_type']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'vertical':'12'}})[0]==400
 checks['rejects_fractional_delay']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'delay':50.5}})[0]==400

@@ -62,6 +62,16 @@ int main(int argc,char** argv){
           "PowerShell extraction failure returns failure");
 
     const auto path=std::filesystem::path(fixture.toStdWString())/L"r6_config.bin";
+    r6::Config library;
+    library.profile_sets.push_back(profilesets::capture(library,"saved","Saved profiles"));
+    library.active_profile_set="saved";
+    check(!profilesets::read(QJsonObject{{"profileSets","invalid"}},library)&&library.profile_sets.size()==1&&library.active_profile_set=="saved",
+          "rejected profile library leaves the existing library and selection intact");
+    check(!profilesets::read(QJsonObject{{"profileSets",profilesets::json(library)},{"activeProfileSet","missing"}},library)&&library.active_profile_set=="saved",
+          "backup validation rejects a stale active set without changing the destination");
+    check(profilesets::read(QJsonObject{{"profileSets",profilesets::json(library)},{"activeProfileSet","missing"}},library,true)&&
+          library.profile_sets.size()==1&&library.profile_sets.front().id=="saved"&&library.active_profile_set.empty(),
+          "stale active set preserves valid library entries without activating another set");
     const auto binary=QString::fromStdWString(path.wstring()),profiles=weaponFile(path),ui=fixture+"/azec_ui.json";
     r6::Engine engine(true);
     const QByteArray originalUi="{\"version\":1,\"favorites\":[\"Ace\"],\"sidebarCollapsed\":true}";
@@ -96,13 +106,13 @@ int main(int argc,char** argv){
     const Layout layout{root/L"Programs",root/L"Data",root/L"StartMenu"/L"Azec.lnk"};
     const std::string future="9999.1.1.1",old="1.0.0.0";
     write(QString::fromStdWString((layout.program/L"versions"/wide(old)/L"runtime"/L"interception.dll").wstring()),"retained DLL");
-    migrateDriver(layout,old,root/L"portable");
-    check(read(QString::fromStdWString((layout.data/L"interception"/L"interception.dll").wstring()))=="retained DLL",
-          "installer migrates existing driver out of versioned runtimes");
+    check(!migrateDriver(layout,old,root/L"portable")&&!fs::exists(layout.data/L"interception"/L"interception.dll"),
+          "installer refuses to migrate an unverified DLL from a versioned runtime");
+    write(QString::fromStdWString((layout.data/L"interception"/L"interception.dll").wstring()),"persistent fixture");
     fs::create_directories(layout.program/L"versions"/wide(future));
     pruneVersions(layout,"");
     check(fs::exists(layout.program/L"versions"/wide(future))&&!fs::exists(layout.program/L"versions"/wide(old))&&
-          read(QString::fromStdWString((layout.data/L"interception"/L"interception.dll").wstring()))=="retained DLL",
+          read(QString::fromStdWString((layout.data/L"interception"/L"interception.dll").wstring()))=="persistent fixture",
           "cleanup preserves newer runtimes and the persistent driver");
     std::cout<<checks<<" review regression checks, "<<failures<<" failures"<<std::endl;
     return failures?1:0;

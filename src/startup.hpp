@@ -5,6 +5,7 @@
 #include "profile_store.hpp"
 #include "diagnostics.hpp"
 #include "strings.hpp"
+#include "ui_preferences.hpp"
 #include <windows.h>
 
 class SingleInstance final : public QObject {
@@ -60,10 +61,10 @@ public:
 };
 
 struct ConfigurationRecovery {QString notice;bool blockSaving=false;};
-inline ConfigurationRecovery loadConfiguration(r6::Engine& engine,const std::filesystem::path& path){
-    if(engine.load(path))return {};
+inline ConfigurationRecovery loadPrimaryConfiguration(r6::Engine& engine,const std::filesystem::path& path,bool& weaponProfilesValid){
+    if(engine.load(path,&weaponProfilesValid))return {};
     bool focusOnly=true,adsOnly=false;
-    engine.edit([&](r6::Config& config){config.language=1;readWeaponProfiles(config,focusOnly,adsOnly,path);});
+    engine.edit([&](r6::Config& config){config.language=1;weaponProfilesValid=readWeaponProfiles(config,focusOnly,adsOnly,path);});
     engine.game_focus_only=focusOnly;engine.ads_only=adsOnly;
     const QString filename=QString::fromStdWString(path.wstring());QFile file(filename);
     if(!file.exists())return {};
@@ -79,4 +80,34 @@ inline ConfigurationRecovery loadConfiguration(r6::Engine& engine,const std::fil
     }
     diagnostic("recover binary","Rejected configuration preserved as "+QFileInfo(backup).fileName());
     return {uiText(UiText::RecoveredSettings,engine.snapshot().language).arg(QFileInfo(backup).fileName()),false};
+}
+inline ConfigurationRecovery loadConfiguration(r6::Engine& engine,const std::filesystem::path& path){
+    bool weaponProfilesValid=true;
+    auto recovery=loadPrimaryConfiguration(engine,path,weaponProfilesValid);
+    const int language=engine.snapshot().language;
+    const auto preserve=[&](const QString& filename){
+        QFile file(filename);QString message;
+        if(!file.open(QIODevice::ReadOnly)){
+            recovery.blockSaving=true;
+            message=uiText(UiText::AdditionalSettingsBlocked,language).arg(QFileInfo(filename).fileName());
+        }else{
+            file.close();const QFileInfo info(filename);
+            const auto backup=info.dir().filePath(info.completeBaseName()+".corrupt-"+
+                QDateTime::currentDateTimeUtc().toString("yyyyMMdd-HHmmss-zzz")+"-"+
+                QUuid::createUuid().toString(QUuid::Id128).left(8)+"."+info.suffix());
+            if(QFile::rename(filename,backup)){
+                diagnostic("recover settings","Rejected settings preserved as "+QFileInfo(backup).fileName());
+                message=uiText(UiText::AdditionalSettingsRecovered,language).arg(QFileInfo(backup).fileName());
+            }else{
+                recovery.blockSaving=true;
+                message=uiText(UiText::AdditionalSettingsBlocked,language).arg(info.fileName());
+            }
+        }
+        if(!recovery.notice.isEmpty())recovery.notice+="\n\n";
+        recovery.notice+=message;
+    };
+    if(!weaponProfilesValid)preserve(weaponFile(path));
+    QJsonObject ui;
+    if(!uiprefs::readDocument(uiprefs::filePath(path),ui))preserve(uiprefs::filePath(path));
+    return recovery;
 }

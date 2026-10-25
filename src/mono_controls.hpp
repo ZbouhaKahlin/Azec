@@ -55,7 +55,7 @@ protected:
             painter.drawLine(QPointF(10,height()-1),QPointF(width()-10,height()-1));
         }
         painter.setFont(font());painter.setPen(ink);
-        const auto alignment=quiet?(Qt::AlignVCenter|(layoutDirection()==Qt::RightToLeft?Qt::AlignRight:Qt::AlignLeft)):Qt::AlignCenter;
+        const auto alignment=quiet?(Qt::AlignAbsolute|Qt::AlignVCenter|(layoutDirection()==Qt::RightToLeft?Qt::AlignRight:Qt::AlignLeft)):Qt::AlignCenter;
         QRect label=rect().adjusted(quiet?6:10,0,quiet?-6:-10,0);
         if(!icon().isNull()){
             const int size=14,gap=6;

@@ -11,7 +11,7 @@ inline int operatorRowHeight=52;
 inline constexpr int operatorIconSize=44;
 // Shared raised-panel geometry: the page stack fills this surface exactly, so
 // transitions must use the same radius and hairline when clipping snapshots.
-inline constexpr qreal raisedPanelRadius=16;
+inline constexpr qreal raisedPanelRadius=32;
 inline constexpr qreal raisedPanelBorder=1;
 
 // Monocode's signature motion: a long, settled ease-out on everything.
@@ -60,6 +60,7 @@ class CodeBlock final : public QWidget {
     WrappingCommandText* code_;
     QPushButton* copy_;
     QString copyLabel_,copiedLabel_;
+    std::function<void()> copyFeedback_;
     bool sized_=false;
 public:
     explicit CodeBlock(const QString& copy,const QString& copied,QWidget* parent=nullptr):QWidget(parent){
@@ -75,11 +76,13 @@ public:
         layout->addWidget(copy_,0,Qt::AlignTop);
         connect(copy_,&QPushButton::clicked,this,[this]{
             QApplication::clipboard()->setText(code_->toPlainText());
+            if(copyFeedback_)copyFeedback_();
             copy_->setText(copiedLabel_);
             QTimer::singleShot(1400,copy_,[this]{if(copy_)copy_->setText(copyLabel_);});
         });
     }
     void setText(const QString& text){code_->setPlainText(text);code_->updateGeometry();updateGeometry();}
+    void setCopyFeedback(std::function<void()> feedback){copyFeedback_=std::move(feedback);}
     QString text() const{return code_->toPlainText();}
 protected:
     // Reserve the wider of the two labels once the themed font is applied, so
@@ -201,7 +204,7 @@ protected:
         painter.drawPixmap(QPointF(sidebarAction?(rtl?width()-42:22):(width()-20)/2.0,(height()-20)/2.0),ink);
         if(sidebarAction&&!text().isEmpty()){
             painter.setOpacity(std::clamp((width()-64.0)/124.0,0.0,1.0));painter.setPen(color);
-            painter.drawText(rtl?QRect(0,0,width()-64,height()):QRect(64,0,width()-64,height()),Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft),text());painter.setOpacity(1);
+            painter.drawText(rtl?QRect(0,0,width()-64,height()):QRect(64,0,width()-64,height()),Qt::AlignAbsolute|Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft),text());painter.setOpacity(1);
         }
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),1.5));painter.drawRoundedRect(QRectF(rect()).adjusted(2,2,-2,-2),8,8);}
     }
@@ -321,7 +324,7 @@ protected:
             const qreal left=rtl?8:iconRect.right()+12,available=rtl?iconRect.left()-16:width()-iconRect.right()-20;
             const qreal textTop=(height()-38)/2.0;
             const QRectF nameRect(left,textTop,available,20),hintRect(left,textTop+20,available,18);
-            const Qt::Alignment alignment=Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft);
+            const Qt::Alignment alignment=Qt::AlignAbsolute|Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft);
             painter.setOpacity(progress);
             painter.setFont(nameFont);painter.setPen(kbtheme::ink);
             painter.drawText(nameRect,alignment,QFontMetrics(nameFont).elidedText(text(),Qt::ElideRight,qMax(0,qRound(available))));

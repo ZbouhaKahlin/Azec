@@ -78,7 +78,8 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
             const bool persistenceChanged=next.bytes()!=before.bytes()||next.primary_key!=before.primary_key||next.secondary_key!=before.secondary_key||
                 rapidChanged||focus!=engine_.game_focus_only||ads!=engine_.ads_only;
             engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_active=active;engine_.game_focus_only=focus;engine_.ads_only=ads;
-            if(persistenceChanged)dirty();applyStyle();syncSelection();updateStatus();
+            if(close_prompt_&&values.contains("recoilActive"))close_recoil_changed_=true;
+            if(persistenceChanged)dirty();syncSelection();updateStatus();
             if(rebuild)QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});
             if(keysChanged&&!save())return fail("Could not save configuration");
             return mobileState();

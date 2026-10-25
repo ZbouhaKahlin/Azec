@@ -178,4 +178,6 @@ inline const char* const lang_de[]={
     "Azec mit der Notfalltaste schließen.",
     "Zum Primärprofil des ausgewählten Operators wechseln.",
     "Zum separaten Sekundärprofil wechseln, wenn es aktiviert ist.",
+    "Beschädigte Einstellungen wurden als %1 gesichert. Nicht lesbare Werte verwenden die Standardwerte; prüfe die Einstellungen vor dem Speichern.",
+    "%1 konnte nicht gesichert werden. Zum Schutz deiner Einstellungen ist das Speichern gesperrt. Sichere diese Datei und prüfe ihre Zugriffsrechte.",
 };

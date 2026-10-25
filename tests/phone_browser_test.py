@@ -41,7 +41,10 @@ def run(full=False):
             checks['second_client_toggle_request_succeeds'] = response.ok
             page.locator('#vertical').press('Tab')
             page.wait_for_function("()=>state.globals.recoilActive===true")
-            checks['remote_poll_after_edit_preserves_profile'] = page.evaluate('JSON.stringify(state.profile)') == initial_profile
+            expected_profile = json.loads(initial_profile)
+            expected_profile['vertical'] = 17.8
+            page.wait_for_function('()=>pending===0 && state.profile.vertical===17.8')
+            checks['remote_poll_after_edit_preserves_profile'] = page.evaluate('state.profile') == expected_profile
             page.evaluate("()=>mutate({action:'setGlobal',values:{recoilActive:false}})")
             page.locator('#phoneSettings > summary').click()
             page.locator('#phoneSettings > summary').click()
@@ -164,7 +167,24 @@ def run(full=False):
             page.keyboard.press('Escape')
             page.evaluate('()=>mutate({action:"save"})')
             checks['custom_hotkey_persists'] = json.loads((folder / 'azec_weapons.json').read_text())['secondaryKey'] == 118
+            # Hold a valid poll response until after authorization is revoked.
+            # A stale success must never reopen the disconnected controls.
+            held_polls = []
+            def hold_poll(route):
+                held_polls.append((route, route.fetch()))
+            page.route('**/api/state', hold_poll)
+            page.evaluate('()=>{document.activeElement.blur();window.azecPendingPoll=poll()}')
+            for _ in range(100):
+                if held_polls:
+                    break
+                page.wait_for_timeout(10)
+            if not held_polls:
+                raise RuntimeError('Could not stage the pending session-refresh response')
             page.evaluate("()=>{token='expired-session';return mutate({action:'save'})}")
+            for route, response in held_polls:
+                route.fulfill(response=response)
+            page.unroute('**/api/state', hold_poll)
+            page.evaluate('window.azecPendingPoll')
             checks['expired_session_returns_to_pairing'] = page.locator('#pair').is_visible() and page.locator('#controls').is_hidden()
             qr_context = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
             qr_page = qr_context.new_page()

@@ -178,4 +178,6 @@ inline const char* const lang_en[]={
     "Close Azec with the emergency exit key.",
     "Switch to the selected operator's primary profile.",
     "Switch to the separate secondary profile when enabled.",
+    "Damaged settings were preserved as %1. Values that could not be read use defaults; review your settings before saving.",
+    "Could not preserve %1. Saving is blocked to protect your existing settings. Back up this file and check its permissions.",
 };

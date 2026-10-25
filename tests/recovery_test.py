@@ -3,6 +3,7 @@ import ctypes
 from ctypes import wintypes
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import urllib.request
 import urllib.error
@@ -68,6 +69,43 @@ def run(parent):
         kernel.CloseHandle(handle)
         (locked/'phone-info.json').unlink(missing_ok=True)
     checks['unreadable_file_unchanged']=(locked/'r6_config.bin').read_bytes()==original
+    for filename in ('azec_weapons.json', 'azec_ui.json'):
+        damaged=Path(tempfile.mkdtemp(prefix='damaged-sidecar-',dir=parent))
+        shutil.copy2(folder/'r6_config.bin',damaged/'r6_config.bin')
+        rejected=b'{invalid settings'
+        (damaged/filename).write_bytes(rejected)
+        process=None
+        try:
+            process,info=start(damaged)
+            backups=list(damaged.glob(Path(filename).stem+'.corrupt-*.json'))
+            checks[filename+'_damaged_bytes_preserved']=len(backups)==1 and backups[0].read_bytes()==rejected
+            saved=call(info,{'action':'save'})[0]==200
+            if filename=='azec_ui.json':
+                saved=call(info,{'action':'setFavorite','operator':0,'enabled':True})[0]==200 and saved
+            checks[filename+'_can_save_after_preservation']=saved and json.loads((damaged/filename).read_text())['version']==1
+            checks[filename+'_recovery_log_has_no_token']=info['token'] not in (damaged/'azec.log').read_text()
+        finally:
+            stop(process)
+            (damaged/'phone-info.json').unlink(missing_ok=True)
+        unreadable=Path(tempfile.mkdtemp(prefix='locked-sidecar-',dir=parent))
+        shutil.copy2(folder/'r6_config.bin',unreadable/'r6_config.bin')
+        primary=(unreadable/'r6_config.bin').read_bytes()
+        (unreadable/filename).write_bytes(rejected)
+        handle=kernel.CreateFileW(str(unreadable/filename),0x80000000,0,None,3,0x80,None)
+        if handle==wintypes.HANDLE(-1).value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        process=None
+        try:
+            process,info=start(unreadable)
+            status,state=call(info,{'action':'setProfile','operator':0,'slot':0,'values':{'vertical':19.4}})
+            checks[filename+'_edits_remain_pending_when_save_blocked']=status==200 and state['dirty'] and call(info,{'action':'save'})[0]==400 and call(info)[1]['dirty']
+            checks[filename+'_blocked_save_preserves_binary']=(unreadable/'r6_config.bin').read_bytes()==primary
+            checks[filename+'_locked_file_not_quarantined']=not list(unreadable.glob(Path(filename).stem+'.corrupt-*.json'))
+        finally:
+            stop(process)
+            kernel.CloseHandle(handle)
+            (unreadable/'phone-info.json').unlink(missing_ok=True)
+        checks[filename+'_locked_bytes_unchanged']=(unreadable/filename).read_bytes()==rejected
     report={'passed':all(checks.values()),'checks':checks}
     (folder/'recovery-verification.json').write_text(json.dumps(report,indent=2))
     print(json.dumps(report,indent=2))

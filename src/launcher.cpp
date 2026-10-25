@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <shlobj.h>
 #include <shellapi.h>
+#include <bcrypt.h>
 #include <shobjidl.h>
 #include <filesystem>
 #include <fstream>
@@ -11,6 +12,8 @@
 #include <algorithm>
 #include <cwctype>
 #include "version.hpp"
+#include "driver_trust.hpp"
+#pragma comment(lib,"bcrypt.lib")
 
 // Embedded builds install per user. Unembedded development/portable launchers
 // still use runtime/ and profiles beside the launcher.
@@ -134,6 +137,10 @@ void migrateProfiles(const fs::path& source,const fs::path& destination){
     bool existing=false,found=false;
     for(const auto* name:profiles){existing|=fs::exists(destination/name);found|=fs::exists(source/name);}
     if(!existing&&found&&!samePath(source,destination)){
+        // A downloaded installer beside stray JSON files is not a portable copy.
+        if(!fs::is_regular_file(source/L"runtime"/L"Azec.exe")){
+            writeText(destination/L"storage-initialized.txt","Azec user settings.\n");return;
+        }
         if(activeProfile(source))throw std::runtime_error("Close the portable copy before importing its profiles");
         std::vector<fs::path> copied;
         try{
@@ -150,8 +157,29 @@ bool migrateDriver(const Layout& layout,const std::string& installed,const fs::p
         if(!fs::is_regular_file(source))source=portable/L"runtime"/L"interception.dll";
         if(!fs::is_regular_file(source))source=portable/L"interception.dll";
         if(!fs::is_regular_file(source))return true;
+        // Copy the exact bytes hashed here, rather than reopening an unchecked
+        // path after verification. Driver loading independently verifies again.
+        std::ifstream input(source,std::ios::binary|std::ios::ate);
+        const auto size=input.tellg();
+        if(!input||size<=0||size>16*1024*1024)return false;
+        std::vector<unsigned char> bytes(static_cast<size_t>(size));input.seekg(0);
+        if(!input.read(reinterpret_cast<char*>(bytes.data()),std::streamsize(bytes.size())))return false;
+        BCRYPT_ALG_HANDLE algorithm=nullptr;unsigned char digest[32]{};
+        if(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0)return false;
+        const auto status=BCryptHash(algorithm,nullptr,0,bytes.data(),ULONG(bytes.size()),digest,sizeof(digest));
+        BCryptCloseAlgorithmProvider(algorithm,0);
+        std::string hex;hex.reserve(64);constexpr char digits[]="0123456789abcdef";
+        for(const auto byte:digest){hex+=digits[byte>>4];hex+=digits[byte&15];}
+        if(status<0||hex!=driver_trust::dllSha256Hex){
+            OutputDebugStringW(L"Azec: driver migration rejected an unverified DLL.\n");return false;
+        }
         fs::create_directories(target.parent_path());
-        fs::copy_file(source,target);
+        const HANDLE output=CreateFileW(target.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(output==INVALID_HANDLE_VALUE)return false;
+        DWORD written=0;
+        bool copied=WriteFile(output,bytes.data(),DWORD(bytes.size()),&written,nullptr)&&written==bytes.size()&&FlushFileBuffers(output);
+        if(!CloseHandle(output))copied=false;
+        if(!copied){DeleteFileW(target.c_str());return false;}
         return true;
     }catch(const fs::filesystem_error& error){
         OutputDebugStringW(L"Azec: optional driver migration skipped.\n");
@@ -177,10 +205,34 @@ void replaceLauncher(const fs::path& source,const fs::path& target){
     }
     throw std::runtime_error("replace launcher");
 }
+void pruneAbandonedPayload(const fs::directory_entry& entry){
+    const auto name=entry.path().filename().string();
+    auto marker=name.find(".staging-");size_t suffix=9;
+    if(marker==std::string::npos){marker=name.find(".incomplete-");suffix=12;}
+    if(marker==std::string::npos)return;
+    const auto version=name.substr(0,marker),owner=name.substr(marker+suffix);
+    if(!validVersion(version)||newer(version,AZEC_VERSION)||owner.empty()||owner.size()>10||
+       !std::all_of(owner.begin(),owner.end(),[](char c){return c>='0'&&c<='9';}))return;
+    try{
+        const auto pid=std::stoull(owner);
+        if(!pid||pid>MAXDWORD||processRunning(DWORD(pid)))return;
+        // Only remove abandoned installer-owned trees. Never follow a linked
+        // directory or junction, including one inside an unfinished payload.
+        const auto ordinary=[](const fs::path& path){
+            const DWORD attributes=GetFileAttributesW(path.c_str());
+            return attributes!=INVALID_FILE_ATTRIBUTES&&!(attributes&FILE_ATTRIBUTE_REPARSE_POINT);
+        };
+        if(!ordinary(entry.path())||!entry.is_directory())return;
+        for(const auto& child:fs::recursive_directory_iterator(entry.path()))if(!ordinary(child.path()))return;
+        std::error_code ignored;fs::remove_all(entry.path(),ignored);
+    }catch(const std::exception&){OutputDebugStringW(L"Azec: abandoned payload cleanup skipped.\n");}
+}
 void pruneVersions(const Layout& layout,const std::string& previous){
     if(activeProfile(layout.data))return;
     for(const auto& entry:fs::directory_iterator(layout.program/L"versions")){
-        const auto name=entry.path().filename().string();if(!validVersion(name)||name==AZEC_VERSION||name==previous||newer(name,AZEC_VERSION))continue;
+        const auto name=entry.path().filename().string();
+        if(!validVersion(name)){pruneAbandonedPayload(entry);continue;}
+        if(name==AZEC_VERSION||name==previous||newer(name,AZEC_VERSION))continue;
         std::error_code ignored;fs::remove_all(entry.path(),ignored);
     }
 }

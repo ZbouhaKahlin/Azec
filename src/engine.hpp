@@ -36,7 +36,7 @@ public:
     bool select_weapon(int slot);
     bool rapid_active() const;
     void set_rapid_active(bool on);
-    bool load(const std::filesystem::path& file);
+    bool load(const std::filesystem::path& file,bool* weaponProfilesValid=nullptr);
     bool save(const std::filesystem::path& file,const QByteArray& uiPreferences={}) const;
     void start();
     void stop();

@@ -14,6 +14,8 @@
 // static and live for the process; PlaySound reads them asynchronously with
 // SND_MEMORY, so feedback never depends on the Windows error beep.
 namespace sound {
+inline bool dryRun=false;
+inline void setDryRun(bool enabled){dryRun=enabled;}
 constexpr double kVolume=0.55;      // monocode's "quiet enough to run in the background"
 constexpr double kOutputGain=4.0;   // cuelume's shared output stage
 
@@ -124,7 +126,7 @@ inline std::vector<BYTE> makeWav(const Recipe& recipe) {
 }
 
 inline void play(const std::vector<BYTE>& wav) {
-    if (wav.size() <= 44) return;
+    if (dryRun || wav.size() <= 44) return;
     PlaySoundW(reinterpret_cast<LPCWSTR>(wav.data()), nullptr,
                SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
 }

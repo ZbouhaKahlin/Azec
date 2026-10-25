@@ -108,7 +108,6 @@ def run(executable, smoke=False, previous=None, installed_previous=None):
             api(info, {"action": "setDual", "operator": 4, "enabled": True})
             api(info, {"action": "setProfile", "operator": 4, "slot": 1, "values": {"vertical": 27.7, "horizontal": -3.4}})
             api(info, {"action": "setFavorite", "operator": 4, "enabled": True})
-            api(info, {"action": "setTheme", "theme": "midnight"})
             api(info, {"action": "selectOperator", "operator": 71})
             api(info, {"action": "setProfile", "operator": 71, "slot": 0, "values": {"vertical": 31.5}})
             api(info, {"action": "save"})
@@ -116,10 +115,16 @@ def run(executable, smoke=False, previous=None, installed_previous=None):
             checks["profiles_stored_outside_program_and_downloads"] = all((fixture.data / n).is_file() and not (fixture.program / n).exists() and not (fixture.downloads / n).exists() for n in PROFILES)
             checks["binary_format_preserved"] = (fixture.data / "r6_config.bin").stat().st_size == 3734
             wait_pid(info["pid"])
+            # Theme is a local desktop preference, not a phone API action.
+            preferences = fixture.data / "azec_ui.json"
+            ui = json.loads(preferences.read_text())
+            ui["theme"] = "light"
+            preferences.write_text(json.dumps(ui))
+            saved = hashes(fixture.data)
             info = fixture.launch(fixture.program / "Azec.exe")
             state = api(info)
             checks["noor_selection_and_primary_reloaded"] = state["operatorId"] == 71 and abs(state["profile"]["vertical"] - 31.5) < .001
-            checks["favorites_and_theme_reloaded"] = state["appearance"]["id"] == "midnight" and next(op for op in state["operators"] if op["id"] == 4)["favorite"]
+            checks["favorites_and_light_theme_reloaded"] = state["appearance"]["scheme"] == "light" and next(op for op in state["operators"] if op["id"] == 4)["favorite"]
             api(info, {"action": "selectOperator", "operator": 4})
             primary = api(info, {"action": "selectWeapon", "slot": 0})
             secondary = api(info, {"action": "selectWeapon", "slot": 1})
@@ -133,12 +138,33 @@ def run(executable, smoke=False, previous=None, installed_previous=None):
             checks["existing_profiles_never_overwritten"] = hashes(fixture.data) == saved
             wait_pid(info["pid"])
             # Repair an incomplete extraction without touching settings.
-            (runtime / "Qt6Svg.dll").unlink()
+            # Windows may briefly retain an image mapping after job cleanup.
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    (runtime / "Qt6Svg.dll").unlink()
+                    break
+                except PermissionError:
+                    if time.monotonic() >= deadline:
+                        raise
+                    time.sleep(.05)
             info = fixture.launch(fixture.program / "Azec.exe")
             checks["missing_dependency_repaired"] = (runtime / "Qt6Svg.dll").is_file() and hashes(fixture.data) == saved
             wait_pid(info["pid"])
+            stray = Installation(parent, executable)
+            fixtures.append(stray)
+            for name in PROFILES:
+                shutil.copy2(fixture.data / name, stray.downloads / name)
+            stray_originals = hashes(stray.downloads)
+            info = stray.launch()
+            stray_state = api(info)
+            checks["stray_download_settings_are_not_imported"] = stray_state["operatorId"] == 0 and stray_state["appearance"]["scheme"] == "dark" and hashes(stray.downloads) == stray_originals
+            wait_pid(info["pid"])
             migration = Installation(parent, executable)
             fixtures.append(migration)
+            # A genuine portable copy includes its adjacent runtime executable.
+            (migration.downloads / "runtime").mkdir()
+            shutil.copy2(runtime / "Azec.exe", migration.downloads / "runtime" / "Azec.exe")
             for name in PROFILES:
                 shutil.copy2(fixture.data / name, migration.downloads / name)
             originals = hashes(migration.downloads)
@@ -169,6 +195,8 @@ def run(executable, smoke=False, previous=None, installed_previous=None):
             if installed_previous:
                 modern = Installation(parent, installed_previous)
                 fixtures.append(modern)
+                (modern.downloads / "runtime").mkdir()
+                shutil.copy2(runtime / "Azec.exe", modern.downloads / "runtime" / "Azec.exe")
                 for name in PROFILES:
                     shutil.copy2(fixture.data / name, modern.downloads / name)
                 info = modern.launch()

@@ -67,14 +67,15 @@ int main(int argc,char** argv){
     const auto root=std::filesystem::path(fixture.toStdWString())/L"installer";
     const Layout layout{root/L"Programs",root/L"Data",root/L"StartMenu"/L"Azec.lnk"};
     const auto portable=root/L"portable";
-    check(write(QString::fromStdWString((portable/L"interception.dll").wstring()),"fixture DLL")&&migrateDriver(layout,"",portable),
-          "optional driver migration still succeeds normally");
-    check(read(QString::fromStdWString((layout.data/L"interception"/L"interception.dll").wstring()))=="fixture DLL",
-          "normal driver migration keeps the original contents");
+    check(write(QString::fromStdWString((portable/L"interception.dll").wstring()),"fixture DLL")&&!migrateDriver(layout,"",portable),
+          "optional driver migration rejects an unverified DLL");
+    check(!fs::exists(layout.data/L"interception"/L"interception.dll"),
+          "rejected driver migration leaves no persistent DLL");
     const Layout blocked{root/L"BlockedPrograms",root/L"blocked-data",root/L"BlockedStartMenu"};
     check(write(QString::fromStdWString(blocked.data.wstring()),"existing file")&&!migrateDriver(blocked,"",portable)&&
+          read(QString::fromStdWString(blocked.data.wstring()))=="existing file"&&
           read(QString::fromStdWString((portable/L"interception.dll").wstring()))=="fixture DLL",
-          "driver migration filesystem failure returns without aborting startup or changing the source");
+          "rejected optional migration leaves existing storage and the source unchanged");
     const auto archive=root/L"azec-payload.zip";const auto archiveName=QString::fromStdWString(archive.wstring());
     check(write(archiveName,"temporary archive"),"create temporary archive cleanup fixture");
     const HANDLE held=CreateFileW(archive.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);

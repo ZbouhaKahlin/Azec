@@ -178,4 +178,6 @@ inline const char* const lang_es[]={
     "Cierra Azec con la tecla de salida de emergencia.",
     "Cambia al perfil principal del operador seleccionado.",
     "Cambia al perfil secundario independiente cuando esté activado.",
+    "Los ajustes dañados se conservaron en %1. Los valores que no se pudieron leer usan los predeterminados; revisa los ajustes antes de guardar.",
+    "No se pudo conservar %1. El guardado está bloqueado para proteger tus ajustes. Haz una copia de este archivo y revisa sus permisos.",
 };

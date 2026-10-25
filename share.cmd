@@ -42,7 +42,7 @@ if defined QUICK (
 )
 rem ---------------------------------------------------------------- version
 set "VERSION="
-for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "Get-Date -Format yyyy.MM.dd.HHmmss"`) do set "VERSION=%%T"
+for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "[DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmmss')"`) do set "VERSION=%%T"
 if not defined VERSION (
     echo Could not generate the release version.
     exit /b 1

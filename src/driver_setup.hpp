@@ -4,6 +4,7 @@
 #include <iterator>
 #include <vector>
 #include "app_paths.hpp"
+#include "driver_trust.hpp"
 
 // One-click Interception setup used by the Settings guide.
 //
@@ -20,7 +21,7 @@ inline bool verify(const QByteArray& data){
 }
 // Hashes of the x64 DLL and installer inside the pinned, verified v1.0.1 ZIP.
 // Never learn these values from a local file or an unsigned sidecar.
-inline QByteArray dllSha256(){return QByteArray::fromHex("ab88164c11b1b48488772d4c3bfaa4509d5b0ae9dbc5a691dc4f96f0260443c8");}
+inline QByteArray dllSha256(){return QByteArray::fromHex(driver_trust::dllSha256Hex);}
 inline QByteArray installerSha256(){return QByteArray::fromHex("e137863a79da797f08e7a137280ff2a123809044a888fd75ce9c973198915abe");}
 inline bool verifyDll(const QByteArray& data){
     return !data.isEmpty()&&QCryptographicHash::hash(data,QCryptographicHash::Sha256)==dllSha256();

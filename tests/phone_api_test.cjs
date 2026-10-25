@@ -9,7 +9,9 @@ function client(fetch) {
   const elements = { pair: { hidden: true }, controls: { hidden: false } };
   const removed = [];
   const context = vm.createContext({ fetch, AbortController, setTimeout, clearTimeout,
-    token: 'fixture-token', $: id => elements[id], sessionStorage: { removeItem: key => removed.push(key) } });
+    token: 'fixture-token', connectionNotice: false, history: { replaceState() {} },
+    location: { pathname: '/', search: '' },
+    $: id => elements[id], sessionStorage: { removeItem: key => removed.push(key) } });
   vm.runInContext(api, context);
   return { context, elements, removed, request: data => context.api('/api/state', data) };
 }
@@ -53,6 +55,6 @@ test('all translated phone dictionaries contain the three server errors', () => 
   const maps = vm.runInContext('phoneTexts', context);
   assert.equal(Object.keys(maps).length, 8); // English uses the original message directly.
   for (const map of Object.values(maps)) {
-    for (const key of ['Invalid color theme', 'This key is not safe for a global shortcut', 'Not found']) assert.ok(map[key], key);
+    for (const key of ['Invalid operator', 'This key is not safe for a global shortcut', 'Not found']) assert.ok(map[key], key);
   }
 });

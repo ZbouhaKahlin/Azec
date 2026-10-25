@@ -24,6 +24,7 @@ int main(int argc,char** argv){
         return QProcess::execute(verifier,arguments.mid(1));
     }
 #endif
+    sound::setDryRun(dryrun);
     int testResult=0,result=0;
     {
     SingleInstance instance;const auto singleton=instance.acquire();

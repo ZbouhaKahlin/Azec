@@ -141,9 +141,15 @@ def run_console(parent):
         (fixture/'console.log').write_text(result.stdout+result.stderr,encoding='utf-8')
         if result.returncode:raise RuntimeError(f'{name} failed; see {fixture / "console.log"}')
         print(f'PASS {name}')
-    for script in ('desktop_isolation_test.py',):
-        subprocess.run([sys.executable,str(ROOT/'tests'/script)],check=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
-    subprocess.run(['node','--test',str(ROOT/'tests/phone_api_test.cjs')],check=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
+    scripts=[('desktop_isolation_test.py',[sys.executable,str(ROOT/'tests/desktop_isolation_test.py')]),
+             ('phone_api_test.cjs',['node','--test',str(ROOT/'tests/phone_api_test.cjs')])]
+    for name,args in scripts:
+        fixture=Path(tempfile.mkdtemp(prefix='console-script-',dir=parent))
+        result=subprocess.run(args,capture_output=True,text=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
+        log=fixture/'console.log'
+        log.write_text(result.stdout+result.stderr,encoding='utf-8')
+        if result.returncode:raise RuntimeError(f'{name} failed; see {log}')
+        print(f'PASS {name}')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

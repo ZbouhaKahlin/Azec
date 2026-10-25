@@ -30,8 +30,7 @@ inline QJsonArray json(const r6::Config& config){
     }
     return sets;
 }
-inline bool read(const QJsonObject& root,r6::Config& config){
-    config.profile_sets.clear();config.active_profile_set.clear();
+inline bool read(const QJsonObject& root,r6::Config& config,bool repairStaleSelection=false){
     if(!root.contains("profileSets"))return true;
     if(!root["profileSets"].isArray()||root["profileSets"].toArray().size()>int(limit))return false;
     std::vector<r6::ProfileSet> sets;QSet<QString> ids,names;
@@ -58,7 +57,12 @@ inline bool read(const QJsonObject& root,r6::Config& config){
         }
         sets.push_back(std::move(set));
     }
-    const auto active=root["activeProfileSet"].toString();if(!active.isEmpty()&&!ids.contains(active))return false;
+    // A stale selection must not discard an otherwise valid saved library.
+    auto active=root["activeProfileSet"].toString();
+    if(!active.isEmpty()&&!ids.contains(active)){
+        if(!repairStaleSelection)return false;
+        active.clear();
+    }
     config.profile_sets=std::move(sets);config.active_profile_set=active.toStdString();
     // The active binary/sidecar values include edits made since the set was captured.
     remember(config);return true;

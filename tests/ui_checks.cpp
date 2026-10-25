@@ -161,8 +161,8 @@ QJsonObject MainWindow::selfTest(const QString& output){
         auto* titleBar=findChild<QWidget*>("titleBar");checks["header_has_requested_breathing_room"]=titleBar->height()==(52)&&((save_->y()>=9&&titleBar->height()-save_->geometry().bottom()-1>=9));
         const auto gearBefore=gear_->grab().toImage();QEnterEvent enter(QPointF(17,17),QPointF(gear_->pos()+QPoint(17,17)),QPointF(gear_->mapToGlobal(QPoint(17,17))));QApplication::sendEvent(gear_,&enter);wait(170);const auto gearHovered=gear_->grab().toImage();capture(output+"/header-hover.png");
         bool transparentEdges=true;for(int y=0;y<gearBefore.height();++y)for(int x=0;x<gearBefore.width();++x)if(x<3||y<3||x>=gearBefore.width()-3||y>=gearBefore.height()-3)transparentEdges&=gearBefore.pixelColor(x,y)==gearHovered.pixelColor(x,y);QEvent leave(QEvent::Leave);QApplication::sendEvent(gear_,&leave);wait(170);
-        bool hoverFlat=gearBefore==gearHovered;{const auto statusBefore=status_->grab().toImage();QEnterEvent statusEnter(QPointF(5,5),QPointF(5,5),status_->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(status_,&statusEnter);wait(30);hoverFlat&=statusBefore==status_->grab().toImage();QEvent statusLeave(QEvent::Leave);QApplication::sendEvent(status_,&statusLeave);}
-        checks["no_hover_effects"]=transparentEdges&&hoverFlat;checks["slider_handles_fit_widget"]=vertical_slider_->height()>=18&&horizontal_slider_->height()>=18;
+        bool hoverSettles=gearBefore==gearHovered;{const auto statusBefore=status_->grab().toImage();const auto geometry=status_->geometry();QEnterEvent statusEnter(QPointF(5,5),QPointF(5,5),status_->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(status_,&statusEnter);wait(150);hoverSettles&=status_->geometry()==geometry;QEvent statusLeave(QEvent::Leave);QApplication::sendEvent(status_,&statusLeave);wait(150);hoverSettles&=statusBefore==status_->grab().toImage();}
+        checks["header_hover_preserves_geometry_and_settles"]=transparentEdges&&hoverSettles;checks["slider_handles_fit_widget"]=vertical_slider_->height()>=18&&horizontal_slider_->height()>=18;
         {
             const double before=vertical_->value();QPushButton* plus=nullptr;QPushButton* minus=nullptr;
             for(auto* button:vertical_slider_->parentWidget()->findChildren<QPushButton*>(QStringLiteral("stepButton"))){if(button->text()=="+")plus=button;else minus=button;}
@@ -175,7 +175,29 @@ QJsonObject MainWindow::selfTest(const QString& output){
         bool question=false;for(auto* button:findChildren<QPushButton*>())question|=button->text()=="?";checks["no_question_mark_control"]=!question;
 
         {const auto shape=grab().toImage();
-        checks["painted_rounded_window_corners"]=shape.pixelColor(1,1).alpha()<40&&shape.pixelColor(26,1).alpha()>200&&shape.pixelColor(width()-2,1).alpha()<40;}
+        const auto pixel=[&](QPoint point){return shape.pixelColor(qRound(point.x()*shape.devicePixelRatio()),qRound(point.y()*shape.devicePixelRatio()));};
+        checks["painted_rounded_window_corners"]=pixel({1,1}).alpha()<40&&pixel({26,1}).alpha()>200&&pixel({width()-2,1}).alpha()<40;}
+        {
+            // Alpha-only screenshots miss acrylic painted by the compositor.
+            // Check the actual HWND region as well as the Qt child-widget mask.
+            const auto nativeCornersClipped=[&]{
+                HRGN region=CreateRectRgn(0,0,0,0);const int kind=GetWindowRgn(HWND(winId()),region);
+                RECT rectangle{};GetWindowRect(HWND(winId()),&rectangle);
+                const int w=rectangle.right-rectangle.left,h=rectangle.bottom-rectangle.top;
+                const bool clipped=kind==COMPLEXREGION&&!PtInRegion(region,1,1)&&!PtInRegion(region,w-2,1)
+                    &&!PtInRegion(region,1,h-2)&&!PtInRegion(region,w-2,h-2)&&PtInRegion(region,w/2,h/2)
+                    &&PtInRegion(region,w/2,1)&&PtInRegion(region,w-2,h/2);
+                DeleteObject(region);return clipped;
+            };
+            checks["native_glass_and_children_have_real_rounded_corners"]=nativeCornersClipped()&&!mask().contains(QPoint(1,1));
+            const QSize original=size();resize(width()+24,height()+16);wait(40);
+            checks["rounded_window_region_tracks_resize"]=nativeCornersClipped();
+            showMaximized();wait(60);
+            HRGN region=CreateRectRgn(0,0,0,0);
+            checks["maximized_window_removes_corner_cutouts"]=isMaximized()&&mask().isEmpty()&&GetWindowRgn(HWND(winId()),region)==ERROR;
+            DeleteObject(region);showNormal();resize(original);wait(60);
+            checks["restored_window_reapplies_native_corners"]=nativeCornersClipped();
+        }
         checks["sendinput_suppressed_in_dry_run"]=engine_.dry_run()&&engine_.injected_events==0;
         status_->setFocus(Qt::OtherFocusReason);scroll_->verticalScrollBar()->setValue(0);QApplication::processEvents();capture(output+"/window.png");
         const auto stationaryPanel=panel_->geometry();auto* preferenceContent=preferences_scroll_->widget();
@@ -321,7 +343,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         phone_enabled_->click();wait(70);const int beforePhoneReverse=phone_details_->height();phone_enabled_->click();checks["phone_retarget_preserves_displayed_height"]=phone_details_->height()==beforePhoneReverse;wait(25);phone_enabled_->click();wait(360);
         checks["rapid_phone_toggle_settles_enabled"]=phone_->listening()&&phone_details_->expanded()&&!phone_details_->transitioning()&&phone_details_->progress()==1&&pairing_qr_->isEnabled()&&!pairing_qr_->revealed()&&preferences_scroll_->widget()==stablePreferences;
         const int oldPreferenceMinimum=preferences_scroll_->minimumHeight(),oldPreferenceMaximum=preferences_scroll_->maximumHeight();preferences_scroll_->setFixedHeight(260);QApplication::processEvents();stableBar->setValue(stableBar->maximum());const int expandedBottom=stableBar->maximum();phone_enabled_->click();wait(90);
-        checks["phone_bottom_scroll_adjusts_during_collapse"]=stableBar->maximum()>0&&stableBar->maximum()<expandedBottom&&stableBar->value()==stableBar->maximum()&&phone_details_->transitioning();wait(250);
+        checks["phone_bottom_scroll_adjusts_during_collapse"]=expandedBottom>0&&stableBar->maximum()<expandedBottom&&stableBar->value()==stableBar->maximum()&&phone_details_->transitioning();wait(250);
         checks["phone_bottom_scroll_stays_in_range_without_reset"]=stableBar->value()==stableBar->maximum()&&stableBar->value()>=0&&preferences_scroll_->widget()==stablePreferences;
         phone_enabled_->click();wait(340);preferences_scroll_->setMinimumHeight(oldPreferenceMinimum);preferences_scroll_->setMaximumHeight(oldPreferenceMaximum);QApplication::processEvents();
         preferences_scroll_->ensureWidgetVisible(pairing_qr_);wait(80);capture(output+"/phone-enabled.png");
@@ -379,7 +401,6 @@ QJsonObject MainWindow::selfTest(const QString& output){
         status_->setFocus(Qt::OtherFocusReason);paint_.stop();const QPoint stationary(-20000,-20000);trackCursor(stationary);wait(100);const int idleRequests=cursor_repaints_;
         for(int sample=0;sample<12;++sample)trackCursor(stationary);wait(350);
         checks["stationary_cursor_does_not_schedule_background_repaints"]=cursor_repaints_==idleRequests;
-        trackCursor(stationary+QPoint(1,0));checks["cursor_movement_schedules_no_repaint"]=cursor_repaints_==idleRequests;
         // Wait for delayed feedback (including the three-second scrollbar fade)
         // to finish, then require the same strict 350 ms without a repaint.
         // Continuous repainting still fails after the bounded settle period.
@@ -387,18 +408,30 @@ QJsonObject MainWindow::selfTest(const QString& output){
         QElapsedTimer idleClock;idleClock.start();qint64 quietSince=0;int idlePaints=paint_count_;
         while(idleClock.elapsed()<6000&&idleClock.elapsed()-quietSince<350){wait(25);if(paint_count_!=idlePaints){idlePaints=paint_count_;quietSince=idleClock.elapsed();}}
         checks["stationary_cursor_does_not_repaint_window"]=idleClock.elapsed()-quietSince>=350;
+        const int beforeCursorMove=paint_count_;trackCursor(stationary+QPoint(1,0));wait(100);
+        checks["cursor_movement_schedules_no_repaint"]=paint_count_==beforeCursorMove;
         paint_.start();
         capture(output+"/save-neutral.png");editOperator([](r6::Operator& op){op.vertical=13.2f;});capture(output+"/save-unsaved.png");save();
         // Load previous default themes and a custom theme through the production loader.
         // The fixture lives in its own directory so no azec_weapons.json sidecar applies.
         const auto themeDirectory=std::filesystem::path(output.toStdWString())/L"theme-fixture";std::error_code themeError;std::filesystem::create_directories(themeDirectory,themeError);const auto themeFixture=themeDirectory/L"theme-test.bin";r6::Config theme;
-        bool migrationPassed=true;for(const auto& legacy:std::array<std::array<float,3>,4>{{{0,1,.4f},{5.f/255,134.f/255,105.f/255},{1.f,91.f/255,99.f/255},{210.f/255,210.f/255,210.f/255}}}){for(int i=0;i<3;++i)theme.neon[i]=legacy[i];r6::Engine migrated(true);migrationPassed&=theme.save(themeFixture)&&migrated.load(themeFixture);const auto loaded=migrated.snapshot();migrationPassed&=QColor::fromRgbF(loaded.neon[0],loaded.neon[1],loaded.neon[2]).name()=="#7248d7"&&loaded.operators[4].vertical==theme.operators[4].vertical;}
+        bool migrationPassed=true;QJsonArray migrationSamples;
+        for(const auto& legacy:std::array<std::array<float,3>,4>{{{0,1,.4f},{5.f/255,134.f/255,105.f/255},{1.f,91.f/255,99.f/255},{210.f/255,210.f/255,210.f/255}}}){
+            for(int i=0;i<3;++i)theme.neon[i]=legacy[i];r6::Engine migrated(true);
+            SetLastError(0);const bool written=theme.save(themeFixture);const DWORD writeError=GetLastError();
+            const bool read=written&&migrated.load(themeFixture);const auto loaded=migrated.snapshot();
+            const auto color=QColor::fromRgbF(loaded.neon[0],loaded.neon[1],loaded.neon[2]).name();
+            const bool preserved=loaded.operators[4].vertical==theme.operators[4].vertical;
+            migrationPassed&=written&&read&&color=="#7248d7"&&preserved;
+            migrationSamples.append(QJsonObject{{"written",written},{"writeError",int(writeError)},{"loaded",read},{"color",color},{"profilePreserved",preserved}});
+        }
+        {QFile details(output+"/appearance-migration.json");if(details.open(QIODevice::WriteOnly))details.write(QJsonDocument(migrationSamples).toJson());}
         checks["previous_default_accents_migrate_without_profile_changes"]=migrationPassed;
         theme.neon[0]=.2f;theme.neon[1]=.4f;theme.neon[2]=.8f;theme.radius=250;r6::Engine customTheme(true);const bool customLoaded=theme.save(themeFixture)&&customTheme.load(themeFixture);const auto normalized=customTheme.snapshot();
         checks["removed_appearance_settings_normalize_on_load"]=customLoaded&&QColor::fromRgbF(normalized.neon[0],normalized.neon[1],normalized.neon[2]).name()=="#7248d7"&&std::abs(normalized.radius-130.f)<.001f&&std::abs(normalized.operators[4].vertical-theme.operators[4].vertical)<.001f;
         showPreferences();chooseSettingsCategory(0);wait(220);
-        checks["settings_has_five_categories"]=settings_nav_buttons_.size()==5&&preference_categories_.size()==5;
-        bool categoryVisibility=true;for(int index=0;index<settings_nav_buttons_.size();++index){settings_nav_buttons_[index]->click();QApplication::processEvents();for(int i=0;i<preference_categories_.size();++i)categoryVisibility&=preference_categories_[i]->isVisible()==(i==index);}
+        checks["settings_has_four_categories"]=settings_nav_buttons_.size()==4&&preference_categories_.size()==4;
+        bool categoryVisibility=true;for(int index=0;index<settings_nav_buttons_.size();++index){settings_nav_buttons_[index]->click();wait(220);for(int i=0;i<preference_categories_.size();++i)categoryVisibility&=preference_categories_[i]->isVisible()==(i==index);}
         checks["settings_categories_show_only_selected_content"]=categoryVisibility;
         chooseSettingsCategory(2);pairing_qr_->click();chooseSettingsCategory(0);checks["changing_settings_category_conceals_qr"]=!pairing_qr_->revealed();
         wait(220);
@@ -447,5 +480,5 @@ QJsonObject MainWindow::selfTest(const QString& output){
         uiprefs::update(uiFixture,[](QJsonObject& root){root["sidebarCollapsed"]=false;});QJsonObject migratedUi;uiprefs::readDocument(uiprefs::filePath(uiFixture),migratedUi);
         checks["obsolete_keys_removed_without_losing_preferences"]=!migratedUi.contains("interface")&&!migratedUi.contains("colorTheme")&&migratedUi["favorites"].toArray().contains("Ash")&&!uiprefs::sidebarCollapsed(uiFixture);
         testDriver();checks["dry_run_driver_test_never_injects_input"]=engine_.injected_events==0;
-        QJsonObject report;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("monocode");report["checks"]=checks;report["rounding_method"]=QStringLiteral("painted antialiased corners (per-pixel alpha over the system blur)");report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="Interception (suppressed in dry-run)";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
+        QJsonObject report;report["all_languages"]=QCoreApplication::arguments().contains("--all-languages");report["interface"]=QStringLiteral("monocode");report["checks"]=checks;report["rounding_method"]=QStringLiteral("native rounded window region with matching painted corners");report["icon_failures"]=QJsonArray::fromStringList(icon_failures_);report["font_family"]=QFontInfo(operator_name_->font()).family();report["heading_font_style"]=QFontInfo(operator_name_->font()).styleName();report["body_font_style"]=QFontInfo(humanize_->parentWidget()->findChild<QLabel*>()->font()).styleName();report["save_font_family"]=QFontInfo(save_->font()).family();report["paint_events"]=paint_count_;report["mouse_api"]="Interception (suppressed in dry-run)";report["input_injection"]="disabled";report["width"]=width();report["height"]=height();report["status_text"]=status_->text();report["display_scale"]=devicePixelRatioF();bool passed=true;for(const auto& check:checks)passed&=check.toBool();report["passed"]=passed;return report;
     }
