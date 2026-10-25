@@ -228,8 +228,21 @@ enum class UiText {
     PhoneNetworkUnavailable,
     AdministratorRestartCancelled,
     AdministratorRestartFailed,
+    Theme,
+    DarkTheme,
+    LightTheme,
+    ThemeHint,
+    CouldNotSaveTheme,
+    ShortcutIntro,
+    ShortcutApplicationGroup,
+    ShortcutWeaponGroup,
+    ShortcutWindowHint,
+    ShortcutRecoilHint,
+    ShortcutPanicHint,
+    ShortcutPrimaryHint,
+    ShortcutSecondaryHint,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::AdministratorRestartFailed)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::ShortcutSecondaryHint)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

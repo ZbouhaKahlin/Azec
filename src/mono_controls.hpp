@@ -36,19 +36,24 @@ protected:
         const bool primary=role=="save"||role=="preferencesSave";
         const bool quiet=role=="driverManualDownload"||role=="driverTroubleshooting"||role=="sectionHeading";
         const bool step=role=="stepButton";
+        const bool plain=property("plainAction").toBool();
         const bool active=property("active").toBool();
         const bool danger=role=="discardChanges";
         const qreal feedback=isDown()?1:std::clamp(hover_,qreal(0),qreal(1));
-        QColor fill=content((quiet?0.0:.04)+feedback*.06);
+        QColor fill=content((quiet||step||status||plain?0.0:.04)+feedback*.06);
         QColor ink=content(.7+feedback*.3);
         if(primary){fill=isDown()?kbtheme::defaultAccent.darker(112):kbtheme::defaultAccent.lighter(100+qRound(feedback*8));ink=kbtheme::readableOn(fill);}
-        if(status&&active){fill=kbtheme::defaultAccent;fill.setAlphaF(.12+feedback*.06);ink=QColor("#8FC1FA");}
+        if(status&&active){fill=kbtheme::defaultAccent;fill.setAlphaF(feedback*.06);ink=kbtheme::activeInk;}
         if(danger){ink=kbtheme::danger;if(feedback>0){fill=kbtheme::pink;fill.setAlphaF(feedback*.12);}}
         QPainter painter(this);painter.setRenderHints(QPainter::Antialiasing|QPainter::TextAntialiasing);
         if(!isEnabled())painter.setOpacity(.4);
         const QRectF face=QRectF(rect()).adjusted(.5,.5,-.5,-.5);
         const qreal radius=status||step?face.height()/2:6;
         painter.setPen(Qt::NoPen);painter.setBrush(fill);painter.drawRoundedRect(face,radius,radius);
+        if(plain&&role=="keyButton"){
+            painter.setPen(QPen(content(.14),1));
+            painter.drawLine(QPointF(10,height()-1),QPointF(width()-10,height()-1));
+        }
         painter.setFont(font());painter.setPen(ink);
         const auto alignment=quiet?(Qt::AlignVCenter|(layoutDirection()==Qt::RightToLeft?Qt::AlignRight:Qt::AlignLeft)):Qt::AlignCenter;
         QRect label=rect().adjusted(quiet?6:10,0,quiet?-6:-10,0);
@@ -77,12 +82,13 @@ protected:
 // QLabel keeps its public text/accessibility API; QTextDocument supplies the
 // reference's 19.5 px paragraph leading instead of Qt's tighter default.
 class MonoDescription final : public QLabel {
-    void prepare(QTextDocument& document,int width) const{
+    QStringList reservedMessages_;
+    void prepare(QTextDocument& document,int width,const QString& message) const{
         document.setDocumentMargin(0);document.setDefaultFont(font());
         QTextOption option;option.setWrapMode(wordWrap()?QTextOption::WrapAtWordBoundaryOrAnywhere:QTextOption::NoWrap);
         option.setTextDirection(layoutDirection());document.setDefaultTextOption(option);
         option.setAlignment(alignment()&Qt::AlignHorizontal_Mask);document.setDefaultTextOption(option);
-        document.setPlainText(text());
+        document.setPlainText(message);
         QTextCursor cursor(&document);cursor.select(QTextCursor::Document);
         QTextBlockFormat block;block.setLineHeight(QFontInfo(font()).pixelSize()*1.625,QTextBlockFormat::FixedHeight);cursor.setBlockFormat(block);
         QTextCharFormat ink;ink.setForeground(kbtheme::muted);cursor.setCharFormat(ink);
@@ -92,16 +98,23 @@ public:
     explicit MonoDescription(const QString& text,QWidget* parent=nullptr):QLabel(text,parent){
         auto policy=sizePolicy();policy.setHeightForWidth(true);setSizePolicy(policy);
     }
+    void reserveMessages(const QStringList& messages){reservedMessages_=messages;updateGeometry();}
     bool hasHeightForWidth() const override{return wordWrap();}
     int heightForWidth(int width) const override{
-        const auto margins=contentsMargins();QTextDocument document;prepare(document,width-margins.left()-margins.right());
-        return qCeil(document.size().height())+margins.top()+margins.bottom();
+        const auto margins=contentsMargins();const int available=width-margins.left()-margins.right();
+        QTextDocument document;prepare(document,available,text());int height=qCeil(document.size().height());
+        for(const auto& message:reservedMessages_){QTextDocument reserved;prepare(reserved,available,message);height=qMax(height,qCeil(reserved.size().height()));}
+        return height+margins.top()+margins.bottom();
     }
     QSize minimumSizeHint() const override{return {0,20+contentsMargins().top()+contentsMargins().bottom()};}
-    QSize sizeHint() const override{return {QLabel::sizeHint().width(),heightForWidth(qMax(1,QLabel::sizeHint().width()))};}
+    QSize sizeHint() const override{
+        int width=QLabel::sizeHint().width();
+        for(const auto& message:reservedMessages_)width=qMax(width,qMin(400,fontMetrics().horizontalAdvance(message)));
+        return {width,heightForWidth(qMax(1,width))};
+    }
 protected:
     void paintEvent(QPaintEvent*) override{
-        QTextDocument document;prepare(document,contentsRect().width());
+        QTextDocument document;prepare(document,contentsRect().width(),text());
         QPainter painter(this);QPointF origin=contentsRect().topLeft();
         const qreal spare=qMax(0.0,contentsRect().height()-document.size().height());
         if(alignment()&Qt::AlignVCenter)origin.ry()+=spare/2;else if(alignment()&Qt::AlignBottom)origin.ry()+=spare;

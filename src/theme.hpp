@@ -4,11 +4,10 @@
 #include "ui_preferences.hpp"
 
 // Monocode design tokens (github.com/hardbeat920/monocode, MIT) adapted for
-// the desktop window: one dark neutral surface, hairline separators, opacity
-// fills instead of opaque cards, a single blue accent, and a translucent
-// window over the system blur. There are no palettes to switch; every value
-// below is the product look.
+// the desktop window: dark glass and light inset presentations share
+// geometry, hairline separators, content fills and a single blue accent.
 namespace kbtheme {
+inline bool light=false;
 inline QColor paper("#171717");          // hsl(240 0% 9%) — the app surface
 inline QColor windowGlass(13,13,13,204); // inset-outer: #0d0d0d at 80%, below the content/5 wash
 inline QColor windowWash(235,235,235,13);
@@ -27,12 +26,24 @@ inline QColor danger("#FB7185");         // error ink
 inline QColor defaultAccent=purple;
 inline QColor outline(235,235,235,10);   // inset-stroke: content/4
 inline const QColor chipInk("#171717");
+inline QColor dialog("#1B1B1B"),sliderThumb("#FFFFFF"),activeInk("#8FC1FA"),successInk("#6DD5AD");
 
-inline void initialize(){
+inline QColor content(qreal opacity){QColor color=ink;color.setAlphaF(opacity);return color;}
+
+inline void initialize(bool useLight=false){
+    light=useLight;
     paper=QColor("#171717");windowGlass=QColor(13,13,13,204);windowWash=QColor(235,235,235,13);panelGlass=QColor(6,6,6,102);surface=QColor("#202020");card=QColor(235,235,235,8);
     ink=QColor("#EBEBEB");muted=QColor(235,235,235,115);purple=defaultAccent=QColor("#459BF7");lavender=QColor(235,235,235,26);
     yellow=QColor("#E8C547");lime=QColor("#10B981");pink=QColor("#F43F5E");blue=QColor("#7DD3FC");danger=QColor("#FB7185");
     outline=QColor(235,235,235,10);
+    dialog=QColor("#1B1B1B");sliderThumb=QColor("#FFFFFF");activeInk=QColor("#8FC1FA");successInk=QColor("#6DD5AD");
+    if(light){
+        // MonoCode's light colors over the same glass depths as Dark.
+        paper=QColor("#F7F7F7");windowGlass=QColor(245,245,245,204);windowWash=QColor(26,26,26,3);panelGlass=QColor(255,255,255,102);
+        surface=QColor("#F5F5F5");ink=QColor("#2E2E2E");muted=content(.45);card=content(.03);lavender=content(.06);outline=content(.04);
+        yellow=QColor("#A07C10");lime=QColor("#047857");pink=QColor("#BE123C");blue=QColor("#0866C6");danger=pink;
+        dialog=QColor("#FFFFFF");sliderThumb=ink;activeInk=blue;successInk=lime;
+    }
 }
 
 // Text that stays readable on a filled surface (the library's 150-luminance rule).

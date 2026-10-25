@@ -35,6 +35,7 @@
 #include <QDir>
 #include <QFile>
 #include <QMessageBox>
+#include <QOperatingSystemVersion>
 #include <algorithm>
 #include <cmath>
 
@@ -94,18 +95,19 @@ class MainWindow final : public QWidget {
     IconButton *sidebar_toggle_=nullptr,*sidebar_search_=nullptr;StickerStarButton* sidebar_favorites_=nullptr;
     QVariantAnimation sidebar_animation_;bool sidebar_collapsed_=false,focus_sidebar_search_=false,sidebar_animating_=false,favorites_shown_=false;
     QVector<QWidget*> preference_categories_;int preference_category_=0;
-    static constexpr int mouse_setup_category_=4;
-    bool glass_active_=false,glass_applied_=false;
+    bool glass_active_=false,glass_applied_=false,glass_lightweight_=false;
+    QVariantAnimation theme_motion_;
+    QPointer<PageSnapshot> theme_snapshot_;
     QVariantAnimation operator_transition_;
     FadeLabel *name_opacity_=nullptr,*icon_opacity_=nullptr;
-    QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr,*subtitle_=nullptr;
+    QLabel *operators_title_=nullptr,*operator_name_=nullptr,*operator_icon_=nullptr;
     QPushButton* status_=nullptr;QPushButton* rapid_status_=nullptr;IconButton *save_=nullptr,*close_=nullptr,*gear_=nullptr;
     QWidget* preferences_=nullptr;QScrollArea* preferences_scroll_=nullptr;
     QWidget* profile_save_dock_=nullptr;QLabel* profile_save_hint_=nullptr;QPushButton* profile_save_button_=nullptr;
     QScrollArea* scroll_=nullptr;QWidget* settings_=nullptr;QVBoxLayout* cards_=nullptr;
     Section *system_=nullptr;
     Toggle *rapid_active_=nullptr,*game_focus_only_=nullptr,*ads_only_=nullptr,*humanize_=nullptr,*dual_=nullptr;
-    ExpandingContent* weapon_selector_=nullptr;WeaponButton *primary_=nullptr,*secondary_=nullptr;
+    WeaponButton *primary_=nullptr,*secondary_=nullptr;
     PhoneServer* phone_=nullptr;
     QPointer<PairingQr> pairing_qr_;
     QPointer<QPushButton> driver_test_;
@@ -123,6 +125,8 @@ class MainWindow final : public QWidget {
     QPointer<QPushButton> copy_link_,copy_code_,phone_new_code_,phone_retry_;
     QPointer<QPushButton> update_button_;QNetworkAccessManager* network_=nullptr;bool update_in_progress_=false;
     QWidget* notice_bar_=nullptr;QLabel *notice_=nullptr,*notice_title_=nullptr,*notice_badge_=nullptr;QPushButton* notice_close_=nullptr;QScrollArea* notice_scroll_=nullptr;
+    QPointer<QComboBox> theme_choice_;
+    QLabel* brand_logo_=nullptr;
     QSystemTrayIcon* tray_=nullptr;
     QMenu* tray_menu_=nullptr;
     QAction *tray_window_=nullptr,*tray_recoil_=nullptr,*tray_rapid_=nullptr,*tray_exit_=nullptr;
@@ -252,7 +256,7 @@ class MainWindow final : public QWidget {
         result->setObjectName(role);return result;
     }
     QHBoxLayout* settingRow(Section* section,const QString& title,const QString& description={},int height=44){
-        auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(description.isEmpty()?height:56);auto* row=new QHBoxLayout(widget);row->setContentsMargins(16,12,16,12);row->setSpacing(12);
+        auto* widget=new QWidget;widget->setObjectName("settingRow");widget->setMinimumHeight(description.isEmpty()?height:56);auto* row=new QHBoxLayout(widget);const bool open=section->property("openProfile").toBool()||section->property("openSettings").toBool();row->setContentsMargins(open?0:16,open?8:12,open?0:16,open?8:12);row->setSpacing(12);
         auto* text=new QWidget;auto* column=new QVBoxLayout(text);column->setContentsMargins(0,0,0,0);column->setSpacing(4);auto* titleLabel=label(title);titleLabel->setWordWrap(true);column->addWidget(titleLabel);
         if(!description.isEmpty()){auto* hint=label(description,"rowHint");hint->setWordWrap(true);column->addWidget(hint);widget->setToolTip(description);}
         row->addWidget(text,1);section->body->addWidget(widget);return row;
@@ -262,22 +266,26 @@ class MainWindow final : public QWidget {
         connect(result,&QAbstractButton::toggled,this,[this,callback](bool on){if(!refreshing_){if(engine_.snapshot().sound)sound::playToggle();callback(on);}});return result;
     }
     ResetSlider* makeSlider(){return new ResetSlider(Qt::Horizontal);}
-    void amount(Section* section,const QString& title,bool vertical){
+    QWidget* amount(const QString& title,bool vertical){
         auto* slider=makeSlider();slider->setRange(vertical?0:-500,vertical?1000:500);slider->setSingleStep(1);slider->setPageStep(5);slider->setAccessibleName(title);
         // A double-click returns the value to the Operator defaults (10.0 / 0.0).
         slider->setResetValue(vertical?100:0);
         auto* value=new QDoubleSpinBox;value->setDecimals(1);value->setSingleStep(.1);value->setRange(vertical?0:-50,vertical?100:50);value->setButtonSymbols(QAbstractSpinBox::NoButtons);value->setAccessibleName(title+text(UiText::Value));
-        auto* row=settingRow(section,title,{},44);row->itemAt(0)->widget()->setFixedWidth(144);value->setFixedWidth(65);value->setAlignment(Qt::AlignCenter);
+        auto* field=new QWidget;field->setObjectName("recoilAxis");auto* column=new QVBoxLayout(field);column->setContentsMargins(0,0,0,0);column->setSpacing(4);
+        auto* titleLabel=label(title);titleLabel->setWordWrap(true);titleLabel->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);titleLabel->setBuddy(value);column->addWidget(titleLabel);
+        value->setObjectName("recoilValue");value->setFixedWidth(110);value->setAlignment(Qt::AlignLeading);column->addWidget(value,0,Qt::AlignLeading);
+        auto* row=new QHBoxLayout;row->setContentsMargins(0,0,0,0);row->setSpacing(6);column->addLayout(row);
         // One step is 0.1; the arrows flank the slider and holding repeats.
         const auto nudge=[slider](int direction){slider->setValue(std::clamp(slider->value()+direction,slider->minimum(),slider->maximum()));};
         auto* minus=new StepButton(QString::fromUtf8("−"),-1,nudge);minus->setAccessibleName(title+QStringLiteral(" -0.1"));minus->setToolTip(QStringLiteral("-0.1"));
         auto* plus=new StepButton("+",1,nudge);plus->setAccessibleName(title+QStringLiteral(" +0.1"));plus->setToolTip(QStringLiteral("+0.1"));
-        row->addWidget(minus);row->addWidget(slider,1);row->addWidget(plus);row->addWidget(value);
+        row->addWidget(minus);row->addWidget(slider,1);row->addWidget(plus);
         if(vertical){vertical_=value;vertical_slider_=slider;}else{horizontal_=value;horizontal_slider_=slider;}
         const auto syncSteps=[=]{minus->setEnabled(slider->value()>slider->minimum());plus->setEnabled(slider->value()<slider->maximum());};
         connect(slider,&QSlider::valueChanged,value,[value,syncSteps](int n){value->setValue(n/10.0);syncSteps();});
         syncSteps();
         connect(value,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[=](double n){QSignalBlocker blocked(slider);slider->setValue(qRound(n*10));syncSteps();if(!refreshing_)editOperator([=](r6::Operator& op){if(vertical)op.vertical=float(n);else op.horizontal=float(n);});});
+        return field;
     }
     void styleNotice(){
         if(!notice_bar_)return;
@@ -289,23 +297,59 @@ class MainWindow final : public QWidget {
         notice_bar_->setStyleSheet(QString("QWidget#noticeBar{background:%1;border:1px solid %2;border-radius:14px;}"
             "QLabel#noticeBadge{background:%3;color:%4;border:0;border-radius:17px;font-size:17px;font-weight:600;}"
             "QLabel#startupNotice{color:%5;font-size:13px;font-weight:400;}")
-            .arg(kbtheme::css(QColor(30,30,30,236)),kbtheme::css(kbtheme::outline),kbtheme::css(badge),badgeInk.name(),kbtheme::ink.name()));
+            .arg(kbtheme::css(kbtheme::dialog),kbtheme::css(kbtheme::outline),kbtheme::css(badge),badgeInk.name(),kbtheme::ink.name()));
         if(auto* shadow=qobject_cast<QGraphicsDropShadowEffect*>(notice_bar_->graphicsEffect())){shadow->setBlurRadius(28);shadow->setOffset(0,6);shadow->setColor(QColor(0,0,0,110));}
     }
     void applyStyle(){
         pages_->settle();qApp->setPalette(kbtheme::palette());setStyleSheet(applicationStyle(accent()));setPalette(kbtheme::palette());
+        if(brand_logo_){
+            QPixmap mark=QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF());
+            QPainter tint(&mark);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(mark.rect(),kbtheme::ink);tint.end();
+            brand_logo_->setPixmap(mark);
+        }
         styleNotice();
         layoutNotice();
         for(auto* child:findChildren<QWidget*>())child->update();update();
     }
+    void setLightTheme(bool light){
+        if(light==kbtheme::light)return;
+        if(!uiprefs::update(config_path_,[=](QJsonObject& root){root["theme"]=light?"light":"dark";})){
+            if(theme_choice_){QSignalBlocker blocked(theme_choice_.data());theme_choice_->setCurrentIndex(kbtheme::light?1:0);}
+            showNotice(text(UiText::CouldNotSaveTheme),true,true);return;
+        }
+        pages_->settle();
+        const QPixmap previous=isVisible()?(theme_snapshot_?theme_snapshot_->frame():grab()):QPixmap();
+        settleThemeTransition();
+        setUpdatesEnabled(false);
+        kbtheme::initialize(light);
+        const BOOL dark=!light;DwmSetWindowAttribute(HWND(winId()),20,&dark,sizeof(dark));
+        applyStyle();
+        if(layout())layout()->activate();
+        setUpdatesEnabled(true);
+        if(!previous.isNull()){
+            // Capture each foreground once; never repolish every animation frame.
+            const QPixmap next=grab();
+            theme_snapshot_=new PageSnapshot(previous,next,this,true);theme_snapshot_->setGeometry(rect());theme_snapshot_->show();theme_snapshot_->raise();
+            theme_motion_.start();
+        }
+    }
+    void settleThemeTransition(){
+        theme_motion_.stop();delete theme_snapshot_.data();
+    }
     void chooseSettingsCategory(int index){
         if(index<0||index>=preference_categories_.size())return;
-        pages_->settle();
-        if(pairing_qr_&&index!=2)pairing_qr_->conceal();preference_category_=index;
-        for(int i=0;i<preference_categories_.size();++i)preference_categories_[i]->setVisible(i==index);
-        for(int i=0;i<settings_nav_buttons_.size();++i)settings_nav_buttons_[i]->setChecked(i==index);
-        if(profile_save_dock_)profile_save_dock_->setVisible(index==3||index==mouse_setup_category_);
-        preferences_scroll_->verticalScrollBar()->setValue(0);
+        if(pairing_qr_&&index!=2)pairing_qr_->conceal();
+        const bool animate=pages_->currentWidget()==preferences_&&index!=preference_category_;
+        const auto change=[this,index]{
+            preference_category_=index;
+            for(int i=0;i<preference_categories_.size();++i)preference_categories_[i]->setVisible(i==index);
+            for(int i=0;i<settings_nav_buttons_.size();++i)settings_nav_buttons_[i]->setChecked(i==index);
+            if(profile_save_dock_)profile_save_dock_->setVisible(index==3);
+            static_cast<SmoothScrollArea*>(preferences_scroll_)->stopScrolling();
+            if(auto* content=preferences_scroll_->widget();content&&content->layout())content->layout()->activate();
+            preferences_scroll_->verticalScrollBar()->setValue(0);
+        };
+        if(animate)pages_->transition(change);else{pages_->settle();change();}
     }
     static void setWidgetOpacity(QWidget* widget,qreal opacity){
         if(!widget)return;
@@ -321,8 +365,8 @@ class MainWindow final : public QWidget {
         setWidgetOpacity(sidebar_favorites_,1.0-expanded);
     }
     void updateSettingsNavLabels(){
-        const QString names[]={text(UiText::General),text(UiText::Shortcuts),text(UiText::PhoneControl),text(UiText::ProfileBackup),text(UiText::MouseSetup)};
-        const QString hints[]={text(UiText::SettingsGeneralHint),text(UiText::SettingsShortcutsHint),text(UiText::SettingsPhoneHint),text(UiText::SettingsBackupHint),text(UiText::MouseSetupTabHint)};
+        const QString names[]={text(UiText::General),text(UiText::Shortcuts),text(UiText::PhoneControl),text(UiText::ProfileBackup)};
+        const QString hints[]={text(UiText::SettingsGeneralHint),text(UiText::SettingsShortcutsHint),text(UiText::SettingsPhoneHint),text(UiText::SettingsBackupHint)};
         for(int i=0;i<settings_nav_buttons_.size()&&i<int(std::size(names));++i){settings_nav_buttons_[i]->setText(names[i]);settings_nav_buttons_[i]->setDescription(hints[i]);settings_nav_buttons_[i]->setToolTip(names[i]+QStringLiteral(" — ")+hints[i]);settings_nav_buttons_[i]->setAccessibleName(names[i]+QStringLiteral(". ")+hints[i]);}
     }
     void updateSidebarControls(){
@@ -356,41 +400,46 @@ class MainWindow final : public QWidget {
         sidebar_collapsed_=collapsed;focus_sidebar_search_=focusSearch&&!collapsed;
         const int target=collapsed?76:200;sidebar_animating_=animate&&sidebar_->width()!=target;updateSidebarControls();
         if(!animate||sidebar_->width()==target){sidebar_animation_.stop();sidebar_animating_=false;sidebar_->setFixedWidth(target);updateSidebarControls();if(focus_sidebar_search_){search_->setFocus(Qt::ShortcutFocusReason);focus_sidebar_search_=false;}return;}
-        retargetAnimation(sidebar_animation_,sidebar_->width(),target,240);
+        retargetAnimation(sidebar_animation_,sidebar_->width(),target,180);
     }
     void buildSettings(){
         refreshing_=true;const auto c=engine_.snapshot();const auto hint=[this](UiText id){return text(id);};if(settings_){scroll_->takeWidget();delete settings_;}
         settings_=new QWidget;settings_->setObjectName("settingsContent");cards_=new QVBoxLayout(settings_);cards_->setContentsMargins(2,0,10,12);cards_->setSpacing(24);
-        auto* weapons=new Section(text(UiText::WeaponProfiles));weapons->body->setSpacing(0);cards_->addWidget(weapons);
-        dual_=toggle(settingRow(weapons,text(UiText::SeparateSecondaryProfile),hint(UiText::Use1And2ToSwitchWeaponProfilesChangeTheKeysInSettings)),"Separate secondary profile",c.secondary_enabled[c.selected],[this](bool on){engine_.edit([&](r6::Config& c){c.enable_secondary(c.selected,on);c.weapon_slot=on?1:0;});dirty();syncSelection();});
+        auto* weaponToolbar=new QWidget;weaponToolbar->setObjectName("weaponToolbar");weaponToolbar->setToolTip(hint(UiText::Use1And2ToSwitchWeaponProfilesChangeTheKeysInSettings));
+        auto* weaponRow=new QHBoxLayout(weaponToolbar);weaponRow->setContentsMargins(0,0,0,0);weaponRow->setSpacing(20);cards_->addWidget(weaponToolbar);
         auto* weaponChoices=new QWidget;weaponChoices->setObjectName("weaponChoices");weaponChoices->setAttribute(Qt::WA_StyledBackground);weaponChoices->setSizePolicy(QSizePolicy::Maximum,QSizePolicy::Fixed);
-        auto* choices=new QHBoxLayout(weaponChoices);choices->setContentsMargins(3,3,3,3);choices->setSpacing(4);
+        auto* choices=new QHBoxLayout(weaponChoices);choices->setContentsMargins(0,0,0,0);choices->setSpacing(4);
         primary_=new WeaponButton([this]{return accent();});secondary_=new WeaponButton([this]{return accent();});for(auto* button:{primary_,secondary_})choices->addWidget(button);
-        auto* weaponBox=new QWidget;auto* weaponBoxLayout=new QVBoxLayout(weaponBox);weaponBoxLayout->setContentsMargins(16,6,16,16);weaponBoxLayout->setSpacing(0);weaponBoxLayout->addWidget(weaponChoices,0,Qt::AlignLeading);
-        weapon_selector_=new ExpandingContent(weaponBox);weapons->body->addWidget(weapon_selector_);
+        weaponRow->addWidget(weaponChoices);weaponRow->addStretch(1);
+        auto* secondaryOption=new QWidget;auto* secondaryRow=new QHBoxLayout(secondaryOption);secondaryRow->setContentsMargins(0,0,0,0);secondaryRow->setSpacing(6);
+        auto* secondaryLabel=new QLabel(text(UiText::SeparateSecondaryProfile));secondaryLabel->setObjectName("rowHint");secondaryLabel->setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Preferred);secondaryRow->addWidget(secondaryLabel,1);
+        dual_=toggle(secondaryRow,text(UiText::SeparateSecondaryProfile),c.secondary_enabled[c.selected],[this](bool on){engine_.edit([&](r6::Config& c){c.enable_secondary(c.selected,on);c.weapon_slot=on?1:0;});dirty();syncSelection();});
+        dual_->setAccessibleDescription(weaponToolbar->toolTip());secondaryLabel->setBuddy(dual_);weaponRow->addWidget(secondaryOption);
+        QWidget::setTabOrder(primary_,secondary_);QWidget::setTabOrder(secondary_,dual_);
         connect(primary_,&QPushButton::clicked,this,[this]{chooseWeapon(0);});connect(secondary_,&QPushButton::clicked,this,[this]{chooseWeapon(1);});
-        auto* recoil=new Section(text(UiText::RecoilControl));cards_->addWidget(recoil);
-        amount(recoil,text(UiText::VerticalForce),true);amount(recoil,text(UiText::HorizontalAdjust),false);
+        auto* recoil=new Section(text(UiText::RecoilControl));recoil->setOpenProfile(true);cards_->addWidget(recoil);
+        auto* axes=new QWidget;axes->setObjectName("recoilAxes");auto* axisColumns=new QHBoxLayout(axes);axisColumns->setContentsMargins(0,0,0,8);axisColumns->setSpacing(32);
+        axisColumns->addWidget(amount(text(UiText::VerticalForce),true),1);axisColumns->addWidget(amount(text(UiText::HorizontalAdjust),false),1);recoil->body->addWidget(axes);
         humanize_=toggle(settingRow(recoil,text(UiText::HumanizeMovement),hint(UiText::VaryMovementSlightlyOnBothAxes)),"Humanize movement",false,[this](bool on){editOperator([=](r6::Operator& op){op.humanize=on;});});
-        auto* rapid=new Section(text(UiText::RapidFire));cards_->addWidget(rapid);
+        auto* rapid=new Section(text(UiText::RapidFire));rapid->setOpenProfile(true);cards_->addWidget(rapid);
         rapid_active_=toggle(settingRow(rapid,text(UiText::RapidFire),hint(UiText::RapidFireGlobalHint)),"Rapid fire",c.active_operator().rapid!=0,[this](bool on){editOperator([=](r6::Operator& op){op.rapid=on;});updateStatus();});
-        auto* delayRow=settingRow(rapid,text(UiText::ShotDelay),hint(UiText::DelayBetweenRepeatedShots));
-        delay_=new QSpinBox;delay_->setRange(30,150);delay_->setSuffix(text(UiText::Ms));delay_->setButtonSymbols(QAbstractSpinBox::NoButtons);delay_->setReadOnly(true);delay_->setFocusPolicy(Qt::NoFocus);delay_->setAlignment(Qt::AlignCenter);delay_->setFixedWidth(85);delay_->setAccessibleName(text(UiText::ShotDelay));delayRow->addWidget(delay_);
-        delay_controls_=new QWidget;auto* delayControls=new QHBoxLayout(delay_controls_);delayControls->setContentsMargins(14,0,12,10);delayControls->setSpacing(10);
+        delay_=new QSpinBox;delay_->setObjectName("delayValue");delay_->setRange(30,150);delay_->setSuffix(text(UiText::Ms));delay_->setButtonSymbols(QAbstractSpinBox::NoButtons);delay_->setReadOnly(true);delay_->setFocusPolicy(Qt::NoFocus);delay_->setAlignment(Qt::AlignTrailing);delay_->setFixedWidth(75);delay_->setAccessibleName(text(UiText::ShotDelay));
+        delay_controls_=new QWidget;delay_controls_->setToolTip(hint(UiText::DelayBetweenRepeatedShots));auto* delayControls=new QHBoxLayout(delay_controls_);delayControls->setContentsMargins(0,8,0,8);delayControls->setSpacing(8);
+        auto* delayLabel=label(text(UiText::ShotDelay));delayLabel->setWordWrap(true);delayControls->addWidget(delayLabel);
         delay_slider_=makeSlider();delay_slider_->setObjectName("shotDelaySlider");delay_slider_->setRange(30,150);delay_slider_->setSingleStep(1);delay_slider_->setPageStep(5);delay_slider_->setAccessibleName(text(UiText::ShotDelay));
         static_cast<ResetSlider*>(delay_slider_)->setResetValue(50);
         const auto nudgeDelay=[this](int direction){delay_slider_->setValue(std::clamp(delay_slider_->value()+direction*5,30,150));};
         delay_minus_=new StepButton(QString::fromUtf8("−"),-1,nudgeDelay);delay_plus_=new StepButton("+",1,nudgeDelay);
         delay_minus_->setAccessibleName(text(UiText::ShotDelay)+QStringLiteral(" -5")+text(UiText::Ms));delay_plus_->setAccessibleName(text(UiText::ShotDelay)+QStringLiteral(" +5")+text(UiText::Ms));
         delay_minus_->setToolTip(QStringLiteral("-5")+text(UiText::Ms));delay_plus_->setToolTip(QStringLiteral("+5")+text(UiText::Ms));
-        delayControls->addWidget(delay_minus_);delayControls->addWidget(delay_slider_,1);delayControls->addWidget(delay_plus_);rapid->body->addWidget(delay_controls_);
+        delayControls->addWidget(delay_minus_);delayControls->addWidget(delay_slider_,1);delayControls->addWidget(delay_plus_);delayControls->addWidget(delay_);rapid->body->addWidget(delay_controls_);
         connect(delay_slider_,&QSlider::valueChanged,delay_,&QSpinBox::setValue);
         connect(delay_,qOverload<int>(&QSpinBox::valueChanged),this,[this](int n){QSignalBlocker blocked(delay_slider_);delay_slider_->setValue(n);syncDelayControls();if(!refreshing_)editOperator([=](r6::Operator& op){op.delay=n;});});
 
         cards_->addStretch();scroll_->setWidget(settings_);refreshing_=false;syncSelection();
     }
     void buildOutputMethod(QVBoxLayout* column){
-        auto* output=new Section(text(UiText::DriverOutput));
+        auto* output=new Section(text(UiText::DriverOutput));output->setOpenSettings(true);
         output->body->setSpacing(14);column->addWidget(output);
         driver_status_=new QLabel(QString());driver_status_->setObjectName("driverState");
         driver_status_->setAlignment(Qt::AlignLeading|Qt::AlignVCenter);
@@ -398,7 +447,7 @@ class MainWindow final : public QWidget {
 
         // One visible walkthrough: every action belongs to the step it explains.
         auto* guide=new QFrame;guide->setObjectName("driverGuide");
-        auto* steps=new QVBoxLayout(guide);steps->setContentsMargins(2,10,2,4);steps->setSpacing(24);
+        auto* steps=new QVBoxLayout(guide);steps->setContentsMargins(0,6,0,4);steps->setSpacing(24);
         const auto step=[&](int number,UiText title,UiText description){
             auto* row=new QHBoxLayout;row->setContentsMargins(0,0,0,0);row->setSpacing(12);
             auto* chip=new QLabel(QString::number(number));chip->setObjectName("driverStepNumber");
@@ -422,6 +471,7 @@ class MainWindow final : public QWidget {
 
         auto* install=step(2,UiText::DriverStepInstall,UiText::DriverStepInstallBody);
         driver_code_=new CodeBlock(text(UiText::CopyCommand),text(UiText::Copied));
+        driver_code_->layout()->setContentsMargins(0,8,0,8);
         install->addWidget(driver_code_);
 
         auto* admin=step(3,UiText::DriverStepAdmin,UiText::DriverStepAdminBody);
@@ -437,8 +487,9 @@ class MainWindow final : public QWidget {
         auto* troubleButton=button(UiText::DriverTroubleshooting,"driverTroubleshooting");
         troubleButton->setText(QString::fromUtf8("▸ ")+text(UiText::DriverTroubleshooting));
         troubleButton->setCheckable(true);helpLayout->addWidget(troubleButton,0,Qt::AlignLeading);
-        auto* trouble=label(text(UiText::DriverTroubleshootingBody),"rowHint");trouble->setWordWrap(true);trouble->hide();
-        helpLayout->addWidget(trouble);connect(troubleButton,&QPushButton::toggled,trouble,&QWidget::setVisible);
+        auto* trouble=label(text(UiText::DriverTroubleshootingBody),"rowHint");trouble->setWordWrap(true);
+        auto* troubleContent=new ExpandingContent(trouble,180);troubleContent->setExpanded(false,false);
+        helpLayout->addWidget(troubleContent);connect(troubleButton,&QPushButton::toggled,troubleContent,[troubleContent](bool open){troubleContent->setExpanded(open);});
         connect(troubleButton,&QPushButton::toggled,this,[this,troubleButton](bool open){
             troubleButton->setText(QString::fromUtf8(open?"▾ ":"▸ ")+text(UiText::DriverTroubleshooting));
         });
@@ -560,11 +611,15 @@ class MainWindow final : public QWidget {
     void buildPreferences(){
         if(!preferences_)return;
         refreshing_=true;const auto c=engine_.snapshot();
-        delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;
+        delete preferences_scroll_->takeWidget();preference_categories_.clear();auto* content=new QWidget;content->setObjectName("settingsSurface");
         auto* outer=new QVBoxLayout(content);outer->setContentsMargins(2,0,10,0);outer->setSpacing(14);
-        const auto categoryLayout=[&]{auto* page=new QWidget;page->setMinimumWidth(0);auto* layout=new QVBoxLayout(page);layout->setContentsMargins(0,0,0,0);layout->setSpacing(14);outer->addWidget(page);preference_categories_.append(page);return layout;};
-        auto* generalLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();auto* mouseLayout=categoryLayout();
-        auto* system=new Section(text(UiText::SystemSettings));system_=system;generalLayout->addWidget(system);
+        const auto categoryLayout=[&]{auto* page=new QWidget;page->setMinimumWidth(0);auto* layout=new QVBoxLayout(page);layout->setContentsMargins(0,0,0,0);layout->setSpacing(24);outer->addWidget(page);preference_categories_.append(page);return layout;};
+        auto* generalLayout=categoryLayout();auto* shortcutsLayout=categoryLayout();auto* phoneLayout=categoryLayout();auto* backupLayout=categoryLayout();
+        auto* system=new Section(text(UiText::SystemSettings));system->setOpenSettings();system_=system;generalLayout->addWidget(system);
+        auto* themeRow=settingRow(system,text(UiText::Theme),text(UiText::ThemeHint));
+        theme_choice_=new LanguageComboBox(nullptr,QStringLiteral("themePopup"));theme_choice_->setObjectName("themeChoice");theme_choice_->setAccessibleName(text(UiText::Theme));
+        theme_choice_->addItem(text(UiText::DarkTheme));theme_choice_->addItem(text(UiText::LightTheme));theme_choice_->setCurrentIndex(kbtheme::light?1:0);themeRow->addWidget(theme_choice_);
+        connect(theme_choice_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){setLightTheme(index==1);});
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::SoundWhenClosingUnsaved)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         game_focus_only_=toggle(settingRow(system,text(UiText::OnlyWhileGameIsActive),text(UiText::OnlyWhileGameIsActiveHint)),"Only in Rainbow Six",engine_.game_focus_only,[this](bool on){engine_.game_focus_only=on;dirty();});
         ads_only_=toggle(settingRow(system,text(UiText::OnlyWhileAiming),text(UiText::OnlyWhileAimingHint)),"Only while aiming",engine_.ads_only,[this](bool on){engine_.ads_only=on;dirty();});
@@ -573,14 +628,25 @@ class MainWindow final : public QWidget {
         language_->setCurrentIndex(qMax(0,language_->findData(c.language)));langRow->addWidget(language_);
         connect(language_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){const int value=language_->itemData(index).toInt();engine_.edit([=](r6::Config& c){c.language=value;});dirty();if(value==6)QTimer::singleShot(0,this,[this]{showPalestineSurprise();});QTimer::singleShot(0,this,[this]{buildPreferences();buildSettings();updateLanguage();});});
         buildOutputMethod(generalLayout);
-        auto* updates=new Section(text(UiText::Updates));generalLayout->addWidget(updates);
+        auto* updates=new Section(text(UiText::Updates));updates->setOpenSettings(true);generalLayout->addWidget(updates);
         auto* versionRow=settingRow(updates,text(UiText::InstalledVersion),QString("Azec ")+QCoreApplication::applicationVersion());
         update_button_=new MonoButton(text(UiText::CheckForUpdates));update_button_->setObjectName("secondary");update_button_->setAccessibleName(text(UiText::CheckForUpdates));update_button_->setEnabled(!update_in_progress_);
         versionRow->addWidget(update_button_);connect(update_button_,&QPushButton::clicked,this,[this]{checkForUpdates();});
-        auto* shortcuts=new Section(text(UiText::Shortcuts));shortcutsLayout->addWidget(shortcuts);
+        auto* shortcutPage=new QWidget;shortcutPage->setObjectName("shortcutPage");shortcutPage->setMaximumWidth(620);shortcutPage->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);shortcutsLayout->addWidget(shortcutPage,0,Qt::AlignLeading);
+        auto* shortcutLayout=new QVBoxLayout(shortcutPage);shortcutLayout->setContentsMargins(0,0,0,0);shortcutLayout->setSpacing(20);
+        auto* shortcutIntro=new QVBoxLayout;shortcutIntro->setSpacing(6);shortcutIntro->addWidget(label(text(UiText::Shortcuts),"shortcutTitle"));
+        auto* shortcutHint=label(text(UiText::ShortcutIntro),"rowHint");shortcutHint->setWordWrap(true);shortcutIntro->addWidget(shortcutHint);shortcutLayout->addLayout(shortcutIntro);
+        auto* appShortcuts=new Section(text(UiText::ShortcutApplicationGroup));appShortcuts->setOpenSettings();shortcutLayout->addWidget(appShortcuts);
+        auto* weaponShortcuts=new Section(text(UiText::ShortcutWeaponGroup));weaponShortcuts->setOpenSettings(true);shortcutLayout->addWidget(weaponShortcuts);
         const QString titles[]={text(UiText::OpenHideWindow),text(UiText::RecoilToggle),text(UiText::PanicExitKey),text(UiText::PrimaryWeapon),text(UiText::SecondaryWeapon)};const int keys[]={c.menu_key,c.recoil_key,c.panic_key,c.primary_key,c.secondary_key};
-        for(int i=0;i<5;++i){auto* row=settingRow(shortcuts,titles[i],{},44);auto* button=new MonoButton(bindingName(keys[i]));button->setObjectName("keyButton");button->setFixedWidth(108);button->setAccessibleName(titles[i]);row->addWidget(button);key_buttons_[i]=button;connect(button,&QPushButton::clicked,this,[this,i]{bindKey(i);});}
-        auto* phoneSection=new Section(text(UiText::PhoneControl));phoneSection->body->setSpacing(0);phoneLayout->addWidget(phoneSection);
+        const UiText shortcutHints[]={UiText::ShortcutWindowHint,UiText::ShortcutRecoilHint,UiText::ShortcutPanicHint,UiText::ShortcutPrimaryHint,UiText::ShortcutSecondaryHint};
+        for(int i=0;i<5;++i){
+            auto* section=i<3?appShortcuts:weaponShortcuts;
+            if(i!=0&&i!=3){auto* divider=new QFrame;divider->setObjectName("profileDivider");divider->setFixedHeight(1);section->body->addWidget(divider);}
+            auto* row=settingRow(section,titles[i],text(shortcutHints[i]));row->parentWidget()->setMinimumHeight(66);
+            auto* button=new MonoButton(bindingName(keys[i]));button->setObjectName("keyButton");button->setFixedSize(96,36);button->setAccessibleName(titles[i]);button->setAccessibleDescription(text(shortcutHints[i]));row->addWidget(button,0,Qt::AlignVCenter);key_buttons_[i]=button;connect(button,&QPushButton::clicked,this,[this,i]{bindKey(i);});
+        }
+        auto* phoneSection=new Section(text(UiText::PhoneControl));phoneSection->setOpenSettings();phoneSection->body->setSpacing(0);phoneLayout->addWidget(phoneSection);
         phone_enabled_=toggle(settingRow(phoneSection,text(UiText::EnablePhoneAccess)),"Enable phone access",c.phone_enabled,[this](bool enabled){
             engine_.edit([&](r6::Config& c){c.phone_enabled=enabled;});
             if(pairing_qr_)pairing_qr_->conceal();
@@ -590,7 +656,7 @@ class MainWindow final : public QWidget {
         });
         phone_enabled_->parentWidget()->setFixedHeight(44);
         {
-            auto* connection=new QWidget;auto* connectionLayout=new QVBoxLayout(connection);connectionLayout->setContentsMargins(15,13,12,8);connectionLayout->setSpacing(7);
+            auto* connection=new QWidget;auto* connectionLayout=new QVBoxLayout(connection);connectionLayout->setContentsMargins(0,13,0,8);connectionLayout->setSpacing(10);
             auto* addressRow=new QHBoxLayout;addressRow->setSpacing(8);
             auto* address=label({},"phoneAddress");phone_address_=address;address->setWordWrap(true);address->setMinimumWidth(0);address->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);address->setTextInteractionFlags(Qt::TextSelectableByMouse);addressRow->addWidget(address,1);
             phone_retry_=new MonoButton(text(UiText::Retry));phone_retry_->setObjectName("secondary");phone_retry_->setAccessibleName(text(UiText::Retry));addressRow->addWidget(phone_retry_);
@@ -598,32 +664,35 @@ class MainWindow final : public QWidget {
             connectionLayout->addLayout(addressRow);
             auto* pair=new QHBoxLayout;pair->setSpacing(7);pair->addWidget(label(text(UiText::PairingCode),"hint"));
             phone_code_=new QLabel(phone_->code());phone_code_->setObjectName("pairingCode");phone_code_->setTextInteractionFlags(Qt::TextSelectableByMouse);pair->addWidget(phone_code_);pair->addStretch();
-            copy_code_=new MonoButton(text(UiText::CopyCode));copy_code_->setObjectName("secondary");pair->addWidget(copy_code_);
+            connectionLayout->addLayout(pair);auto* pairActions=new QHBoxLayout;pairActions->setSpacing(12);
+            copy_code_=new MonoButton(text(UiText::CopyCode));copy_code_->setObjectName("secondary");pairActions->addWidget(copy_code_);
             connect(copy_code_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(phone_->code());if(engine_.snapshot().sound)sound::playCopy();copy_code_->setText(text(UiText::Copied));QTimer::singleShot(1400,copy_code_.data(),[this]{if(copy_code_)copy_code_->setText(text(UiText::CopyCode));});});
-            copy_link_=new MonoButton(text(UiText::CopyLink));copy_link_->setObjectName("secondary");pair->addWidget(copy_link_);
+            copy_link_=new MonoButton(text(UiText::CopyLink));copy_link_->setObjectName("secondary");pairActions->addWidget(copy_link_);
             connect(copy_link_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(phone_->pairingLink());if(engine_.snapshot().sound)sound::playCopy();copy_link_->setText(text(UiText::Copied));QTimer::singleShot(1400,copy_link_.data(),[this]{if(copy_link_)copy_link_->setText(text(UiText::CopyLink));});});
-            phone_new_code_=new MonoButton(text(UiText::NewCode));phone_new_code_->setObjectName("secondary");pair->addWidget(phone_new_code_);
+            phone_new_code_=new MonoButton(text(UiText::NewCode));phone_new_code_->setObjectName("secondary");pairActions->addWidget(phone_new_code_);
             connect(phone_new_code_,&QPushButton::clicked,this,[this]{phone_->rotate();if(pairing_qr_)pairing_qr_->conceal();updatePhoneDetails();showNotice(text(UiText::NewCodeCreated));});
-            connectionLayout->addLayout(pair);
+            pairActions->addStretch();connectionLayout->addLayout(pairActions);
             auto* note=label(text(UiText::OpenThisAddressInSafariOnTheSameWiFi),"hint");note->setWordWrap(true);connectionLayout->addWidget(note);
             pairing_qr_=new PairingQr(text(UiText::ClickToRevealQR),text(UiText::ClickToHideQR));
             pairing_qr_->setEnabled(phone_->listening());pairing_qr_->setPairingLink(phone_->listening()?phone_->pairingLink():QString());
             connectionLayout->addWidget(pairing_qr_,0,Qt::AlignLeft);
-            phone_details_=new ExpandingContent(connection,300);phoneSection->body->addWidget(phone_details_);phone_details_->setExpanded(c.phone_enabled,false);
+            phone_details_=new ExpandingContent(connection,180);phoneSection->body->addWidget(phone_details_);phone_details_->setExpanded(c.phone_enabled,false);
             updatePhoneDetails();
         }
-        buildMouseSetup(mouseLayout);
         auto* guideRow=new QHBoxLayout;
         auto* guide=new MonoButton(text(UiText::QuickGuide));guide->setObjectName("secondary");guideRow->addWidget(guide);connect(guide,&QPushButton::clicked,this,[this]{help();});
         guideRow->addStretch();generalLayout->addLayout(guideRow);
-        auto* exportCard=new Section(text(UiText::ExportBackup));backupLayout->addWidget(exportCard);
-        auto* exportHint=label(text(UiText::ExportBackupHint),"rowHint");exportHint->setWordWrap(true);exportHint->setContentsMargins(14,4,12,4);exportCard->body->addWidget(exportHint);
-        auto* exportButton=new MonoButton(text(UiText::ExportBackup));exportButton->setObjectName("secondary");exportCard->body->addWidget(exportButton);
-        auto* importCard=new Section(text(UiText::ImportBackup));backupLayout->addWidget(importCard);
-        auto* importHint=label(text(UiText::ImportBackupHint),"rowHint");importHint->setWordWrap(true);importHint->setContentsMargins(14,4,12,4);importCard->body->addWidget(importHint);
-        auto* importButton=new MonoButton(text(UiText::ChooseBackup));importButton->setObjectName("secondary");importButton->setEnabled(!save_blocked_);importCard->body->addWidget(importButton);
+        auto* exportCard=new Section(text(UiText::ExportBackup));exportCard->setOpenSettings();backupLayout->addWidget(exportCard);
+        auto* exportRow=new QHBoxLayout;exportRow->setSpacing(16);exportCard->body->addLayout(exportRow);
+        auto* exportHint=label(text(UiText::ExportBackupHint),"rowHint");exportHint->setWordWrap(true);exportRow->addWidget(exportHint,1);
+        auto* exportButton=new MonoButton(text(UiText::ExportBackup));exportButton->setObjectName("secondary");exportRow->addWidget(exportButton,0,Qt::AlignVCenter);
+        auto* importCard=new Section(text(UiText::ImportBackup));importCard->setOpenSettings(true);backupLayout->addWidget(importCard);
+        auto* importRow=new QHBoxLayout;importRow->setSpacing(16);importCard->body->addLayout(importRow);
+        auto* importHint=label(text(UiText::ImportBackupHint),"rowHint");importHint->setWordWrap(true);importRow->addWidget(importHint,1);
+        auto* importButton=new MonoButton(text(UiText::ChooseBackup));importButton->setObjectName("secondary");importButton->setEnabled(!save_blocked_);importRow->addWidget(importButton,0,Qt::AlignVCenter);
         connect(exportButton,&QPushButton::clicked,this,[this]{exportProfiles();});connect(importButton,&QPushButton::clicked,this,[this]{importProfiles();});
-        outer->addStretch();preferences_scroll_->setWidget(content);updateSettingsNavLabels();chooseSettingsCategory(preference_category_);refreshing_=false;
+        for(auto* action:content->findChildren<QPushButton*>())action->setProperty("plainAction",true);
+        outer->addStretch();preferences_scroll_->setWidget(content);updateSettingsNavLabels();chooseSettingsCategory(std::clamp(preference_category_,0,int(preference_categories_.size())-1));refreshing_=false;
     }
     // Both installed and older portable shared builds have a payload marker.
     bool packagedBuild() const{return QFileInfo(QCoreApplication::applicationDirPath()+"/version.txt").exists();}
@@ -707,7 +776,7 @@ class MainWindow final : public QWidget {
         // right-to-left, in both the app window and every dialog.
         const int language=engine_.snapshot().language;const auto direction=(language==5||language==6)?Qt::RightToLeft:Qt::LeftToRight;
         if(qApp->layoutDirection()!=direction){qApp->setLayoutDirection(direction);applyStyle();}
-        operators_title_->setText(text(UiText::AllOperators));favorites_title_->setText(text(UiText::Favorites));search_->setPlaceholderText(text(UiText::SearchOperators));subtitle_->setText(text(UiText::OperatorSettings));
+        operators_title_->setText(text(UiText::AllOperators));favorites_title_->setText(text(UiText::Favorites));search_->setPlaceholderText(text(UiText::SearchOperators));
         updateSettingsNavLabels();
         styleNotice();layoutNotice();
         updateSidebarControls();
@@ -715,10 +784,9 @@ class MainWindow final : public QWidget {
     }
     void syncSelection(){
         const auto c=engine_.snapshot();const auto& op=c.active_operator();refreshing_=true;operator_name_->setText(QString::fromUtf8(op.name));operator_icon_->setPixmap(operatorPixmap(QString::fromUtf8(op.name),44,devicePixelRatioF()));
-        dual_->syncChecked(c.secondary_enabled[c.selected]);weapon_selector_->setExpanded(c.secondary_enabled[c.selected]);
+        dual_->syncChecked(c.secondary_enabled[c.selected]);secondary_->setEnabled(c.secondary_enabled[c.selected]);
         primary_->setText(text(UiText::Primary));secondary_->setText(text(UiText::Secondary));
         primary_->setChosen(c.active_slot()==0);secondary_->setChosen(c.active_slot()==1);
-        subtitle_->setText(c.secondary_enabled[c.selected]?(c.active_slot()?text(UiText::SecondaryWeapon):text(UiText::PrimaryWeapon)):text(UiText::OperatorSettings));
         vertical_->setValue(op.vertical);horizontal_->setValue(op.horizontal);vertical_slider_->setValue(qRound(op.vertical*10));horizontal_slider_->setValue(qRound(op.horizontal*10));humanize_->syncChecked(op.humanize);delay_->setValue(std::clamp(op.delay,30,150));delay_->setEnabled(op.rapid!=0);refreshing_=false;updateStatus();
     }
     void chooseWeapon(int slot){if(engine_.select_weapon(slot)){stopTransition();syncSelection();}}
@@ -839,28 +907,45 @@ protected:
         const qreal radius=isMaximized()?0:16;
         QPainterPath shape;shape.addRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),radius,radius);
         p.fillPath(shape,glass_active_?kbtheme::windowGlass:kbtheme::paper);
-        if(glass_active_)p.fillPath(shape,kbtheme::windowWash);
+        if(glass_active_){
+            p.fillPath(shape,kbtheme::windowWash);
+        }
     }
-    // Acrylic blur behind a translucent window — the monocode glass look. The
-    // system tint stays empty so the widget paints the reference's inset shell; if the
-    // system refuses the effect the window simply stays opaque.
-    void enableWindowGlass(){
-        if(glass_applied_)return;glass_applied_=true;
+    // Keep the same translucent shell over either effect. Change the native
+    // material only at move/resize boundaries, never for each mouse position.
+    bool applyWindowGlass(bool lightweight){
         struct AccentPolicy{DWORD state;DWORD flags;DWORD color;DWORD animationId;};
         struct AttributeData{DWORD attribute;PVOID data;SIZE_T size;};
-        const auto setComposition=reinterpret_cast<BOOL(WINAPI*)(HWND,AttributeData*)>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
-        if(!setComposition)return;
-        AccentPolicy policy{4,0,0x01000000,0}; // ACCENT_ENABLE_ACRYLICBLURBEHIND; tint alpha 1, exactly window-vibrancy's convention
+        static const auto setComposition=reinterpret_cast<BOOL(WINAPI*)(HWND,AttributeData*)>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
+        if(!setComposition)return false;
+        // ACCENT_ENABLE_BLURBEHIND (3) uses flag 2; acrylic (4) uses flag 0.
+        // Leave the system tint nearly empty; Qt paints the inset shell.
+        // Both themes keep glass active. Theme changes only repaint the tint,
+        // avoiding the clear frame caused by disabling/re-enabling acrylic.
+        AccentPolicy policy{lightweight?3u:4u,lightweight?2u:0u,0x01000000u,0};
         AttributeData helper{19,reinterpret_cast<PVOID>(&policy),sizeof(policy)}; // WCA_ACCENT_POLICY
-        if(setComposition(HWND(winId()),&helper)){glass_active_=true;update();}
+        if(!setComposition(HWND(winId()),&helper))return false;
+        const bool wasActive=glass_active_;
+        glass_active_=true;glass_lightweight_=lightweight;
+        if(wasActive!=glass_active_)update();
+        return true;
+    }
+    void enableWindowGlass(){
+        if(glass_applied_)return;glass_applied_=true;
+        // Attach after the first paint, retaining the opaque fallback on failure.
+        applyWindowGlass(false);
     }
     void showEvent(QShowEvent* event) override {
         QWidget::showEvent(event);engine_.menu_visible=true;
-        if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);const BOOL dark=TRUE;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));
+        if(!native_ready_){native_ready_=true;const HWND handle=HWND(winId());const auto style=GetWindowLongPtrW(handle,GWL_STYLE);SetWindowLongPtrW(handle,GWL_STYLE,style|WS_THICKFRAME|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED);const BOOL dark=!kbtheme::light;DwmSetWindowAttribute(handle,20,&dark,sizeof(dark));
             // The blur attaches after the first paint, like the reference.
             QTimer::singleShot(0,this,[this]{enableWindowGlass();});}
     }
-    void hideEvent(QHideEvent* event) override {if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);}
+    void hideEvent(QHideEvent* event) override {
+        settleThemeTransition();
+        if(glass_lightweight_)applyWindowGlass(false);
+        if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);
+    }
     void closeEvent(QCloseEvent* event) override {
         if(close_prompt_){if(!isVisible())showNormal();raise();activateWindow();QApplication::alert(this,0);if(close_alert_&&close_alert_->isVisible()){close_alert_->raise();close_alert_->activateWindow();}event->ignore();return;}
         if(unsaved_&&!force_close_){
@@ -879,8 +964,9 @@ protected:
         }
         if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
-    void resizeEvent(QResizeEvent* event) override {QWidget::resizeEvent(event);layoutNotice();}
+    void resizeEvent(QResizeEvent* event) override {settleThemeTransition();QWidget::resizeEvent(event);layoutNotice();}
     bool eventFilter(QObject* object,QEvent* event) override {
+        if(object==sidebar_search_box_&&event->type()==QEvent::Resize&&sidebar_search_)sidebar_search_->setFixedWidth(static_cast<QResizeEvent*>(event)->size().width());
         if(event->type()==QEvent::FocusIn||event->type()==QEvent::FocusOut||event->type()==QEvent::MouseButtonPress){
             if(auto* button=qobject_cast<QPushButton*>(object);button&&(isAncestorOf(button)||button->window()->parentWidget()==this)){
                 const auto reason=event->type()==QEvent::MouseButtonPress?Qt::MouseFocusReason:static_cast<QFocusEvent*>(event)->reason();const bool keyboard=event->type()==QEvent::FocusIn&&(reason==Qt::TabFocusReason||reason==Qt::BacktabFocusReason||reason==Qt::ShortcutFocusReason);
@@ -915,16 +1001,32 @@ protected:
         return QWidget::eventFilter(object,event);
     }
     bool nativeEvent(const QByteArray& type,void* message,qintptr* result) override {
-        auto* msg=static_cast<MSG*>(message);if(msg->message==WM_NCCALCSIZE&&msg->wParam){*result=0;return true;}
+        auto* msg=static_cast<MSG*>(message);
+        if(msg->message==WM_ENTERSIZEMOVE&&glass_active_){
+            // Windows 10 acrylic stalls native dragging. Plain blur keeps the
+            // background translucent without that material's movement cost.
+            // Do not apply this workaround to Windows 11, where plain blur has
+            // its own compositor performance problems.
+            const auto windows=QOperatingSystemVersion::current();
+            if(windows.majorVersion()==10&&windows.microVersion()<22000&&!glass_lightweight_){settleThemeTransition();applyWindowGlass(true);}
+        }else if(msg->message==WM_EXITSIZEMOVE&&glass_lightweight_){
+            // Also sent for a cancelled move/resize. Failed changes retain the
+            // last successful material instead of losing the glass background.
+            applyWindowGlass(false);
+        }
+        if(msg->message==WM_NCCALCSIZE&&msg->wParam){*result=0;return true;}
         if(msg->message==WM_NCHITTEST){RECT r;GetWindowRect(HWND(winId()),&r);const int x=short(LOWORD(msg->lParam)),y=short(HIWORD(msg->lParam)),edge=qRound(6*devicePixelRatioF());const bool left=x<r.left+edge,right=x>=r.right-edge,top=y<r.top+edge,bottom=y>=r.bottom-edge;
             if(top&&left)*result=HTTOPLEFT;else if(top&&right)*result=HTTOPRIGHT;else if(bottom&&left)*result=HTBOTTOMLEFT;else if(bottom&&right)*result=HTBOTTOMRIGHT;else if(left)*result=HTLEFT;else if(right)*result=HTRIGHT;else if(top)*result=HTTOP;else if(bottom)*result=HTBOTTOM;else return QWidget::nativeEvent(type,message,result);return true;}return QWidget::nativeEvent(type,message,result);
     }
 public:
     explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path):engine_(engine),config_path_(std::move(config_path)){
-        kbtheme::initialize();
+        kbtheme::initialize(uiprefs::lightTheme(config_path_));
+        theme_motion_.setDuration(160);theme_motion_.setStartValue(0.0);theme_motion_.setEndValue(1.0);theme_motion_.setEasingCurve(monoEase());
+        connect(&theme_motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){if(theme_snapshot_)theme_snapshot_->setProgress(value.toReal());});
+        connect(&theme_motion_,&QVariantAnimation::finished,this,[this]{settleThemeTransition();});
         setObjectName("mainWindow");setWindowTitle("Azec");setWindowFlags(Qt::Window|Qt::FramelessWindowHint);setAttribute(Qt::WA_TranslucentBackground);setWindowIcon(QIcon(":/ui/app-icon.svg"));const auto area=QGuiApplication::primaryScreen()->availableGeometry();setMinimumSize(std::min(760,area.width()-32),std::min(560,area.height()-32));resize(std::min(864,area.width()-48),std::min(664,area.height()-48));move(area.center()-rect().center());
         auto* layout=new QVBoxLayout(this);layout->setContentsMargins(0,0,0,0);layout->setSpacing(0);auto* header=new DragHeader;header->setObjectName("titleBar");header->setFixedHeight(52);auto* top=new QHBoxLayout(header);top->setContentsMargins(20,0,20,0);top->setSpacing(5);
-        auto* logo=new QLabel;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));top->addWidget(logo);top->addSpacing(5);
+        auto* logo=new QLabel;brand_logo_=logo;logo->setObjectName("brandLogo");logo->setFixedSize(32,32);logo->setPixmap(QIcon(":/ui/logo.svg").pixmap(QSize(32,32),devicePixelRatioF()));top->addWidget(logo);top->addSpacing(5);
         top->addWidget(new BrandLabel);
         top->addStretch();status_=new MonoButton;status_->setObjectName("status");status_->setFixedHeight(32);status_->setCursor(Qt::PointingHandCursor);status_->setToolTip(text(UiText::ToggleRecoilActivity));top->addWidget(status_);connect(status_,&QPushButton::clicked,this,[this]{toggleRecoil();});
         rapid_status_=new MonoButton;rapid_status_->setObjectName("statusRapid");rapid_status_->setFixedHeight(32);rapid_status_->setCursor(Qt::PointingHandCursor);rapid_status_->setToolTip(text(UiText::RapidFire));top->addWidget(rapid_status_);connect(rapid_status_,&QPushButton::clicked,this,[this]{toggleRapid();});
@@ -959,10 +1061,14 @@ public:
         auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{if(sidebar_collapsed_)setSidebarCollapsed(false,true,true);else{search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();}});
         auto* escapeShortcut=new QShortcut(QKeySequence(Qt::Key_Escape),this);connect(escapeShortcut,&QShortcut::activated,this,[this]{if(notice_bar_->isVisible()){notice_timer_.stop();notice_bar_->hide();}else if(pages_->currentWidget()==preferences_)showOperators();else if(!search_->text().isEmpty())search_->clear();});
         clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});paint_.start();
-        QTimer::singleShot(350,this,[this]{checkMouseSensitivityChange();});
     }
 
     void capture(const QString& file){grab().save(file);}
+    void captureDocumentation(const QString& folder){
+        if(!engine_.dry_run()||!QDir().mkpath(folder))return;
+        capture(folder+"/desktop.png");showPreferences();chooseSettingsCategory(0);
+        QTimer::singleShot(300,this,[this,folder]{capture(folder+"/settings.png");closeForTimeout();});
+    }
     void writePhoneInfo(const QString& path) const {if(!engine_.dry_run())return;QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"port",int(phone_->port())},{"address",phone_->address()},{"token",phone_->token()},{"code",phone_->code()},{"pid",int(QCoreApplication::applicationPid())},{"dryRun",true},{"interface",QStringLiteral("monocode")}}).toJson());}
     void closeUsingControl(){close_->click();}
     void showNotice(const QString& message,bool error=false,bool persistent=false){
@@ -971,12 +1077,12 @@ public:
         if(!error&&notice_bar_->isVisible()&&notice_bar_->property("saveError").toBool())return;
         notice_bar_->setProperty("saveError",false);notice_bar_->setProperty("phoneError",false);
         notice_bar_->setProperty("error",error);notice_->setText(message);styleNotice();
-        notice_bar_->show();notice_scroll_->verticalScrollBar()->setValue(0);layoutNotice();notice_timer_.stop();
+        notice_timer_.stop();layoutNotice();notice_scroll_->verticalScrollBar()->setValue(0);notice_bar_->show();notice_bar_->raise();
         if(!persistent&&!error){notice_timer_.setInterval(5000);notice_timer_.start();}
     }
     // A nonmodal card stays centered inside Azec without taking keyboard focus.
     void layoutNotice(){
-        if(!notice_bar_||notice_bar_->isHidden())return;
+        if(!notice_bar_)return;
         const int width=qMin(400,this->width()-40);
         const int bodyHeight=qMax(40,notice_->heightForWidth(width-64));
         notice_scroll_->setFixedHeight(qMin(bodyHeight,qMax(60,this->height()-280)));

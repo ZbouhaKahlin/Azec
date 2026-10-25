@@ -14,7 +14,7 @@ int main(int argc,char** argv){
         return 3;
     }
     const auto configPath=std::filesystem::current_path()/L"r6_config.bin";
-    kbtheme::initialize();
+    kbtheme::initialize(uiprefs::lightTheme(configPath));
     app.setPalette(kbtheme::palette());
     const auto arguments=app.arguments();const bool selftest=arguments.contains("--ui-self-test"),dryrun=selftest||arguments.contains("--dry-run");QString output,phoneInfo;int duration=0;for(const auto& argument:arguments){if(argument.startsWith("--phone-info="))phoneInfo=argument.mid(13);if(argument.startsWith("--output="))output=argument.mid(9);if(argument.startsWith("--exit-after-ms="))duration=argument.mid(16).toInt();}if(output.isEmpty())output=QDir::currentPath();QDir().mkpath(output);
 #ifndef AZEC_UI_TESTS
@@ -34,6 +34,8 @@ int main(int argc,char** argv){
         return 3;
     }
     r6::Engine engine(dryrun);const auto recovery=loadConfiguration(engine,configPath);DesktopTranslator translator([&]{return engine.snapshot().language;});app.installTranslator(&translator);engine.start();MainWindow window(engine,configPath);window.setStartupNotice(recovery.notice,recovery.blockSaving);instance.onActivate(&window);window.show();if(!phoneInfo.isEmpty())window.writePhoneInfo(phoneInfo);
+    const auto captureFolder=azec_paths::argument("--capture-ui=");
+    if(dryrun&&!selftest&&!captureFolder.isEmpty())QTimer::singleShot(900,&window,[&window,captureFolder]{window.captureDocumentation(captureFolder);});
 #ifdef AZEC_UI_TESTS
     if(selftest)QTimer::singleShot(700,&window,[&]{const auto report=window.selfTest(output);QSaveFile file(output+"/ui-verification.json");const auto bytes=QJsonDocument(report).toJson();const bool written=file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();if(!written)diagnostic("verification report",file.errorString());testResult=written&&report["passed"].toBool()?0:2;QTimer::singleShot(150,&window,[&]{window.finishVerification();});});else
 #endif

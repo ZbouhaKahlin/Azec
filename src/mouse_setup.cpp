@@ -37,9 +37,9 @@ r6::SensitivitySetup MainWindow::converterSourceInput() const {
 
 void MainWindow::buildMouseSetup(QVBoxLayout* column){
     const auto config=engine_.snapshot();
-    auto* library=new Section(text(UiText::ProfileSets));column->addWidget(library);
-    auto* libraryHint=label(text(UiText::ProfileSetsHint),"rowHint");libraryHint->setWordWrap(true);libraryHint->setContentsMargins(14,4,12,4);library->body->addWidget(libraryHint);
-    auto* row=new QHBoxLayout;row->setContentsMargins(14,0,12,8);row->setSpacing(8);library->body->addLayout(row);profile_sets_=new LanguageComboBox;
+    auto* library=new Section(text(UiText::ProfileSets));library->setOpenSettings();column->addWidget(library);
+    auto* libraryHint=label(text(UiText::ProfileSetsHint),"rowHint");libraryHint->setWordWrap(true);libraryHint->setContentsMargins(0,4,0,8);library->body->addWidget(libraryHint);
+    auto* row=new QHBoxLayout;row->setContentsMargins(0,0,0,8);row->setSpacing(8);library->body->addLayout(row);profile_sets_=new LanguageComboBox;
     profile_sets_->setMinimumWidth(0);profile_sets_->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);profile_sets_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);profile_sets_->setMinimumContentsLength(8);profile_sets_->setAccessibleName(text(UiText::ActiveProfileSet));
     if(config.active_profile_set.empty())profile_sets_->addItem(text(UiText::CurrentProfiles),QString());
     for(const auto& set:config.profile_sets)profile_sets_->addItem(QString::fromStdString(set.name),QString::fromStdString(set.id));
@@ -53,19 +53,19 @@ void MainWindow::buildMouseSetup(QVBoxLayout* column){
     });
     profile_sets_->setEnabled(!save_blocked_);connect(profile_sets_,qOverload<int>(&QComboBox::activated),this,[this]{manageProfileSet(3);});
 
-    mouse_setup_=new Section(text(UiText::ConvertSensitivity));column->addWidget(mouse_setup_);auto* section=mouse_setup_.data();
-    const auto step=[&](UiText title){auto* heading=label(text(title),"rowTitle");heading->setWordWrap(true);heading->setContentsMargins(14,8,12,0);section->body->addWidget(heading);};
+    mouse_setup_=new Section(text(UiText::ConvertSensitivity));mouse_setup_->setOpenSettings(true);column->addWidget(mouse_setup_);auto* section=mouse_setup_.data();
+    const auto step=[&](UiText title){auto* heading=label(text(title),"rowTitle");heading->setWordWrap(true);heading->setContentsMargins(0,16,0,8);section->body->addWidget(heading);};
     step(UiText::ChooseConversionSource);
-    auto* sourceStatus=label(converter_import_?text(UiText::ImportedSource).arg(converter_import_name_):text(UiText::CurrentProfiles),"rowHint");sourceStatus->setTextFormat(Qt::PlainText);sourceStatus->setWordWrap(true);sourceStatus->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);sourceStatus->setContentsMargins(14,0,12,0);section->body->addWidget(sourceStatus);
-    auto* sourceActions=new QVBoxLayout;sourceActions->setContentsMargins(14,6,12,8);sourceActions->setSpacing(8);
+    auto* sourceStatus=label(converter_import_?text(UiText::ImportedSource).arg(converter_import_name_):text(UiText::CurrentProfiles),"rowHint");sourceStatus->setTextFormat(Qt::PlainText);sourceStatus->setWordWrap(true);sourceStatus->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);sourceStatus->setContentsMargins(0,0,0,0);section->body->addWidget(sourceStatus);
+    auto* sourceActions=new QVBoxLayout;sourceActions->setContentsMargins(0,6,0,8);sourceActions->setSpacing(8);
     auto* import=new MonoButton(text(UiText::ChooseBackup));auto* current=new MonoButton(text(UiText::UseCurrentProfiles));if(!converter_import_)current->hide();
-    for(auto* button:{import,current}){button->setObjectName("secondary");sourceActions->addWidget(button);}section->body->addLayout(sourceActions);
+    for(auto* button:{import,current}){button->setObjectName("secondary");sourceActions->addWidget(button,0,Qt::AlignLeading);}section->body->addLayout(sourceActions);
     connect(import,&QPushButton::clicked,this,[this]{importForConversion();});connect(current,&QPushButton::clicked,this,[this]{resetConverter();buildPreferences();});
     step(UiText::ConversionValues);
 
     const auto from=converter_draft_.value_or(converter_import_?converter_import_->sensitivity:config.sensitivity);
     const auto to=mouse_draft_.value_or(config.sensitivity);mouse_source_=QString::fromStdWString(to.source);
-    auto* grid=new QGridLayout;grid->setContentsMargins(14,4,12,8);grid->setHorizontalSpacing(10);grid->setVerticalSpacing(10);grid->setColumnStretch(0,1);
+    auto* grid=new QGridLayout;grid->setContentsMargins(0,4,0,8);grid->setHorizontalSpacing(10);grid->setVerticalSpacing(10);grid->setColumnStretch(0,1);
     for(int i=0;i<2;++i){auto* heading=label(text(i?UiText::ToSensitivity:UiText::FromSensitivity),"rowHint");heading->setAlignment(Qt::AlignCenter);grid->addWidget(heading,0,i+1);}
     const auto dpi=[&](int col,int value,const QString& prefix){auto* field=new QSpinBox;field->setRange(0,100000);field->setSingleStep(50);field->setSpecialValueText(QString::fromUtf8("—"));field->setButtonSymbols(QAbstractSpinBox::NoButtons);field->setFixedWidth(100);field->setAlignment(Qt::AlignCenter);field->setAccessibleName(prefix+" · "+text(UiText::MouseDpi));field->setValue(value);grid->addWidget(field,1,col);return field;};
     grid->addWidget(label(text(UiText::MouseDpi)),1,0);converter_dpi_=dpi(1,from.dpi,text(UiText::FromSensitivity));mouse_dpi_=dpi(2,to.dpi,text(UiText::ToSensitivity));
@@ -76,16 +76,17 @@ void MainWindow::buildMouseSetup(QVBoxLayout* column){
     converter_horizontal_=number(UiText::SensitivityHorizontal,2,1,3,100,1,from.horizontal);mouse_horizontal_=number(UiText::SensitivityHorizontal,2,2,3,100,1,to.horizontal);
     converter_vertical_=number(UiText::SensitivityVertical,3,1,3,100,1,from.vertical);mouse_vertical_=number(UiText::SensitivityVertical,3,2,3,100,1,to.vertical);
     converter_multiplier_=number(UiText::SensitivityMultiplier,4,1,6,1,.001,from.multiplier);mouse_multiplier_=number(UiText::SensitivityMultiplier,4,2,6,1,.001,to.multiplier);section->body->addLayout(grid);
-    auto* fileActions=new QHBoxLayout;fileActions->setContentsMargins(14,0,12,8);fileActions->setSpacing(8);
+    auto* fileActions=new QHBoxLayout;fileActions->setContentsMargins(0,0,0,8);fileActions->setSpacing(8);
     auto* read=new MonoButton(text(UiText::ReadGameSettings));auto* choose=new MonoButton(text(UiText::ChooseGameSettings));
-    for(auto* button:{read,choose}){button->setObjectName("secondary");fileActions->addWidget(button);}section->body->addLayout(fileActions);
+    for(auto* button:{read,choose}){button->setObjectName("secondary");fileActions->addWidget(button);}fileActions->addStretch();section->body->addLayout(fileActions);
     connect(read,&QPushButton::clicked,this,[this]{readGameSensitivity();});connect(choose,&QPushButton::clicked,this,[this]{readGameSensitivity(true);});
-    mouse_setup_status_=label({},"rowHint");mouse_setup_status_->setWordWrap(true);mouse_setup_status_->setContentsMargins(14,0,12,0);section->body->addWidget(mouse_setup_status_);mouse_setup_status_->hide();
+    mouse_setup_status_=label({},"rowHint");mouse_setup_status_->setWordWrap(true);mouse_setup_status_->setContentsMargins(0,0,0,0);section->body->addWidget(mouse_setup_status_);mouse_setup_status_->hide();
     step(UiText::ConversionResult);
     converter_name_=new QLineEdit;converter_name_->setMaxLength(80);converter_name_->setAccessibleName(text(UiText::ProfileSetName));converter_name_->setText(converter_name_draft_.isEmpty()?uniqueSetName(config,text(UiText::ConvertedProfiles)):converter_name_draft_);section->body->addWidget(converter_name_);
-    auto* hint=label(text(UiText::MouseSetupHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(14,0,12,8);section->body->addWidget(hint);
-    converter_validation_=label({},"rowHint");converter_validation_->setWordWrap(true);converter_validation_->setContentsMargins(14,0,12,4);section->body->addWidget(converter_validation_);
-    auto* actionsRow=new QHBoxLayout;actionsRow->setContentsMargins(14,0,12,8);mouse_rescale_=new MonoButton(text(UiText::ConvertAsNewSet));mouse_rescale_->setObjectName("save");actionsRow->addWidget(mouse_rescale_);section->body->addLayout(actionsRow);mouse_save_=nullptr;
+    auto* hint=label(text(UiText::MouseSetupHint),"rowHint");hint->setWordWrap(true);hint->setContentsMargins(0,8,0,8);section->body->addWidget(hint);
+    converter_validation_=label({},"rowHint");converter_validation_->setWordWrap(true);converter_validation_->setContentsMargins(0,0,0,4);section->body->addWidget(converter_validation_);
+    static_cast<MonoDescription*>(converter_validation_.data())->reserveMessages({text(UiText::CouldNotSaveConfiguration),text(UiText::MouseSetupRequired),text(UiText::InvalidSetName)});
+    auto* actionsRow=new QHBoxLayout;actionsRow->setContentsMargins(0,0,0,8);mouse_rescale_=new MonoButton(text(UiText::ConvertAsNewSet));mouse_rescale_->setObjectName("save");actionsRow->addWidget(mouse_rescale_);actionsRow->addStretch();section->body->addLayout(actionsRow);mouse_save_=nullptr;
     connect(mouse_rescale_,&QPushButton::clicked,this,[this]{rescaleMouseProfiles();});
     for(auto* field:{mouse_dpi_.data(),converter_dpi_.data()})connect(field,qOverload<int>(&QSpinBox::valueChanged),this,[this]{updateMouseSetupControls();});
     for(auto* field:{mouse_horizontal_.data(),mouse_vertical_.data(),mouse_multiplier_.data(),converter_horizontal_.data(),converter_vertical_.data(),converter_multiplier_.data()})connect(field,qOverload<double>(&QDoubleSpinBox::valueChanged),this,[this]{updateMouseSetupControls();});
@@ -98,7 +99,7 @@ void MainWindow::updateMouseSetupControls(){
     const bool valuesValid=mouse_draft_->valid()&&converter_draft_->valid();
     const bool nameValid=validSetName(engine_.snapshot(),converter_name_draft_.trimmed());
     const auto explanation=save_blocked_?text(UiText::CouldNotSaveConfiguration):!valuesValid?text(UiText::MouseSetupRequired):!nameValid?text(UiText::InvalidSetName):QString();
-    converter_validation_->setText(explanation);converter_validation_->setVisible(!explanation.isEmpty());mouse_rescale_->setToolTip(explanation);
+    converter_validation_->setText(explanation);mouse_rescale_->setToolTip(explanation);
     mouse_rescale_->setEnabled(!save_blocked_&&valuesValid&&nameValid);
 }
 void MainWindow::resetConverter(){

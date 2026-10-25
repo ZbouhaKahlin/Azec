@@ -1,12 +1,16 @@
 # Azec
 
-This is the **MonoCode** branch: the transparent desktop redesign. The original Goofy interface remains on main; the download below is the published release.
+This is the **MonoCode** branch: the desktop redesign with Dark and Light themes. The original Goofy interface remains on main; the download below is the published release.
 
 A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 operators, independent primary and secondary weapon settings, and a companion phone interface on your local network.
 
 [Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec-releases/releases) · [Application reference](docs/reference.md)
 
-![Published Goofy desktop and connected phone browser](docs/showcase-latest.png)
+| Dark | Light |
+| --- | --- |
+| ![Azec Dark theme](docs/ui-dark.png) | ![Azec Light theme](docs/ui-light.png) |
+
+Current MonoCode desktop, captured with example profiles. The download above is the published release; these screenshots show this branch.
 
 ## Get started
 
@@ -14,8 +18,6 @@ A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 op
 2. Complete the one-time [driver setup](#driver-setup) before using mouse output. Installing Azec itself does not require administrator rights; the driver setup and driver access require elevation.
 3. Select an operator, adjust its primary profile, and click **Save**. Enable a separate secondary profile if you want different settings for the second weapon.
 4. Turn on **Recoil** when ready. Fresh profiles have Rapid fire off; saved Rapid fire choices belong to each weapon profile.
-
-Convert sensitivity and manage profile sets in **Settings → Converter & profiles**.
 
 Azec runs locally. Profile editing and phone control do not need a cloud account or internet connection. Driver downloads and update checks need internet access.
 
@@ -64,23 +66,13 @@ Phone access can be disabled in Settings. The page bundles its fonts and assets 
 
 ## Personalize your workspace
 
-Azec has one dark look, shared by the desktop window and the phone page: a translucent window over the system's blur, quiet hairlines, and a single blue accent, following the [monocode](https://github.com/hardbeat920/monocode) design language. There is no theme picker; the look is the product.
+Choose **Dark** or **Light** in **Settings → General → Theme**. Both follow the [monocode](https://github.com/hardbeat920/monocode) design language, with quiet hairlines and one blue accent. Both themes use a translucent window over system blur. Light pairs a pale gray shell with a white content panel. Your choice saves automatically, and the connected phone follows it. Changing the theme does not save or discard profile edits.
 
 The sidebar remembers whether it is expanded or collapsed. Right-click an operator to add or remove a favorite. Favorites appear once, above the remaining operators. Search works in either sidebar state; selecting the compact search icon expands and focuses it.
 
-Settings groups options into **General**, **Shortcuts**, **Phone control**, **Profile backup**, and **Converter & profiles**. Language and feedback sound are available in General.
+Settings groups options into **General**, **Shortcuts**, **Phone control**, and **Profile backup**. Language and feedback sound are available in General.
 
-## Converter, profile sets, and backups
-
-### Keep sensitivity changes manageable
-
-Open **Settings → Converter & profiles**. Import an Azec JSON backup or use your current profiles, enter the original **From** and your **To** DPI, horizontal/vertical sensitivity, and multiplier, then choose **Preview conversion** and **Create copy**. Reading your local `GameSettings.ini` fills the To game values. The preview shows both conversion factors. Your current profiles and an imported original are preserved as separate named sets; imported app preferences are not applied by the converter.
-
-Choose a set from the selector on the same Settings page. The **⋯** menu lets you duplicate, rename, or delete a set. Each set holds all primary/secondary weapon profiles and its sensitivity. Switching retains edits; click **Save changes** at the bottom to keep the library and current values. The main screen and phone keep editing the active set through the shared engine.
-
-DPI is reference information; rescaling uses the change in game sensitivity and multiplier on each axis. A rescale is rejected in full if any affected profile would exceed its allowed range. Accepted changes remain unsaved until you click **Save**.
-
-### Move or restore your profiles
+## Profile backups
 
 Open **Settings → Profile backup**. **Export backup** saves your profiles and supported settings to one file. Under **Import backup**, choose a backup file, review the summary, and confirm the import. Backups include favorites, sidebar state, the named profile library, and numeric sensitivity settings, and omit the machine-specific game-settings path.
 

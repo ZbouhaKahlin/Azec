@@ -75,13 +75,15 @@ Available automated coverage:
 - Non-panic bindings accept any supported key; panic retains the stricter safe-key filter, and conflicting assignments are rejected.
 - Browsing the roster does not mark the profile dirty, and the wheel over a number field does not change a value.
 - The pairing code chip, copy actions, new-code rotation, and the server-failure retry path are exercised in the desktop and browser suites.
-- The phone Output card, independent primary/secondary Rapid fire, removal of obsolete controls, and the single shared look are checked in the browser suite.
+- The phone Output card, independent primary/secondary Rapid fire, removal of obsolete controls, and the default Dark presentation are checked in the browser suite. Light phone rendering is not covered by that suite.
 
 Still manual or not covered: a physical iPhone, real in-game input, the audible sound cues, the acrylic blur behind the real window, and the behaviour of the game-focus gate while a real game is running. Treat these as unverified and say so in delivery notes.
 
 ## Fixtures and artifacts
 
 Python runners create fresh directories under `.build/verification`, run isolated dry-run instances, and stop their entire process trees, including installer descendants. Independent groups use at most two workers by default (`--jobs 1` runs sequentially); GUI fixtures run below normal priority. Console checks cover binary compatibility, sensitivity, updater integrity and the five reliability fixes. Suite JSON reports record group timings and failures. Core checks are included once through the sensitivity verifier, rather than repeated in the build root. Inspect JSON reports and relevant screenshots. Never run fixture checks against the user's configuration or from the project root: the native checks write settings into their working directory. Standalone `core-tests.exe` also needs a fresh fixture as its working directory; pass a filename within that fixture.
+
+For explicitly requested documentation screenshots, launch `runtime/Azec.exe --dry-run --capture-ui=<absolute-output-folder>` through `HiddenProcess` in a fresh fixture. It captures the desktop and General settings, then closes without running checks. Choose the fixture’s theme with `{"version":1,"theme":"dark"}` or `{"version":1,"theme":"light"}` in its `azec_ui.json`. These captures use example profiles and never reveal Phone control credentials.
 
 Only when visible manual inspection is explicitly requested, launch the absolute path to `runtime/Azec.exe` from a fresh fixture directory with `--dry-run`. For requested motion captures, run the verifier there with `--ui-self-test --motion-only`; add `--motion-timing-only` to omit frame capture. Fixture settings, pairing info, revealed QR images, and motion captures must remain local. CI excludes pairing-info files and revealed QR captures from uploads.
 

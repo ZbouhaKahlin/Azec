@@ -116,7 +116,6 @@ def run(full=False):
             page.locator('#delay').press('End')
             page.wait_for_function('()=>state.profile.delay===150 && pending===0')
             checks['delay_stops_at_max'] = page.locator('#delayPlus').is_disabled()
-            page.locator('.weapon-options > summary').click()
             page.locator('#dual').check()
             page.wait_for_function('()=>state.dual && state.weaponSlot===1 && pending===0')
             page.locator('#delay').focus()

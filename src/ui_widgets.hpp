@@ -105,7 +105,7 @@ protected:
         // A soft two-step shadow, then the panel: dark fill, one hairline.
         painter.setPen(Qt::NoPen);painter.setBrush(QColor(0,0,0,36));painter.drawRoundedRect(face.adjusted(2,3,-2,3),12,12);
         painter.setBrush(QColor(0,0,0,52));painter.drawRoundedRect(face.adjusted(1,1,-1,2),11,11);
-        painter.setBrush(QColor(32,32,32,248));painter.drawRoundedRect(face,10,10);
+        painter.setBrush(kbtheme::surface);painter.drawRoundedRect(face,10,10);
         painter.setBrush(Qt::NoBrush);painter.setPen(QPen(kbtheme::outline,1));painter.drawRoundedRect(face.adjusted(.5,.5,-.5,-.5),10,10);
     }
 };
@@ -115,7 +115,7 @@ class LanguageComboBox final : public QComboBox {
     InkPopup* popup_;
     QListWidget* choices_;
     void choose(){const int index=choices_->currentRow();hidePopup();if(index>=0){setCurrentIndex(index);emit activated(index);}}
-    void styleChoices(){choices_->setStyleSheet(QString("QListWidget{background:transparent;border:0;outline:0;color:%1;} QListWidget::item{height:36px;padding:0 8px;border-radius:6px;background:transparent;} QListWidget::item:selected{background:%2;color:%1;} QListWidget::item:hover:!selected{background:transparent;}").arg(kbtheme::ink.name(),kbtheme::css(kbtheme::lavender)));}
+    void styleChoices(){choices_->setStyleSheet(QString("QListWidget{background:transparent;border:0;padding:0;margin:0;outline:0;color:%1;} QListWidget::item{height:36px;padding:0 8px;border-radius:6px;background:transparent;} QListWidget::item:selected{background:%2;color:%1;} QListWidget::item:hover:!selected{background:transparent;}").arg(kbtheme::ink.name(),kbtheme::css(kbtheme::lavender)));}
 public:
     explicit LanguageComboBox(QWidget* parent=nullptr,const QString& popupName=QStringLiteral("languagePopup")):QComboBox(parent),popup_(new InkPopup(this)),choices_(new QListWidget(popup_)){
         popup_->setObjectName(popupName);auto* layout=new QVBoxLayout(popup_);layout->setContentsMargins(12,12,14,15);layout->addWidget(choices_);
@@ -129,7 +129,16 @@ public:
         styleChoices();
         choices_->clear();for(int i=0;i<count();++i)new QListWidgetItem(itemIcon(i),itemText(i),choices_);
         choices_->setCurrentRow(currentIndex());const auto screen=QGuiApplication::screenAt(mapToGlobal(rect().center()));const QRect bounds=(screen?screen:QGuiApplication::primaryScreen())->availableGeometry();
-        popup_->resize(qMin(bounds.width(),qMax(width(),choices_->sizeHintForColumn(0)+40)),qMin(bounds.height()-16,count()*36+30));
+        // QSS padding and font metrics can make rows taller than 36 px.
+        // Measure the actual contents so the two-theme menu cannot clip Dark
+        // above the selected Light row. Only screen-limited menus may scroll.
+        choices_->ensurePolished();choices_->doItemsLayout();
+        const auto margins=popup_->layout()->contentsMargins();
+        int rowsHeight=0;for(int i=0;i<count();++i)rowsHeight+=qMax(36,choices_->sizeHintForRow(i));
+        const auto listMargins=choices_->contentsMargins();
+        const int chrome=listMargins.top()+listMargins.bottom();
+        popup_->resize(qMin(bounds.width(),qMax(width(),choices_->sizeHintForColumn(0)+40)),qMin(bounds.height()-16,rowsHeight+chrome+margins.top()+margins.bottom()));
+        popup_->layout()->activate();choices_->doItemsLayout();choices_->verticalScrollBar()->setValue(0);
         QPoint position=mapToGlobal(QPoint(0,height()+4));if(position.y()+popup_->height()>bounds.bottom())position.setY(mapToGlobal(QPoint()).y()-popup_->height()-4);
         position.setX(qBound(bounds.left(),position.x(),bounds.right()-popup_->width()+1));position.setY(qMax(bounds.top(),position.y()));popup_->move(position);popup_->show();choices_->setFocus(Qt::PopupFocusReason);choices_->scrollToItem(choices_->currentItem());
     }
@@ -137,8 +146,9 @@ public:
 protected:
     void paintEvent(QPaintEvent* event) override{
         QComboBox::paintEvent(event);
-        QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setPen(QPen(kbtheme::muted,1.4,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
-        const int x=width()-16,y=height()/2;const QPolygon chevron{{x-4,y-2},{x,y+2},{x+4,y-2}};p.drawPolyline(chevron);
+        // The stylesheet suppresses Qt's native arrow; draw one open chevron.
+        QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setBrush(Qt::NoBrush);p.setPen(QPen(kbtheme::muted,1.4,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+        const int x=layoutDirection()==Qt::RightToLeft?16:width()-16,y=height()/2;const QPolygon chevron{{x-4,y-2},{x,y+2},{x+4,y-2}};p.drawPolyline(chevron);
     }
     bool eventFilter(QObject* watched,QEvent* event) override{
         if(watched==choices_&&event->type()==QEvent::KeyPress){const int key=static_cast<QKeyEvent*>(event)->key();if(key==Qt::Key_Return||key==Qt::Key_Enter||key==Qt::Key_Space){choose();return true;}if(key==Qt::Key_Escape||key==Qt::Key_Tab){hidePopup();setFocus(Qt::PopupFocusReason);return true;}}
@@ -164,11 +174,18 @@ class IconButton final : public QPushButton {
     std::function<QColor()> accent_;
     QPixmap mask_;
     qreal maskRatio_=0;
+    QVariantAnimation hoverMotion_;
+    qreal hover_=0;
 public:
     IconButton(const QString& path,std::function<QColor()> accent,QWidget* parent=nullptr):QPushButton(parent),renderer_(path),accent_(std::move(accent)){
         setIcon(QIcon(path));setIconSize(QSize(20,20));setFixedSize(34,34);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);
+        hoverMotion_.setEasingCurve(monoEase());
+        connect(&hoverMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){hover_=value.toReal();update();});
     }
 protected:
+    void enterEvent(QEnterEvent* event) override{QPushButton::enterEvent(event);if(property("sidebarAction").toBool())retargetAnimation(hoverMotion_,hover_,1,120);}
+    void leaveEvent(QEvent* event) override{QPushButton::leaveEvent(event);if(property("sidebarAction").toBool())retargetAnimation(hoverMotion_,hover_,0,120);}
+    void hideEvent(QHideEvent* event) override{hoverMotion_.stop();hover_=0;QPushButton::hideEvent(event);}
     void paintEvent(QPaintEvent*) override {
         const qreal ratio=devicePixelRatioF();
         if(mask_.isNull()||maskRatio_!=ratio){maskRatio_=ratio;mask_=QPixmap(QSize(20,20)*ratio);mask_.setDevicePixelRatio(ratio);mask_.fill(Qt::transparent);QPainter maskPainter(&mask_);renderer_.render(&maskPainter,QRectF(0,0,20,20));}
@@ -179,10 +196,12 @@ protected:
         QPixmap ink=mask_;QPainter tint(&ink);tint.setCompositionMode(QPainter::CompositionMode_SourceIn);tint.fillRect(ink.rect(),color);tint.end();
         QPainter painter(this);if(!isEnabled())painter.setOpacity(.35);
         const bool sidebarAction=property("sidebarAction").toBool();
-        painter.drawPixmap(QPointF(sidebarAction?18:(width()-20)/2.0,(height()-20)/2.0),ink);
+        if(sidebarAction){painter.setRenderHint(QPainter::Antialiasing);painter.setPen(Qt::NoPen);painter.setBrush(kbtheme::content(.05*hover_));painter.drawRoundedRect(QRectF(rect()).adjusted(1,1,-1,-1),8,8);}
+        const bool rtl=layoutDirection()==Qt::RightToLeft;
+        painter.drawPixmap(QPointF(sidebarAction?(rtl?width()-42:22):(width()-20)/2.0,(height()-20)/2.0),ink);
         if(sidebarAction&&!text().isEmpty()){
             painter.setOpacity(std::clamp((width()-64.0)/124.0,0.0,1.0));painter.setPen(color);
-            painter.drawText(QRect(64,0,124,height()),Qt::AlignVCenter|Qt::AlignLeft,text());painter.setOpacity(1);
+            painter.drawText(rtl?QRect(0,0,width()-64,height()):QRect(64,0,width()-64,height()),Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft),text());painter.setOpacity(1);
         }
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),1.5));painter.drawRoundedRect(QRectF(rect()).adjusted(2,2,-2,-2),8,8);}
     }
@@ -240,7 +259,7 @@ inline void paintSettingsGlyphDetails(QPainter& painter,SettingsGlyph glyph,cons
 }
 
 inline void paintStickerGlyph(QPainter& painter,const QRectF& box,SettingsGlyph glyph,bool active){
-    const QColor stroke=active?kbtheme::ink:QColor(235,235,235,128);
+    const QColor stroke=active?kbtheme::ink:kbtheme::content(.5);
     const QPainterPath shape=settingsGlyphShape(glyph);
     const qreal scale=box.width()/24.0;
     painter.save();painter.translate(box.topLeft());painter.scale(scale,scale);painter.translate(12,12);
@@ -277,30 +296,38 @@ protected:
 
 class SettingsNavButton final : public QAbstractButton {
     SettingsGlyph glyph_;QString description_;
+    QVariantAnimation hoverMotion_;
+    qreal hover_=0;
+    void hoverTo(qreal target){retargetAnimation(hoverMotion_,hover_,target,120);}
 public:
     explicit SettingsNavButton(SettingsGlyph glyph,QWidget* parent=nullptr):QAbstractButton(parent),glyph_(glyph){
         setCheckable(true);setCursor(Qt::PointingHandCursor);setFocusPolicy(Qt::StrongFocus);setFixedHeight(62);
         setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);setMinimumWidth(0);
+        hoverMotion_.setEasingCurve(monoEase());
+        connect(&hoverMotion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){hover_=value.toReal();update();});
     }
     SettingsGlyph glyph() const{return glyph_;}
     void setDescription(const QString& description){description_=description;update();}
 protected:
-    void enterEvent(QEnterEvent* event) override{QAbstractButton::enterEvent(event);update();}
-    void leaveEvent(QEvent* event) override{QAbstractButton::leaveEvent(event);update();}
+    void enterEvent(QEnterEvent* event) override{QAbstractButton::enterEvent(event);hoverTo(1);}
+    void leaveEvent(QEvent* event) override{QAbstractButton::leaveEvent(event);hoverTo(0);}
+    void hideEvent(QHideEvent* event) override{hoverMotion_.stop();hover_=0;QAbstractButton::hideEvent(event);}
     void paintEvent(QPaintEvent*) override{
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
         const QRectF pill=QRectF(rect()).adjusted(1,2,-1,-2);
-        if(isChecked()||underMouse()){painter.setPen(Qt::NoPen);painter.setBrush(isChecked()?kbtheme::lavender:kbtheme::card);painter.drawRoundedRect(pill,10,10);}
+        const QColor fill=isChecked()?kbtheme::lavender:kbtheme::content(.05*hover_);
+        painter.setPen(Qt::NoPen);painter.setBrush(fill);painter.drawRoundedRect(pill,8,8);
         const qreal progress=std::clamp((width()-64.0)/124.0,0.0,1.0);
         const int art=22;const qreal compactX=(width()-art)/2.0,iconX=compactX+(16-compactX)*progress;
         const bool rtl=QApplication::layoutDirection()==Qt::RightToLeft;
-        const QRectF iconRect(rtl?width()-16-art:iconX,(height()-art)/2.0,art,art);
+        const QRectF iconRect(rtl?width()-iconX-art:iconX,(height()-art)/2.0,art,art);
         paintStickerGlyph(painter,iconRect,glyph_,isChecked());
         if(progress>0.01){
             QFont nameFont=font();nameFont.setPixelSize(13);nameFont.setWeight(QFont::Medium);
             QFont hintFont=font();hintFont.setPixelSize(11);hintFont.setWeight(QFont::Normal);
             const qreal left=rtl?8:iconRect.right()+12,available=rtl?iconRect.left()-16:width()-iconRect.right()-20;
-            const QRectF nameRect(left,8,available,20),hintRect(left,28,available,18);
+            const qreal textTop=(height()-38)/2.0;
+            const QRectF nameRect(left,textTop,available,20),hintRect(left,textTop+20,available,18);
             const Qt::Alignment alignment=Qt::AlignVCenter|(rtl?Qt::AlignRight:Qt::AlignLeft);
             painter.setOpacity(progress);
             painter.setFont(nameFont);painter.setPen(kbtheme::ink);
@@ -343,7 +370,7 @@ protected:
         const QColor accent=accent_();
         const QRectF track=QRectF(6,4,36,20);
         // A 20% content well when off; the accent fill fades in when on.
-        const QColor fill=mixColor(QColor(235,235,235,51),accent,clamped);
+        const QColor fill=mixColor(kbtheme::content(.2),accent,clamped);
         p.setPen(Qt::NoPen);p.setBrush(fill);p.drawRoundedRect(track,10,10);
         const qreal knobX=16.0+16.0*clamped;
         p.setBrush(Qt::white);p.drawEllipse(QPointF(knobX,14),8,8);
@@ -352,7 +379,7 @@ protected:
     }
 };
 
-// Compact chip that nudges a value by one increment; holding repeats.
+// Bare adjustment sign with the same hit target and hold-to-repeat behavior.
 class StepButton final : public MonoButton {
     QTimer repeat_,delay_;
     int direction_;
@@ -377,7 +404,6 @@ protected:
 class ExpandingContent final : public QWidget {
     QWidget* content_;
     QVariantAnimation animation_;
-    QPixmap snapshot_;
     qreal progress_=0;
     int fullHeight_=0,duration_;
     bool expanded_=false,initialized_=false;
@@ -387,11 +413,12 @@ class ExpandingContent final : public QWidget {
     void apply(){
         setFixedHeight(qRound(fullHeight_*progress_));update();
     }
-    void sizeContent(){fullHeight_=naturalHeight();content_->setGeometry(0,0,width(),fullHeight_);if(content_->layout())content_->layout()->activate();}
-    void settle(){animation_.stop();progress_=expanded_?1:0;sizeContent();snapshot_=QPixmap();content_->setEnabled(expanded_);content_->setVisible(expanded_);apply();}
+    void sizeContent(){content_->ensurePolished();fullHeight_=naturalHeight();content_->setGeometry(0,0,width(),fullHeight_);if(content_->layout())content_->layout()->activate();}
+    void settle(){animation_.stop();progress_=expanded_?1:0;sizeContent();content_->setAttribute(Qt::WA_TransparentForMouseEvents,!expanded_);content_->setEnabled(true);content_->setVisible(expanded_);apply();}
 public:
     explicit ExpandingContent(QWidget* content,int duration=200,QWidget* parent=nullptr):QWidget(parent),content_(content),duration_(duration){
         content_->setParent(this);
+        content_->installEventFilter(this);
         setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);setFixedHeight(0);
         animation_.setEasingCurve(monoEase());
         connect(&animation_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){progress_=value.toReal();apply();});
@@ -404,19 +431,18 @@ public:
         if(initialized_&&expanded_==expanded)return;
         const bool first=!initialized_;initialized_=true;expanded_=expanded;animation_.stop();
         if(first||!animate||!isVisible()){settle();return;}
-        // Freeze one correctly laid-out frame. Fading/resizing live child widgets
-        // through an opacity effect can stretch controls and repaint clipped QR
-        // content repeatedly; only this cached surface is painted during motion.
-        content_->setEnabled(true);sizeContent();
-        snapshot_=QPixmap(QSize(width(),fullHeight_)*devicePixelRatioF());snapshot_.setDevicePixelRatio(devicePixelRatioF());snapshot_.fill(Qt::transparent);
-        {QPainter painter(&snapshot_);content_->render(&painter,QPoint(),QRegion(),QWidget::DrawChildren);}
-        content_->hide();
+        // Clip the live content at its natural size. Its ink and background keep
+        // the same opacity throughout, with no snapshot/live-widget handover.
+        sizeContent();content_->setEnabled(true);content_->setAttribute(Qt::WA_TransparentForMouseEvents,!expanded_);content_->show();
         retargetAnimation(animation_,progress_,expanded?1.0:0.0,std::max(120,qRound(duration_*std::abs((expanded?1.0:0.0)-progress_))));
     }
     QSize sizeHint() const override{return {content_->sizeHint().width(),qRound(fullHeight_*progress_)};}
 protected:
-    void paintEvent(QPaintEvent*) override{if(!snapshot_.isNull()){QPainter painter(this);painter.setOpacity(std::sin(progress_*1.5707963267948966));painter.drawPixmap(0,0,snapshot_);}}
-    void resizeEvent(QResizeEvent* event) override{QWidget::resizeEvent(event);if(event->oldSize().width()!=width())settle();}
+    bool eventFilter(QObject* watched,QEvent* event) override{
+        if(watched==content_&&event->type()==QEvent::LayoutRequest){sizeContent();apply();}
+        return QWidget::eventFilter(watched,event);
+    }
+    void resizeEvent(QResizeEvent* event) override{QWidget::resizeEvent(event);if(event->oldSize().width()!=width()){sizeContent();apply();}}
     void hideEvent(QHideEvent* event) override{settle();QWidget::hideEvent(event);}
 };
 
@@ -427,28 +453,30 @@ class WeaponButton final : public QPushButton {
     std::function<QColor()> accent_;
 public:
     explicit WeaponButton(std::function<QColor()> accent):accent_(std::move(accent)){
-        setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);setMinimumSize(88,32);setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Fixed);motion_.setEasingCurve(monoEase());
+        setObjectName("weaponChoice");setCursor(Qt::PointingHandCursor);setMinimumSize(88,40);setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Fixed);setCheckable(true);setAutoExclusive(true);motion_.setEasingCurve(monoEase());
         connect(&motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){amount_=value.toReal();update();});
     }
     void setChosen(bool chosen){
         if(initialized_&&chosen_==chosen)return;
         const bool animate=initialized_&&isVisible();initialized_=true;chosen_=chosen;
-        setProperty("chosen",chosen);setAccessibleDescription(chosen?"Selected":"");
+        setProperty("chosen",chosen);{QSignalBlocker blocked(this);setChecked(chosen);}
         if(animate)retargetAnimation(motion_,amount_,chosen?1:0,140);
         else{motion_.stop();amount_=chosen?1:0;update();}
     }
+    QSize sizeHint() const override{return {std::max(88,fontMetrics().horizontalAdvance(text())+24),40};}
 protected:
     void hideEvent(QHideEvent* event) override{motion_.stop();amount_=chosen_?1:0;QPushButton::hideEvent(event);}
     void paintEvent(QPaintEvent*) override{
 
-        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
+        QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);if(!isEnabled())painter.setOpacity(.4);
         const QRectF pill=QRectF(rect()).adjusted(1,1,-1,-1);
         const qreal amount=std::clamp(amount_,0.0,1.0);
-        // MonoCode segmented choice: transparent idle, content/10 selected.
-        const QColor fill=mixColor(QColor(235,235,235,0),kbtheme::lavender,amount);
-        painter.setPen(Qt::NoPen);painter.setBrush(fill);painter.drawRoundedRect(pill,8,8);
-        QColor ink=mixColor(QColor(235,235,235,179),kbtheme::ink,amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
-        painter.setFont(font());painter.setPen(ink);painter.drawText(rect(),Qt::AlignCenter,text());
+        // Compact tabs share a hairline baseline; only the selection has color.
+        QColor underline=accent_();underline.setAlphaF(amount);
+        painter.setPen(QPen(underline,2,Qt::SolidLine,Qt::FlatCap));
+        painter.drawLine(QPointF(12,height()-1),QPointF(width()-12,height()-1));
+        QColor ink=mixColor(kbtheme::content(.7),kbtheme::ink,amount);if(isDown())ink=mixColor(ink,kbtheme::ink,.35);
+        painter.setFont(font());painter.setPen(ink);painter.drawText(rect().adjusted(0,0,0,-4),Qt::AlignCenter,text());
         if(hasFocus()&&window()->testAttribute(Qt::WA_KeyboardFocusChange)){painter.setBrush(Qt::NoBrush);painter.setPen(QPen(accent_(),1.5));painter.drawRoundedRect(pill,8,8);}
 
     }
@@ -481,7 +509,8 @@ public:
 
         p->save();p->setRenderHint(QPainter::Antialiasing);p->setRenderHint(QPainter::TextAntialiasing);const QRect r=option.rect;
         const bool selected=option.state&QStyle::State_Selected;
-        const QRectF pill=QRectF(r.adjusted(4,2,-4,-2));
+        const int visibleWidth=option.widget?option.widget->width():r.width();
+        const QRectF pill=QRectF(QRect(r.left(),r.top(),visibleWidth,r.height()).adjusted(4,2,-4,-2));
         if(selected){p->setPen(Qt::NoPen);p->setBrush(kbtheme::lavender);p->drawRoundedRect(pill,8,8);}
         // Anchor artwork and names while the sidebar clips/fades their trailing
         // edge. Recentring icons or re-eliding text on every frame produces
@@ -490,7 +519,7 @@ public:
         // The item is 200 px wide while the viewport is narrower, so the far
         // edge of option.rect is already outside the visible row.
         const int visibleRight=option.widget?option.widget->width()-1:r.right();
-        const int iconX=rtl?visibleRight-operatorIconSize-5:r.left()+6;
+        const int iconX=rtl?visibleRight-operatorIconSize-9:r.left()+10;
         qvariant_cast<QIcon>(index.data(Qt::DecorationRole)).paint(p,QRect(iconX,r.top()+4,operatorIconSize,operatorIconSize));
         QFont f=option.font;f.setFamily("Segoe UI");f.setPixelSize(13);f.setWeight(QFont::Normal);p->setFont(f);p->setPen(kbtheme::ink);
         p->setClipRect(r);p->setOpacity(std::clamp((r.width()-58.0)/116.0,0.0,1.0));
@@ -567,10 +596,11 @@ protected:
 };
 
 class PageSnapshot final : public QWidget {
-    QPixmap previous_,next_;qreal progress_=0;
+    QPixmap previous_,next_;qreal progress_=0;bool wholeWindow_=false;
 public:
-    PageSnapshot(QPixmap previous,QPixmap next,QWidget* parent):QWidget(parent),previous_(std::move(previous)),next_(std::move(next)){
+    PageSnapshot(QPixmap previous,QPixmap next,QWidget* parent,bool wholeWindow=false):QWidget(parent),previous_(std::move(previous)),next_(std::move(next)),wholeWindow_(wholeWindow){
         setAttribute(Qt::WA_NoSystemBackground);setObjectName("pageTransition");
+        if(wholeWindow_){setAttribute(Qt::WA_TransparentForMouseEvents);setObjectName("themeTransition");}
     }
     void setProgress(qreal progress){progress_=progress;update();}
     QPixmap frame() const{
@@ -586,6 +616,11 @@ public:
     }
 protected:
     void paintEvent(QPaintEvent*) override {
+        if(wholeWindow_){
+            // Replace the backing pixels instead of stacking another translucent
+            // window over the live controls. Acrylic stays live underneath.
+            QPainter painter(this);painter.setCompositionMode(QPainter::CompositionMode_Source);painter.drawPixmap(0,0,frame());return;
+        }
         // The snapshot is a rectangular pixmap; clip it to the panel interior so
         // the hairline and rounded corners stay visible while it fades out.
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);
@@ -606,15 +641,14 @@ public:
     }
     void settle(){fade_.stop();if(snapshot_){delete snapshot_;snapshot_=nullptr;if(currentWidget())currentWidget()->show();}}
     bool transitioning() const{return snapshot_!=nullptr;}
-    void switchTo(QWidget* page){
-        if(page==currentWidget()||indexOf(page)<0)return;
+    void transition(const std::function<void()>& change){
         QPixmap previous;
         const auto capture=[this](QWidget* widget){
             QPixmap image(size()*devicePixelRatioF());image.setDevicePixelRatio(devicePixelRatioF());image.fill(Qt::transparent);
             QPainter painter(&image);widget->render(&painter,QPoint(),QRegion(),QWidget::DrawChildren);return image;
         };
         if(isVisible())previous=snapshot_?snapshot_->frame():capture(currentWidget());
-        settle();setCurrentWidget(page);
+        settle();change();auto* page=currentWidget();
         if(previous.isNull())return;
         if(page->layout())page->layout()->activate();
         QPixmap next=capture(page);
@@ -622,6 +656,10 @@ public:
         // well would double the card fills and briefly darken the whole panel.
         page->hide();
         snapshot_=new PageSnapshot(std::move(previous),std::move(next),this);snapshot_->setGeometry(rect());snapshot_->show();snapshot_->raise();fade_.start();
+    }
+    void switchTo(QWidget* page){
+        if(page==currentWidget()||indexOf(page)<0)return;
+        transition([this,page]{setCurrentWidget(page);});
     }
 protected:
     void resizeEvent(QResizeEvent* event) override {settle();QStackedWidget::resizeEvent(event);}
@@ -665,6 +703,7 @@ public:
         else if(angleDelta)glideBy(notchDistance(angleDelta));
     }
     bool gliding() const{return glide_.state()==QAbstractAnimation::Running;}
+    void stopScrolling(){glide_.stop();}
 protected:
     void wheelEvent(QWheelEvent* event) override {
         auto* bar=verticalScrollBar();
@@ -767,5 +806,14 @@ public:
         auto* titleLabel=new QLabel(title);titleLabel->setObjectName("sectionTitle");titleLabel->setWordWrap(true);titleLabel->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);row->addWidget(titleLabel,1);layout->addWidget(header);
         content=new QWidget;body=new QVBoxLayout(content);body->setContentsMargins(1,1,1,1);body->setSpacing(0);layout->addWidget(content);
         content->setObjectName("settingGroup");content->setAttribute(Qt::WA_StyledBackground);
+    }
+    void setOpenProfile(bool separator=false){setOpenSection("openProfile","profileGroup",separator);}
+    void setOpenSettings(bool separator=false){setOpenSection("openSettings","settingsGroup",separator);}
+private:
+    void setOpenSection(const char* propertyName,const char* contentName,bool separator){
+        setProperty(propertyName,true);content->setObjectName(contentName);body->setContentsMargins(0,0,0,0);
+        headerRow->setContentsMargins(0,0,0,0);
+        auto* column=static_cast<QVBoxLayout*>(layout());column->setSpacing(12);
+        if(separator){auto* line=new QFrame;line->setObjectName("profileDivider");line->setFixedHeight(1);column->insertWidget(0,line);}
     }
 };

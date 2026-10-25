@@ -20,6 +20,7 @@ inline bool readDocument(const QString& path,QJsonObject& root){
 }
 
 inline bool sidebarCollapsed(const std::filesystem::path& configuration){QJsonObject root;return readDocument(filePath(configuration),root)&&root["sidebarCollapsed"].toBool(false);}
+inline bool lightTheme(const std::filesystem::path& configuration){QJsonObject root;return readDocument(filePath(configuration),root)&&root["theme"].toString()=="light";}
 inline bool update(const std::filesystem::path& configuration,const std::function<void(QJsonObject&)>& change){
     QJsonObject root;const auto path=filePath(configuration);
     if(!readDocument(path,root)){diagnostic("save UI preferences","Unreadable or invalid file; existing preferences retained");return false;}
