@@ -743,11 +743,12 @@ class MainWindow final : public QWidget {
         updateSettingsNavLabels();
         if(minimize_){minimize_->setToolTip(text(UiText::Minimize));minimize_->setAccessibleName(text(UiText::Minimize));}
         close_->setToolTip(text(UiText::Close));close_->setAccessibleName(text(UiText::Close));
+        search_->setAccessibleName(text(UiText::SearchOperatorsLabel));favorites_list_->setAccessibleName(text(UiText::FavoriteOperators));operators_->setAccessibleName(text(UiText::AllOperators));
         styleNotice();layoutNotice();
         updateSidebarControls();
         status_->setReservedLabels({text(UiText::RecoilOn),text(UiText::RecoilOff)});
         rapid_status_->setReservedLabels({text(UiText::RapidFireOn),text(UiText::RapidFireOff)});
-        updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));status_->setToolTip(text(UiText::ToggleRecoilActivity));rapid_status_->setToolTip(text(UiText::RapidFire));filterOperators();syncSelection();updateStatus();
+        updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));back_->setAccessibleName(text(UiText::BackToOperators));status_->setToolTip(text(UiText::ToggleRecoilActivity));save_->setAccessibleName(text(UiText::SaveConfiguration));rapid_status_->setToolTip(text(UiText::RapidFire));filterOperators();syncSelection();updateStatus();
     }
     void syncSelection(){
         const auto c=engine_.snapshot();const auto& op=c.active_operator();refreshing_=true;operator_name_->setText(QString::fromUtf8(op.name));operator_icon_->setPixmap(operatorPixmap(QString::fromUtf8(op.name),44,devicePixelRatioF()));
@@ -764,7 +765,9 @@ class MainWindow final : public QWidget {
     void updateStatus(){const bool active=engine_.recoil_active;status_->setText(active?text(UiText::RecoilOn):text(UiText::RecoilOff));status_->setStatusActive(active);status_->style()->unpolish(status_);status_->style()->polish(status_);
         const bool rapid=engine_.rapid_active();rapid_status_->setText(rapid?text(UiText::RapidFireOn):text(UiText::RapidFireOff));rapid_status_->setStatusActive(rapid);rapid_status_->style()->unpolish(rapid_status_);rapid_status_->style()->polish(rapid_status_);
         if(rapid_active_)rapid_active_->syncChecked(rapid);if(game_focus_only_)game_focus_only_->syncChecked(engine_.game_focus_only);if(ads_only_)ads_only_->syncChecked(engine_.ads_only);syncDelayControls();if(tray_rapid_)tray_rapid_->setChecked(rapid);}
-    void toggleRecoil(){engine_.recoil_active=!engine_.recoil_active;if(engine_.snapshot().sound)sound::playToggle();updateStatus();}
+    // A toggle made while the unsaved-close prompt holds recoil off must
+    // survive the prompt's resolution, exactly like a phone toggle.
+    void toggleRecoil(){engine_.recoil_active=!engine_.recoil_active;if(close_prompt_)close_recoil_changed_=true;if(engine_.snapshot().sound)sound::playToggle();updateStatus();}
     void toggleRapid(){const bool on=!engine_.rapid_active();engine_.set_rapid_active(on);dirty();if(engine_.snapshot().sound)sound::playToggle();updateStatus();}
     bool textEditingActive() const {auto* focused=QApplication::focusWidget();return focused&&(qobject_cast<QLineEdit*>(focused)||qobject_cast<QAbstractSpinBox*>(focused)||qobject_cast<QComboBox*>(focused));}
     void pollKeys(){

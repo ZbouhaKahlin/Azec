@@ -10,23 +10,22 @@
 inline QString weaponFile(const std::filesystem::path& base){return QString::fromStdWString((base.parent_path()/L"azec_weapons.json").wstring());}
 // Rapid fire is stored per weapon profile. Older sidecars carried a single
 // global switch; those load by copying it onto every primary and secondary
-// profile so the effective behavior does not change on upgrade.
+// profile so the effective behavior does not change on upgrade. An absent or
+// rejected sidecar never clears the binary's primary rapid flags: those flags
+// are saved settings, and the caller quarantines the rejected file instead.
 inline bool readWeaponProfiles(r6::Config& config,bool& gameFocusOnly,bool& adsOnly,const std::filesystem::path& base){
-    const auto clearRapid=[&]{for(auto& op:config.operators)op.rapid=0;for(auto& op:config.secondary)op.rapid=0;};
-    QFile file(weaponFile(base));if(!file.exists()){clearRapid();return true;}
-    if(!file.open(QIODevice::ReadOnly)){diagnostic("load weapon profiles",file.errorString());clearRapid();return false;}
-    if(file.size()>1024*1024){diagnostic("load weapon profiles","File exceeds 1 MiB; ignored");clearRapid();return false;}
+    QFile file(weaponFile(base));if(!file.exists())return true;
+    if(!file.open(QIODevice::ReadOnly)){diagnostic("load weapon profiles",file.errorString());return false;}
+    if(file.size()>1024*1024){diagnostic("load weapon profiles","File exceeds 1 MiB; ignored");return false;}
     const auto bytes=file.readAll();
-    if(file.error()!=QFile::NoError){diagnostic("load weapon profiles",file.errorString());clearRapid();return false;}
+    if(file.error()!=QFile::NoError){diagnostic("load weapon profiles",file.errorString());return false;}
     QJsonParseError error;const auto document=QJsonDocument::fromJson(bytes,&error);
-    if(error.error!=QJsonParseError::NoError||!document.isObject()){diagnostic("load weapon profiles","Invalid JSON; ignored");clearRapid();return false;}
-    const auto root=document.object();if(root["version"].toInt()!=1){diagnostic("load weapon profiles","Unsupported version; ignored");clearRapid();return false;}
+    if(error.error!=QJsonParseError::NoError||!document.isObject()){diagnostic("load weapon profiles","Invalid JSON; ignored");return false;}
+    const auto root=document.object();if(root["version"].toInt()!=1){diagnostic("load weapon profiles","Unsupported version; ignored");return false;}
     bool valid=true;
     if(const auto setup=sensitivity::fromJson(root["sensitivity"].toObject()))config.sensitivity=*setup;
     const auto validKey=[](const QJsonValue& value,int fallback){const int key=value.toInt(fallback);return r6::validHotkey(key)?key:fallback;};
     config.primary_key=validKey(root["primaryKey"],'1');config.secondary_key=validKey(root["secondaryKey"],'2');config.phone_enabled=root["phoneEnabled"].toBool(true);
-    bool legacyRapid=false;
-    if(root.contains("rapidActive")&&root["rapidActive"].isBool())legacyRapid=root["rapidActive"].toBool();
     if(root.contains("gameFocusOnly")&&root["gameFocusOnly"].isBool())gameFocusOnly=root["gameFocusOnly"].toBool();
     if(root.contains("adsOnly")&&root["adsOnly"].isBool())adsOnly=root["adsOnly"].toBool();
     const auto profiles=root["operators"].toObject();
@@ -47,7 +46,13 @@ inline bool readWeaponProfiles(r6::Config& config,bool& gameFocusOnly,bool& adsO
         if(!std::isfinite(vertical)||!std::isfinite(horizontal)||vertical<0||vertical>100||horizontal<-50||horizontal>50||delay<0||delay>60000){diagnostic("load extension profile",name+": invalid values; ignored");valid=false;continue;}
         auto& op=config.operators[id];op.vertical=float(vertical);op.horizontal=float(horizontal);op.delay=delay;op.rapid=item["rapid"].toBool();op.humanize=item["humanize"].toBool(true);
     }
-    if(!root["perProfileRapid"].toBool(false)){for(auto& op:config.operators)op.rapid=legacyRapid?1:0;for(auto& op:config.secondary)op.rapid=legacyRapid?1:0;}
+    // Selection and shortcut writes can create a minimal sidecar. Only an
+    // explicit legacy switch may replace the saved per-profile flags.
+    if(!root["perProfileRapid"].toBool(false)&&root["rapidActive"].isBool()){
+        const bool legacyRapid=root["rapidActive"].toBool();
+        for(auto& op:config.operators)op.rapid=legacyRapid?1:0;
+        for(auto& op:config.secondary)op.rapid=legacyRapid?1:0;
+    }
     if(!profilesets::read(root,config,true)){diagnostic("load profile sets","Invalid profile library; active weapon values retained");valid=false;}
     return valid;
 }

@@ -53,6 +53,45 @@ int main(int argc,char** argv){
     const auto before=imported.bytes();auto invalid=backup;invalid["version"]=99;
     check(!parseBackup(invalid,imported,favorites,options,&live)&&imported.bytes()==before,"invalid import leaves the destination unchanged");
 
+    {
+        auto library=live;library.active_profile_set="saved";
+        library.profile_sets.push_back(profilesets::capture(library,"saved","Saved profiles"));
+        auto legacy=backup;legacy.remove("profileSets");legacy.remove("activeProfileSet");
+        check(parseBackup(legacy,imported,favorites,options,&library)&&imported.active_profile_set=="saved"&&imported.profile_sets.size()==1,
+              "backup without a library preserves the current active library identity");
+        const auto libraryPath=path.parent_path()/L"library"/L"r6_config.bin";
+        QDir().mkpath(QString::fromStdWString(libraryPath.parent_path().wstring()));
+        imported.operators[0].vertical=29;imported.secondary[0].vertical=39;imported.secondary_initialized[0]=true;
+        engine.edit([&](r6::Config& config){config=imported;});
+        const bool roundtrip=engine.save(libraryPath)&&restored.load(libraryPath);const auto saved=restored.snapshot();
+        check(roundtrip&&saved.active_profile_set=="saved"&&saved.profile_sets.size()==1&&saved.profile_sets[0].primary[0].vertical==29&&saved.profile_sets[0].secondary[0].vertical==39,
+              "edits after an older import survive in both weapons of the active library set");
+        auto stale=makeBackup(library,{},true,false);stale["activeProfileSet"]="missing";
+        check(parseBackup(stale,imported,favorites,options,&library)&&imported.active_profile_set.empty()&&imported.profile_sets.size()==1&&imported.profile_sets[0].id=="saved",
+              "backup with a stale library reference preserves profiles and repairs selection");
+        stale["profileSets"]="invalid";const auto retained=imported.bytes();
+        check(!parseBackup(stale,imported,favorites,options,&library)&&imported.bytes()==retained&&imported.profile_sets.size()==1,
+              "malformed backup libraries remain rejected without modifying imported profiles");
+    }
+    {
+        const auto rapidPath=path.parent_path()/L"rapid-recovery"/L"r6_config.bin";
+        QDir().mkpath(QString::fromStdWString(rapidPath.parent_path().wstring()));
+        r6::Config rapid;rapid.operators[0].rapid=1;rapid.operators[4].rapid=1;
+        const auto preservesRapid=[&]{const auto config=restored.snapshot();return config.operators[0].rapid&&config.operators[4].rapid&&!config.operators[1].rapid;};
+        check(rapid.save(rapidPath)&&restored.load(rapidPath)&&preservesRapid(),"missing sidecar preserves binary rapid flags");
+        const auto sidecar=weaponFile(rapidPath);
+        check(write(sidecar,"{broken")&&restored.load(rapidPath)&&preservesRapid(),"damaged sidecar preserves binary rapid flags");
+        check(QFile::remove(sidecar)&&persistSelection(rapidPath,4)&&restored.load(rapidPath)&&preservesRapid()&&restored.snapshot().selected==4,
+              "selection-only sidecar preserves binary rapid flags");
+        check(QFile::remove(sidecar)&&persistHotkeys(rapidPath,VK_HOME,VK_F7,VK_END,'3','4')&&restored.load(rapidPath)&&preservesRapid(),
+              "shortcut-only sidecar preserves binary rapid flags");
+        check(restored.save(rapidPath)&&restored.load(rapidPath)&&preservesRapid(),"recovered rapid flags survive a normal save and restart");
+        check(write(sidecar,"{\"version\":1,\"rapidActive\":false}")&&restored.load(rapidPath)&&!restored.snapshot().operators[0].rapid,
+              "explicit legacy rapid-off still migrates");
+        check(write(sidecar,"{\"version\":1,\"rapidActive\":true}")&&restored.load(rapidPath)&&restored.snapshot().operators[1].rapid&&restored.snapshot().secondary[1].rapid,
+              "explicit legacy rapid-on still migrates to both weapons");
+    }
+
     const auto ui=uiprefs::filePath(path);QJsonObject preferences;
     check(write(ui,{})&&uiprefs::readDocument(ui,preferences)&&preferences.isEmpty()&&
           uiprefs::update(path,[](QJsonObject& root){root["colorTheme"]="rose";root["favorites"]=QJsonArray{"Ace"};}),

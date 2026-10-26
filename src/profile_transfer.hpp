@@ -112,9 +112,14 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
         next.secondary_enabled[id]=existing->secondary_enabled[id];next.secondary_initialized[id]=existing->secondary_initialized[id];
     }
     if(root.contains("profileSets")){
-        if(!profilesets::read(root,next))return false;
+        // A stale active-set id repairs like the sidecar load instead of
+        // rejecting an otherwise valid backup.
+        if(!profilesets::read(root,next,true))return false;
     }else if(existing){
-        auto previous=*existing;profilesets::remember(previous);next.profile_sets=std::move(previous.profile_sets);
+        auto previous=*existing;profilesets::remember(previous);
+        next.profile_sets=std::move(previous.profile_sets);
+        // Keep the library marked active so later edits keep syncing into it.
+        next.active_profile_set=previous.active_profile_set;
     }
     result=next;favorites=nextFavorites;return true;
 }

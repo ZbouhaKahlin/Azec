@@ -94,7 +94,9 @@ bool Config::load(const std::filesystem::path& path) {
     read(next.rapid_key);
     read(next.rapid_master); read(next.neon); read(next.radius);
     // Extension selections are reapplied from azec_weapons.json after the load.
-    if (next.selected < 0 || next.selected >= legacy_operator_count) return false;
+    // The writer clamps this field, so an out-of-range value is repairable
+    // garbage rather than a reason to discard every saved profile.
+    if (next.selected < 0 || next.selected >= legacy_operator_count) next.selected = 0;
     for (auto& op : next.operators) {
         if (!std::memchr(op.name, 0, 32) || !std::isfinite(op.vertical) ||
             !std::isfinite(op.horizontal)) return false;

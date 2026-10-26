@@ -1,5 +1,6 @@
 #include "../src/main_window.hpp"
 #include "../src/profile_transfer.hpp"
+#include "../src/startup.hpp"
 #include <QBackingStore>
 #include "startup_update_checks.hpp"
 
@@ -463,7 +464,10 @@ QJsonObject MainWindow::selfTest(const QString& output){
         bool flagAssetsValid=true;for(const auto& entry:languageEntries())flagAssetsValid&=QSvgRenderer(languageFlagResource(entry.value)).isValid()&&!languageFlag(entry.value).isNull();checks["language_picker_uses_bundled_country_flag_assets"]=flagAssetsValid&&QSvgRenderer(QStringLiteral(":/flags/ps.svg")).isValid();
         checks["language_popup_uses_ink_frame"]=languagePopup&&languagePopup->isVisible()&&(languagePopup->windowFlags()&Qt::FramelessWindowHint)&&languagePopup->findChild<QListWidget*>()->count()==9;
         if(languagePopup){languagePopup->grab().save(output+"/language-popup.png");auto* list=languagePopup->findChild<QListWidget*>();const auto before=list->grab().toImage();QEnterEvent enterChoice(QPointF(5,5),QPointF(5,5),list->mapToGlobal(QPoint(5,5)));QApplication::sendEvent(list,&enterChoice);checks["language_popup_hover_stays_flat"]=before==list->grab().toImage();}language_->hidePopup();
-        language_->setCurrentIndex(1);QApplication::processEvents();checks["portuguese_labels"]=operators_title_->text()=="Todos os operadores"&&save_->toolTip().startsWith("Salvar configurações");language_->setCurrentIndex(0);QApplication::processEvents();
+        language_->setCurrentIndex(1);QApplication::processEvents();checks["portuguese_labels"]=operators_title_->text()=="Todos os operadores"&&save_->toolTip().startsWith("Salvar configurações");
+        const auto accessibleLabelsMatch=[&]{return search_->accessibleName()==text(UiText::SearchOperatorsLabel)&&favorites_list_->accessibleName()==text(UiText::FavoriteOperators)&&operators_->accessibleName()==text(UiText::AllOperators)&&back_->accessibleName()==text(UiText::BackToOperators)&&save_->accessibleName()==text(UiText::SaveConfiguration);};
+        checks["accessible_labels_follow_language_change"]=accessibleLabelsMatch();language_->setCurrentIndex(0);QApplication::processEvents();
+        checks["accessible_labels_follow_language_change_back"]=accessibleLabelsMatch();
         if(QCoreApplication::arguments().contains("--all-languages")){
         bool localizedSidebarFits=true,hebrewPrankVisible=true,localizedDialogs=true;int frenchIndex=-1,prankIndex=-1;
         for(int i=0;i<language_->count();++i){language_->setCurrentIndex(i);QApplication::processEvents();if(auto* popup=findChild<QDialog*>("palestinePopup"))popup->close();const int id=language_->itemData(i).toInt();localizedSidebarFits&=sidebar_scroll_->widget()->width()<=sidebar_scroll_->viewport()->width();localizedSidebarFits&=operators_title_->width()<=sidebar_scroll_->viewport()->width();if(id==2)frenchIndex=i;if(id==6)prankIndex=i;
@@ -619,7 +623,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["valid_import_updates_production_ui"]=applyBackup(QJsonDocument(backup).toJson())&&unsaved_&&engine_.snapshot().bytes()==baseline.bytes();
         checks["all_hotkeys_checked_for_conflicts"]=hotkeyConflict(baseline,2,baseline.menu_key)==0&&hotkeyConflict(baseline,2,0)==-1;
         checks["phone_rejects_global_hotkey_collision"]=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key2",baseline.menu_key}}}}).contains("error");
-        checks["phone_accepts_mouse_hotkeys"]=!mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",1}}}}).contains("error");
+        checks["phone_accepts_mouse_hotkeys"]=!mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",5}}}}).contains("error")&&mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",1}}}}).contains("error");
         mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"key1",baseline.recoil_key}}}});
         // A shortcut change persists the binding without committing a pending profile edit.
         {
@@ -647,6 +651,19 @@ QJsonObject MainWindow::selfTest(const QString& output){
         editOperator([](r6::Operator& op){op.vertical=13.1f;});
         QTimer::singleShot(80,this,[this,output]{if(auto* modal=QApplication::activeModalWidget()){modal->grab().save(output+"/unsaved-close.png");if(auto* cancel=modal->findChild<QPushButton*>("cancelClose"))cancel->click();}});
         close();checks["cancel_close_keeps_unsaved_app_running"]=isVisible()&&engine_.running&&unsaved_;
+        // Exercise the actual tray action while the modal close prompt has
+        // temporarily suspended recoil, then cancel and retain the new state.
+        for(const bool initial:{false,true}){
+            engine_.recoil_active=initial;
+            QTimer::singleShot(80,this,[this]{tray_recoil_->trigger();if(close_alert_)if(auto* cancel=close_alert_->findChild<QPushButton*>("cancelClose"))cancel->click();});
+            close();checks[initial?"tray_recoil_change_survives_cancel_from_on":"tray_recoil_change_survives_cancel_from_off"]=isVisible()&&engine_.running&&unsaved_&&engine_.recoil_active.load();
+        }
+        engine_.recoil_active=true;
+        QTimer::singleShot(80,this,[this]{mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"recoilActive",false}}}});if(close_alert_)if(auto* cancel=close_alert_->findChild<QPushButton*>("cancelClose"))cancel->click();});
+        close();checks["phone_recoil_off_survives_cancel_close"]=isVisible()&&unsaved_&&!engine_.recoil_active.load();
+        engine_.recoil_active=true;
+        QTimer::singleShot(80,this,[this]{tray_recoil_->trigger();tray_recoil_->trigger();if(close_alert_)if(auto* cancel=close_alert_->findChild<QPushButton*>("cancelClose"))cancel->click();});
+        close();checks["tray_recoil_off_survives_cancel_close"]=isVisible()&&unsaved_&&!engine_.recoil_active.load();
         // The panic key keeps working everywhere except while Azec's own text
         // or number fields own the keyboard.
         search_->setFocus(Qt::OtherFocusReason);QApplication::setActiveWindow(this);QApplication::processEvents();
@@ -662,6 +679,36 @@ QJsonObject MainWindow::selfTest(const QString& output){
         checks["repeat_close_surfaces_prompt_again"]=repeat_surfaced&&repeat_kept_app;
         save_blocked_=true;QTimer::singleShot(80,this,[]{if(auto* modal=QApplication::activeModalWidget())if(auto* button=modal->findChild<QPushButton*>("save"))button->click();});
         close();checks["failed_save_during_close_keeps_window_open"]=isVisible()&&engine_.running&&unsaved_;save_blocked_=false;
+        {
+            const auto previous=QDir::currentPath();const auto lockFolder=output+"/lock-checks";QDir().mkpath(lockFolder);QDir::setCurrent(lockFolder);
+            const auto readLock=[](const QString& name){QFile file(name);return file.open(QIODevice::ReadOnly)?file.readAll():QByteArray();};
+            const auto writeLock=[](const QByteArray& bytes){QFile file("azec.lock");return file.open(QIODevice::WriteOnly|QIODevice::Truncate)&&file.write(bytes)==bytes.size();};
+            QByteArray templateBytes;
+            {QLockFile owner("template.lock");if(owner.tryLock(0))templateBytes=readLock("template.lock");}
+            {
+                QLockFile owner("azec.lock");const bool held=owner.tryLock(0);const auto before=readLock("azec.lock");SingleInstance contender;
+                checks["live_lock_without_activation_reports_failure_and_stays_owned"]=held&&contender.acquire()==SingleInstance::Result::Unavailable&&readLock("azec.lock")==before;
+            }
+            auto remote=templateBytes.split('\n');if(remote.size()>2)remote[2]="azec-test-remote-host.invalid";
+            {
+                const auto bytes=remote.join('\n');const bool written=writeLock(bytes);SingleInstance contender;
+                checks["remote_lock_reports_failure_without_reclaiming"]=written&&contender.acquire()==SingleInstance::Result::Unavailable&&readLock("azec.lock")==bytes;
+            }
+            QFile::remove("azec.lock");
+            QProcess foreign;foreign.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args){args->flags|=CREATE_NO_WINDOW;});
+            foreign.start(qEnvironmentVariable("SystemRoot")+"/System32/WindowsPowerShell/v1.0/powershell.exe",{"-NoProfile","-NonInteractive","-Command","Start-Sleep -Seconds 30"});
+            const bool running=foreign.waitForStarted(5000);auto recycled=templateBytes.split('\n');if(!recycled.isEmpty())recycled[0]=QByteArray::number(foreign.processId());
+            {
+                const bool written=running&&writeLock(recycled.join('\n'));SingleInstance contender;
+                checks["recycled_pid_from_unrelated_process_does_not_block_startup"]=written&&contender.acquire()==SingleInstance::Result::Acquired&&foreign.state()==QProcess::Running;
+            }
+            foreign.kill();foreign.waitForFinished(5000);
+            {
+                const bool written=writeLock("truncated lock");SingleInstance contender;
+                checks["orphaned_truncated_lock_is_reclaimed"]=written&&contender.acquire()==SingleInstance::Result::Acquired;
+            }
+            QDir::setCurrent(previous);
+        }
         engine_.edit([&](r6::Config& config){config=baseline;});applyStyle();syncSelection();dirty();save();wait(1800);
         status_->setFocus(Qt::OtherFocusReason);paint_.stop();const QPoint stationary(-20000,-20000);trackCursor(stationary);wait(100);const int idleRequests=cursor_repaints_;
         for(int sample=0;sample<12;++sample)trackCursor(stationary);wait(350);

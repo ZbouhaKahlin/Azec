@@ -18,19 +18,22 @@ private:
     QLocalServer server_;
     QMetaObject::Connection activation_;
     QString name_="azec-"+QString::fromLatin1(QCryptographicHash::hash(QDir::current().canonicalPath().toCaseFolded().toUtf8(),QCryptographicHash::Sha256).toHex().left(32));
-    static bool processRunning(qint64 pid){
+    static bool processCouldOwnLock(qint64 pid){
         if(pid<=0)return false;
         const HANDLE handle=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,static_cast<DWORD>(pid));
         if(!handle)return GetLastError()==ERROR_ACCESS_DENIED;
-        DWORD exit_code=0;const bool running=GetExitCodeProcess(handle,&exit_code)&&exit_code==STILL_ACTIVE;CloseHandle(handle);return running;
-    }
-    // QLockFile only grows stale while the process it records stays alive, so a
-    // truncated or orphaned lock file would otherwise stall startup forever.
-    bool ownerIsGone() const {
-        qint64 pid=0;QString hostname,appname;
-        if(!lock_.getLockInfo(&pid,&hostname,&appname))return true;
-        if(!hostname.isEmpty()&&hostname!=QSysInfo::machineHostName())return false;
-        return !processRunning(pid);
+        DWORD exit_code=0;bool owner=true;
+        if(GetExitCodeProcess(handle,&exit_code)&&exit_code!=STILL_ACTIVE)owner=false;
+        else {
+            wchar_t image[32768];DWORD length=DWORD(std::size(image));
+            if(QueryFullProcessImageNameW(handle,0,image,&length)){
+                const auto name=QFileInfo(QString::fromWCharArray(image,int(length))).fileName();
+                owner=name.compare("Azec.exe",Qt::CaseInsensitive)==0
+                    ||name.compare("Azec-checks.exe",Qt::CaseInsensitive)==0
+                    ||name.compare(QFileInfo(QCoreApplication::applicationFilePath()).fileName(),Qt::CaseInsensitive)==0;
+            }
+        }
+        CloseHandle(handle);return owner;
     }
     void listen(){
         QLocalServer::removeServer(name_);
@@ -43,7 +46,25 @@ public:
             if(lock_.error()!=QLockFile::LockFailedError){diagnostic("startup lock","Unable to lock configuration directory");return Result::Unavailable;}
             QLocalSocket socket;socket.connectToServer(name_);
             if(socket.waitForConnected(800)){socket.write("show\n");socket.waitForBytesWritten(500);return Result::AlreadyRunning;}
-            if(!ownerIsGone())return Result::AlreadyRunning;
+            qint64 pid=0;QString hostname,appname;
+            const bool known=lock_.getLockInfo(&pid,&hostname,&appname);
+            // A live same-machine owner answers the activation server above.
+            // Beyond it, a lock recorded on another computer is live as far as
+            // this rule allows knowing; report it instead of exiting silently.
+            const bool localMachine=!known||hostname.isEmpty()
+                ||hostname.compare(QSysInfo::machineHostName(),Qt::CaseInsensitive)==0
+                ||hostname.compare(QHostInfo::localHostName(),Qt::CaseInsensitive)==0;
+            if(!localMachine){
+                diagnostic("startup lock","Configuration directory is locked by another computer ("+hostname+")");
+                return Result::Unavailable;
+            }
+            // Inspect the running image, not the name recorded in the lock:
+            // a recycled PID still carries the old owner's recorded name.
+            // If identity cannot be established, preserve the possible owner.
+            if(known&&processCouldOwnLock(pid)){
+                diagnostic("startup lock","A live configuration owner could not be activated");
+                return Result::Unavailable;
+            }
             diagnostic("startup lock","Reclaiming a lock file whose owner is gone");
             if(!lock_.removeStaleLockFile()||!lock_.tryLock(0)){diagnostic("startup lock","Unable to reclaim the lock file");return Result::Unavailable;}
         }

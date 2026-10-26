@@ -98,6 +98,7 @@ inline QString applicationStyle(const QColor& accent){
         QSlider::handle:horizontal:hover { background:$sliderThumb; }
 
         QComboBox { background:$card; color:$ink; border:1px solid transparent; border-radius:8px; padding:6px 10px; min-width:120px; font-size:13px; font-weight:400; }
+        QComboBox:hover { background:$soft; }
         QComboBox:focus { border-color:%1; }
         QComboBox::drop-down { border:0; width:22px; }
         QComboBox::down-arrow { image:none; width:0; height:0; border:0; }

@@ -80,8 +80,12 @@ bool self_test(const std::filesystem::path& output) {
     ok &= check(write(bytes)&&!invalid.load(garbage),"unterminated name rejected");
     bytes=original;const float nan=std::numeric_limits<float>::quiet_NaN();std::memcpy(bytes.data()+32,&nan,sizeof(nan));
     ok &= check(write(bytes)&&!invalid.load(garbage),"nonfinite profile rejected");
-    bytes=original;const std::int32_t outside=71;std::memcpy(bytes.data()+3704,&outside,sizeof(outside));
-    ok &= check(write(bytes)&&!invalid.load(garbage),"invalid selected operator rejected");
+    bool selectionRepaired=true;Config expected;expected.operators[4].vertical=23.5f;expected.operators[4].rapid=1;
+    for(const std::int32_t outside:{-1,71,77,std::numeric_limits<std::int32_t>::min(),std::numeric_limits<std::int32_t>::max()}){
+        bytes=expected.bytes();std::memcpy(bytes.data()+3704,&outside,sizeof(outside));Config clamped;
+        selectionRepaired&=write(bytes)&&clamped.load(garbage)&&clamped.selected==0&&clamped.bytes()==expected.bytes();
+    }
+    ok &= check(selectionRepaired,"out-of-range selection repairs without changing saved profiles");
     bytes.assign(1024*1024+1,0);
     ok &= check(write(bytes)&&!invalid.load(garbage),"oversized configuration rejected before allocation");
     Config old;old.operators[0].vertical=7.5f;Config replacement;replacement.operators[0].vertical=99;

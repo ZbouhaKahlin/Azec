@@ -37,18 +37,6 @@ inline std::optional<r6::SensitivitySetup> readFile(const QString& path){
     if(!h||!v||!m||!setup.validGame())return {};
     setup.source=QFileInfo(path).absoluteFilePath().toStdWString();return setup;
 }
-inline QStringList candidates(){
-    auto documents=QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation);
-    documents<<QDir::homePath()+"/Documents";documents.removeDuplicates();QStringList files;
-    for(const auto& document:documents)for(const auto* name:{"Rainbow Six - Siege","Rainbow Six Siege"}){
-        QDir game(document+"/My Games/"+name);if(!game.exists())continue;
-        const auto add=[&](const QString& path){if(QFileInfo::exists(path)&&readFile(path))files<<QFileInfo(path).canonicalFilePath();};
-        add(game.filePath("GameSettings.ini"));
-        const auto accounts=game.entryList(QDir::Dirs|QDir::NoDotAndDotDot,QDir::Name);
-        for(int i=0;i<std::min(256,int(accounts.size()));++i)add(game.filePath(accounts[i]+"/GameSettings.ini"));
-    }
-    files.removeDuplicates();return files;
-}
 inline bool sameGame(const r6::SensitivitySetup& a,const r6::SensitivitySetup& b){
     return qAbs(a.horizontal-b.horizontal)<0.000001&&qAbs(a.vertical-b.vertical)<0.000001&&qAbs(a.multiplier-b.multiplier)<0.000000001;
 }

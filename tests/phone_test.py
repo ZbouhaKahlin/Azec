@@ -72,7 +72,8 @@ checks['home_screen_icon_available']=call('/app-icon.svg',auth=False)[0]==200
 checks['rejects_wrong_value_type']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'vertical':'12'}})[0]==400
 checks['rejects_fractional_delay']=call('/api/update',{'action':'setProfile','operator':4,'slot':0,'values':{'delay':50.5}})[0]==400
 checks['rejects_duplicate_hotkeys']=call('/api/update',{'action':'setGlobal','values':{'key2':45}})[0]==400
-checks['accepts_mouse_button_binding']=call('/api/update',{'action':'setGlobal','values':{'key1':1}})[0]==200
+checks['accepts_mouse_button_binding']=call('/api/update',{'action':'setGlobal','values':{'key1':5}})[0]==200
+checks['rejects_primary_mouse_binding']=call('/api/update',{'action':'setGlobal','values':{'key1':1}})[0]==400 and call('/api/update',{'action':'setGlobal','values':{'key1':2}})[0]==400
 checks['accepts_modifier_binding']=call('/api/update',{'action':'setGlobal','values':{'key1':17}})[0]==200
 checks['rejects_removed_settings']=call('/api/update',{'action':'setGlobal','values':{'radius':200}})[0]==400 and call('/api/update',{'action':'setGlobal','values':{'rapidMaster':True}})[0]==400 and call('/api/update',{'action':'setGlobal','values':{'accent':'#123456'}})[0]==400
 global_values={'key0':45,'key1':119,'key2':120,'key3':51,'key4':52,'language':0}

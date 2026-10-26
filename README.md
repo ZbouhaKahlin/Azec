@@ -17,7 +17,7 @@ Current desktop and phone design, shown with example profiles. The download abov
 3. Select an operator, adjust its primary profile, and click **Save**. Enable a separate secondary profile if you want different settings for the second weapon.
 4. Turn on **Recoil** when ready. Fresh profiles have Rapid fire off; saved Rapid fire choices belong to each weapon profile.
 
-Azec runs locally. Profile editing and phone control do not need a cloud account or internet connection. Driver downloads and update checks need internet access.
+Azec runs locally. Profile editing and phone control do not need a cloud account or internet connection. Driver downloads and update checks need internet access. Azec is an independent reconstruction of the original tool; real in-game behavior has not been verified.
 
 ## Driver setup
 

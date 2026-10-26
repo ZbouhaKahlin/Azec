@@ -57,10 +57,13 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
                     else {next.sound=value.toBool();rebuild=true;}
                 }else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
                 else if(key.startsWith("key")&&key.size()==4&&key[3]>='0'&&key[3]<='4'&&validInteger(value,0,255)){
-                    const int index=key[3].digitValue();
-                    const bool safe=index==2?r6::validGlobalHotkey(value.toInt()):r6::validHotkey(value.toInt());
+                    const int index=key[3].digitValue(),chosen=value.toInt();
+                    // The desktop capture never offers the left/right mouse
+                    // buttons; a phone binding on either would trigger on
+                    // every real click.
+                    const bool safe=index==2?r6::validGlobalHotkey(chosen):(chosen==0||chosen>2)&&r6::validHotkey(chosen);
                     if(!safe)return fail("This key is not safe for a global shortcut");
-                    int* keys[]={&next.menu_key,&next.recoil_key,&next.panic_key,&next.primary_key,&next.secondary_key};*keys[index]=value.toInt();rebuild=keysChanged=true;
+                    int* keys[]={&next.menu_key,&next.recoil_key,&next.panic_key,&next.primary_key,&next.secondary_key};*keys[index]=chosen;rebuild=keysChanged=true;
                 }
                 else return fail("Invalid setting: "+key);
             }

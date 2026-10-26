@@ -39,6 +39,7 @@ def run(parent):
         checks['damaged_primary_preserved']=any(path.read_bytes()==original for path in folder.glob('r6_config.corrupt-*.bin'))
         checks['secondary_survives_primary_recovery']=ash['dual']
         checks['unversioned_favorites_load']=ash['favorite']
+        checks['rapid_recovery_fixture_seeded']=call(info,{'action':'setProfile','operator':4,'slot':0,'values':{'rapid':True}})[0]==200
         checks['defaults_save_after_recovery']=call(info,{'action':'save'})[0]==200 and (folder/'r6_config.bin').stat().st_size==3734
         call(info,{'action':'setFavorite','operator':4,'enabled':True})
         checks['favorites_write_version']=json.loads((folder/'azec_ui.json').read_text())['version']==1
@@ -79,6 +80,9 @@ def run(parent):
             process,info=start(damaged)
             backups=list(damaged.glob(Path(filename).stem+'.corrupt-*.json'))
             checks[filename+'_damaged_bytes_preserved']=len(backups)==1 and backups[0].read_bytes()==rejected
+            if filename=='azec_weapons.json':
+                _,state=call(info,{'action':'selectOperator','operator':4})
+                checks['damaged_weapon_file_preserves_primary_rapid']=state['profile']['rapid']
             saved=call(info,{'action':'save'})[0]==200
             if filename=='azec_ui.json':
                 saved=call(info,{'action':'setFavorite','operator':0,'enabled':True})[0]==200 and saved
@@ -101,6 +105,9 @@ def run(parent):
             checks[filename+'_edits_remain_pending_when_save_blocked']=status==200 and state['dirty'] and call(info,{'action':'save'})[0]==400 and call(info)[1]['dirty']
             checks[filename+'_blocked_save_preserves_binary']=(unreadable/'r6_config.bin').read_bytes()==primary
             checks[filename+'_locked_file_not_quarantined']=not list(unreadable.glob(Path(filename).stem+'.corrupt-*.json'))
+            if filename=='azec_weapons.json':
+                _,state=call(info,{'action':'selectOperator','operator':4})
+                checks['unreadable_weapon_file_preserves_primary_rapid']=state['profile']['rapid']
         finally:
             stop(process)
             kernel.CloseHandle(handle)

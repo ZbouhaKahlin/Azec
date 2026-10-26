@@ -7,6 +7,7 @@
 /imgui.ini
 /dry-run-result.txt
 /runtime/
+/updates/
 /phone-info.json
 /ui-verification.json
 /azec.log*
