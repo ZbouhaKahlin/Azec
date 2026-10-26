@@ -28,3 +28,4 @@ HEADERS += src/driver_download.hpp
 HEADERS += src/profile_sets.hpp
 HEADERS += src/interaction_icons.hpp
 HEADERS += src/startup_view.hpp
+HEADERS += src/startup_update.hpp

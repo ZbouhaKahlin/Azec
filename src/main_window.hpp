@@ -1076,23 +1076,23 @@ public:
         capturing_startup_=true;content_->render(&frame,QPoint(),QRegion(),QWidget::DrawChildren);capturing_startup_=false;
         const auto bounds=[this](QWidget* widget){return QRect(widget->mapTo(content_,QPoint()),widget->size());};
         QVector<StartupView::PieceSpec> pieces;
-        pieces.append({bounds(findChild<QWidget*>("titleBar")),0,380,true});
-        pieces.append({bounds(sidebar_search_box_),0,460});
+        pieces.append({bounds(findChild<QWidget*>("titleBar")),0,520,true});
+        pieces.append({bounds(sidebar_search_box_),0,620});
         int rowDelay=80;
         const QRect rosterClip=bounds(sidebar_scroll_->viewport());
         for(auto* list:{favorites_list_,operators_}){
             if(list->isHidden()||list->parentWidget()->isHidden())continue;
             QWidget* heading=list==favorites_list_?favorites_title_->parentWidget():operators_header_;
             const auto headingRect=bounds(heading).intersected(rosterClip);
-            if(!headingRect.isEmpty())pieces.append({headingRect,qMax(20,rowDelay-40),480});
+            if(!headingRect.isEmpty())pieces.append({headingRect,qMax(20,rowDelay-40),650});
             for(int i=0;i<list->count();++i){
                 if(list->item(i)->isHidden())continue;
                 const QRect row=list->visualItemRect(list->item(i)).translated(list->viewport()->mapTo(content_,QPoint()));
                 const QRect visible=row.intersected(rosterClip).intersected(bounds(list->viewport()));
-                if(!visible.isEmpty()){pieces.append({visible,rowDelay,540});rowDelay+=42;}
+                if(!visible.isEmpty()){pieces.append({visible,rowDelay,730});rowDelay+=42;}
             }
         }
-        pieces.append({bounds(panel_),rowDelay+70,600});
+        pieces.append({bounds(panel_),rowDelay+70,810});
         const QSize compactSize(qMin(400,width()),qMin(232,height()));const QRect compact(startup_geometry_.center()-QPoint(compactSize.width()/2,compactSize.height()/2),compactSize);
         startup_view_=new StartupView(frame,pieces,compact,startup_geometry_,bounds(brand_),engine_.snapshot().language,this,
             [this](const QRect& rectangle){if(geometry()!=rectangle)setGeometry(rectangle);},[this]{finishStartup();});

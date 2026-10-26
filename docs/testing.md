@@ -45,6 +45,7 @@ These commands run from the repository root in PowerShell. Desktop-backed runner
 | Desktop checks at 100% | `python tests/run_checks.py --ui-only` |
 | Startup loading, expansion, content reveal, and interruption captures | `python tests/run_checks.py --startup-only` |
 | Native startup frame timing without screenshot overhead | `python tests/run_checks.py --startup-timing-only` |
+| Startup update progress, offline launch, verified handoff, and Retry | `python tests/run_checks.py --startup-update-only` |
 | Phone browser checks | `python tests/phone_browser_test.py` |
 | Phone QR-photo pairing, delay layout, and sound scheduling | `python tests/phone_companion_test.py` |
 | Pairing expiry, including the real 61-second wait | `python tests/run_checks.py --slow` |
@@ -60,6 +61,8 @@ These commands run from the repository root in PowerShell. Desktop-backed runner
 `--full` expands requested checks; it does not implicitly enable desktop checks. In `run_checks.py`, it also enables the real pairing-expiry wait whenever HTTP behavior checks are included; `--ui-only --full` omits HTTP and that wait. `build.cmd test --slow` includes expiry during a build. The console group, including `build.cmd test`, requires Node.js with `node --test` support for `phone_api_test.cjs`. The browser runner requires `pip install playwright` and installed Google Chrome. The separate companion runner also needs `pip install qrcode pillow`; its temporary pairing QR images are deleted during cleanup. Both browser runners use `--mute-audio` so Web Audio cannot play through the current desktop. QR decoding requires `pip install opencv-python-headless`. It checks production QR captures across representative pairing links and a longer symbol with alignment markers. Every capture is decoded unchanged and with mild blur, reduced contrast, smaller size, and perspective distortion. These synthetic checks do not establish physical-phone scanning speed.
 
 Use `build.cmd checks` to prepare the desktop verifier and all console verifiers without running tests. Console binaries remain under `.build/checks-*/release`; only the desktop verifier goes in `runtime/Azec-checks.exe`. The test-only driver DLL is never copied into the app runtime. `build.cmd test` also builds it and explicitly runs behavior checks. Rebuild after changes to C++ or embedded assets; testing a stale executable does not validate source edits. The release app delegates `--ui-self-test` to the separate verification executable.
+
+Ordinary dry-run fixtures skip the real startup update check and never download or execute an updater. `--startup-update-only` routes the update window's requests to a local server and uses a callback instead of running the downloaded fixture. It checks the smooth bar reset, verified download, current-version launch, offline message, corrupt and missing-hash failures, installer-launch failure, and Retry after a confirmed required update. It does not install or publish a real release.
 
 ## Choosing coverage
 

@@ -16,6 +16,7 @@ public:
 private:
     QLockFile lock_{QDir::current().filePath("azec.lock")};
     QLocalServer server_;
+    QMetaObject::Connection activation_;
     QString name_="azec-"+QString::fromLatin1(QCryptographicHash::hash(QDir::current().canonicalPath().toCaseFolded().toUtf8(),QCryptographicHash::Sha256).toHex().left(32));
     static bool processRunning(qint64 pid){
         if(pid<=0)return false;
@@ -50,7 +51,8 @@ public:
         return Result::Acquired;
     }
     void onActivate(QWidget* window){
-        connect(&server_,&QLocalServer::newConnection,window,[this,window]{
+        disconnect(activation_);
+        activation_=connect(&server_,&QLocalServer::newConnection,window,[this,window]{
             while(server_.hasPendingConnections()){
                 auto* socket=server_.nextPendingConnection();
                 window->showNormal();window->raise();window->activateWindow();

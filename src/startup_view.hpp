@@ -7,13 +7,16 @@
 // captured; all snapshots and blur frames disappear when the handoff finishes.
 class StartupView final : public QWidget {
 public:
-    static constexpr int loadingDuration=1440,expansionDuration=720;
+    static constexpr int loadingStepDuration=800,loadingDuration=3*loadingStepDuration,expansionDuration=720;
+    // Start content during the expansion's slow tail to avoid an empty-window pause.
+    static constexpr int revealStart=loadingDuration+expansionDuration-180;
     struct PieceSpec {QRect rect;int delay=0;int duration=540;bool header=false;};
 private:
-    struct Piece {PieceSpec spec;std::array<QPixmap,3> frames;};
+    struct Piece {PieceSpec spec;std::array<QPixmap,3> frames;QImage blended;};
     QVector<Piece> pieces_;
     QRect compact_,expanded_;QRectF brand_target_;
-    QStringList messages_;QVariantAnimation timeline_;
+    QString loading_label_;QFont loading_font_;QVector<std::array<QPixmap,3>> words_;QImage word_blend_;
+    qreal label_width_=0,word_width_=0;int text_height_=0;bool rtl_=false;QVariantAnimation timeline_;
     int time_=0,total_=0;std::function<void(const QRect&)> geometry_;std::function<void()> finished_;
 #ifdef AZEC_UI_TESTS
     struct FrameTiming {int time;double at,work;};
@@ -28,6 +31,11 @@ private:
         effect->setBlurHints(QGraphicsBlurEffect::QualityHint);effect->setBlurRadius(radius);item->setGraphicsEffect(effect);
         QPixmap result(source.size());result.setDevicePixelRatio(source.devicePixelRatio());result.fill(Qt::transparent);
         QPainter painter(&result);const QRectF bounds(QPointF(),source.deviceIndependentSize());scene.render(&painter,bounds,bounds);return result;
+    }
+    static void interpolate(QImage& target,const std::array<QPixmap,3>& frames,qreal clarity){
+        const qreal level=fraction(clarity)*2;const int first=qMin(1,int(level));
+        QPainter blend(&target);blend.setCompositionMode(QPainter::CompositionMode_Source);
+        blend.drawPixmap(0,0,frames[first]);blend.setOpacity(level-first);blend.drawPixmap(0,0,frames[first+1]);
     }
     QRectF compactBrand() const {return {compact_.width()/2.0-94,43,188,66};}
     void advance(int time){
@@ -46,16 +54,29 @@ public:
                 std::function<void(const QRect&)> geometry,std::function<void()> finished)
         :QWidget(parent),compact_(compact),expanded_(expanded),brand_target_(brand),geometry_(std::move(geometry)),finished_(std::move(finished)){
         setObjectName("startupPresentation");setAttribute(Qt::WA_NoSystemBackground);setFocusPolicy(Qt::StrongFocus);
-        for(const auto id:{UiText::StartupComponents,UiText::StartupProfiles,UiText::StartupOperators,UiText::StartupControls,UiText::StartupWorkspace,UiText::StartupReady})messages_.append(uiText(id,language));
+        loading_label_=uiText(UiText::StartupLoading,language);rtl_=language==5||language==6;
+        loading_font_=QFont("Segoe UI");loading_font_.setPixelSize(12);const QFontMetrics metrics(loading_font_);
+        label_width_=metrics.horizontalAdvance(loading_label_);text_height_=metrics.height();QStringList words;
+        for(const auto id:{UiText::StartupComponents,UiText::StartupProfiles,UiText::StartupWorkspace}){
+            words.append(uiText(id,language));word_width_=qMax(word_width_,qreal(metrics.horizontalAdvance(words.back())));
+        }
+        const qreal ratio=frame.devicePixelRatio();const QSize tile(qCeil((word_width_+24)*ratio),qCeil((text_height_+24)*ratio));
+        for(const auto& word:words){
+            QPixmap sharp(tile);sharp.setDevicePixelRatio(ratio);sharp.fill(Qt::transparent);
+            {QPainter p(&sharp);p.setFont(loading_font_);p.setPen(kbtheme::muted);p.drawText(QRectF(12,12,word_width_,text_height_),Qt::AlignVCenter|(rtl_?Qt::AlignRight:Qt::AlignLeft),word);}
+            words_.append({blur(sharp,10),blur(sharp,4),sharp});
+        }
+        word_blend_=QImage(tile,QImage::Format_ARGB32_Premultiplied);word_blend_.setDevicePixelRatio(ratio);
         int revealDuration=0;
         for(const auto& spec:specs){
             const QRect crop=spec.rect.intersected(QRect(QPoint(),expanded.size()));if(crop.isEmpty())continue;
             const qreal ratio=frame.devicePixelRatio();QPixmap sharp=frame.copy(QRect(qRound(crop.x()*ratio),qRound(crop.y()*ratio),qRound(crop.width()*ratio),qRound(crop.height()*ratio)));
             if(spec.header){QPainter clear(&sharp);clear.setCompositionMode(QPainter::CompositionMode_Clear);clear.fillRect(brand_target_.translated(-crop.topLeft()),Qt::transparent);}
-            Piece piece;piece.spec=spec;piece.spec.rect=crop;piece.frames={blur(sharp,12),blur(sharp,3.5),sharp};pieces_.append(std::move(piece));
+            Piece piece;piece.spec=spec;piece.spec.rect=crop;piece.frames={blur(sharp,12),blur(sharp,3.5),sharp};
+            piece.blended=QImage(sharp.size(),QImage::Format_ARGB32_Premultiplied);piece.blended.setDevicePixelRatio(ratio);pieces_.append(std::move(piece));
             revealDuration=qMax(revealDuration,spec.delay+spec.duration);
         }
-        total_=loadingDuration+expansionDuration+revealDuration;
+        total_=qMax(loadingDuration+expansionDuration,revealStart+revealDuration);
         timeline_.setDuration(total_);timeline_.setStartValue(0);timeline_.setEndValue(total_);
         connect(&timeline_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){advance(value.toInt());});
         connect(&timeline_,&QVariantAnimation::finished,this,[this]{finished_();});
@@ -67,6 +88,7 @@ public:
         timeline_.start();
     }
 #ifdef AZEC_UI_TESTS
+    void seekForVerification(int time){advance(time);}
     QJsonObject frameTimings() const{
         const auto encode=[](const QVector<FrameTiming>& samples){QJsonArray result;for(const auto& sample:samples)result.append(QJsonObject{{"time",sample.time},{"atMs",sample.at},{"workMs",sample.work}});return result;};
         return {{"updates",encode(update_timings_)},{"paints",encode(paint_timings_)}};
@@ -75,9 +97,9 @@ public:
     void stop(){timeline_.stop();}
     int elapsed() const{return time_;}
     int duration() const{return total_;}
-    qreal loadingProgress() const{return smooth(qreal(time_)/loadingDuration);}
+    qreal loadingProgress() const{return .25+.75*smooth(qreal(time_)/loadingDuration);}
     qreal cornerRadius() const{return 24-8*expansion();}
-    int loadingStep() const{return qMin(5,time_*6/loadingDuration);}
+    int loadingStep() const{return qMin(int(words_.size())-1,time_/loadingStepDuration);}
     QRectF wordmarkRect() const{
         const qreal t=expansion();
         return blend(compactBrand().translated(compact_.topLeft()),brand_target_.translated(expanded_.topLeft()),t).translated(-parentWidget()->geometry().topLeft());
@@ -89,15 +111,17 @@ protected:
         const auto record=qScopeGuard([&]{if(timing_clock_.isValid())paint_timings_.append({time_,began/1e6,(timing_clock_.nsecsElapsed()-began)/1e6});});
 #endif
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setRenderHint(QPainter::SmoothPixmapTransform);
-        const int revealTime=time_-loadingDuration-expansionDuration;
+        const int revealTime=time_-revealStart;
         if(revealTime>=0){
-            for(const auto& piece:pieces_){
+            for(auto& piece:pieces_){
                 const auto& spec=piece.spec;const qreal t=fraction(qreal(revealTime-spec.delay)/spec.duration);if(t<=0)continue;
+                if(t>=1){painter.drawPixmap(spec.rect.topLeft(),piece.frames.back());continue;}
                 const qreal settled=monoEase().valueForProgress(t),alpha=smooth(t/.65),clarity=smooth(t);
-                const qreal level=clarity*2;const int first=qMin(1,int(level));const qreal mix=level-first;
+                // Blend premultiplied images before fading once; separate SourceOver
+                // fades attenuate each other and make the panel's opacity pulse.
+                interpolate(piece.blended,piece.frames,clarity);
                 painter.save();painter.setClipRect(spec.rect.adjusted(0,-16,0,0));painter.translate(0,-12*(1-settled));
-                painter.setOpacity(alpha*(1-mix));painter.drawPixmap(spec.rect.topLeft(),piece.frames[first]);
-                painter.setOpacity(alpha*mix);painter.drawPixmap(spec.rect.topLeft(),piece.frames[first+1]);painter.restore();
+                painter.setOpacity(alpha);painter.drawImage(spec.rect.topLeft(),piece.blended);painter.restore();
             }
         }
         BrandLabel::draw(painter,wordmarkRect(),devicePixelRatioF());
@@ -105,11 +129,17 @@ protected:
         painter.setOpacity(1-exit);const qreal center=width()/2.0,barY=compact_.height()*.64;
         const QRectF bar(center-124,barY,248,3);painter.setPen(Qt::NoPen);painter.setBrush(kbtheme::content(.09));painter.drawRoundedRect(bar,1.5,1.5);
         painter.setBrush(kbtheme::defaultAccent);QRectF fill=bar;fill.setWidth(bar.width()*loadingProgress());painter.drawRoundedRect(fill,1.5,1.5);
-        QFont font("Segoe UI");font.setPixelSize(12);painter.setFont(font);
-        const qreal phase=std::fmod(qreal(qMin(time_,loadingDuration-1)),loadingDuration/6.0)/(loadingDuration/6.0);
-        const qreal transition=smooth(phase/.32);const int step=loadingStep();
-        const QRectF textRect(center-170,barY+17,340,22);painter.setPen(kbtheme::muted);
-        if(step>0&&transition<1){painter.setOpacity((1-exit)*(1-transition));painter.drawText(textRect.translated(0,-4*transition),Qt::AlignCenter,messages_[step-1]);}
-        painter.setOpacity((1-exit)*(step==0?1:transition));painter.drawText(textRect.translated(0,step==0?0:4*(1-transition)),Qt::AlignCenter,messages_[step]);
+        painter.setFont(loading_font_);painter.setPen(kbtheme::muted);
+        const qreal left=center-(label_width_+6+word_width_)/2,top=barY+17+(22-text_height_)/2.0;
+        const qreal wordX=rtl_?left:left+label_width_+6;
+        painter.drawText(QRectF(rtl_?left+word_width_+6:left,top,label_width_,text_height_),Qt::AlignVCenter|(rtl_?Qt::AlignRight:Qt::AlignLeft),loading_label_);
+        const qreal phase=std::fmod(qreal(qMin(time_,loadingDuration-1)),loadingStepDuration);
+        const qreal transition=smooth(phase/420);const int step=loadingStep();
+        const auto drawWord=[&](int index,qreal clarity,qreal opacity,qreal offset){
+            interpolate(word_blend_,words_[index],clarity);painter.setOpacity((1-exit)*opacity);
+            painter.drawImage(QPointF(wordX-12,top-12+offset),word_blend_);
+        };
+        if(step>0&&transition<1)drawWord(step-1,1-transition,1-transition,-3*transition);
+        drawWord(step,step==0?1:transition,step==0?1:transition,step==0?0:3*(1-transition));
     }
 };

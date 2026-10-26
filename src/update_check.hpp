@@ -1,12 +1,16 @@
 #pragma once
 // Update check against the public releases-only repository. Anonymous HTTPS only:
-// no account, no identifiers, no telemetry. Failure is always non-fatal.
+// no account, no identifiers, no telemetry. Downloads are verified before use.
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
 #include <QtNetwork>
 #include <QSaveFile>
 #include <QCryptographicHash>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QTimer>
 #include <functional>
 #include <memory>
 
@@ -39,7 +43,8 @@ inline QNetworkRequest request(const QUrl& url){
 // Stream to an atomic temporary file. No executable is exposed to the updater
 // until the complete response matches the release's SHA-256.
 inline void downloadVerified(QNetworkAccessManager* network,QObject* owner,const QUrl& url,
-                             const QByteArray& expected,const QString& target,std::function<void(bool)> finished){
+                             const QByteArray& expected,const QString& target,std::function<void(bool)> finished,
+                             std::function<void(qint64,qint64)> progress={}){
     struct Download {
         QSaveFile file;
         QCryptographicHash hash{QCryptographicHash::Sha256};
@@ -50,6 +55,7 @@ inline void downloadVerified(QNetworkAccessManager* network,QObject* owner,const
     auto state=std::make_shared<Download>(target);
     if(digest.isEmpty()||target.isEmpty()||!state->file.open(QIODevice::WriteOnly)){finished(false);return;}
     auto* reply=network->get(request(url));reply->setReadBufferSize(1024*1024);
+    if(progress)QObject::connect(reply,&QNetworkReply::downloadProgress,owner,std::move(progress));
     const auto consume=[reply,state]{
         const auto bytes=reply->readAll();state->size+=bytes.size();
         if(state->size>128*1024*1024||state->file.write(bytes)!=bytes.size()){state->ok=false;reply->abort();return;}
@@ -81,5 +87,48 @@ inline bool newer(const QString& candidate,const QString& current){
         if(a!=b)return a>b;
     }
     return false;
+}
+
+struct Release {
+    bool checked=false,required=false;
+    QString version;QUrl asset;QByteArray digest;
+    bool downloadable() const{return required&&!asset.isEmpty()&&!digest.isEmpty();}
+};
+inline bool numericVersion(QString value){
+    if(value.startsWith('v')||value.startsWith('V'))value.remove(0,1);
+    const auto parts=value.split('.');if(parts.size()<2||parts.size()>6)return false;
+    for(const auto& part:parts){bool ok=false;part.toInt(&ok);if(!ok||part.isEmpty())return false;for(auto c:part)if(c<'0'||c>'9')return false;}
+    return true;
+}
+inline Release releaseFromJson(const QByteArray& bytes,const QString& current){
+    const auto root=QJsonDocument::fromJson(bytes).object();const auto tag=root["tag_name"].toString();
+    if(!numericVersion(tag)||root["draft"].toBool()||root["prerelease"].toBool())return {};
+    Release result;result.checked=true;result.version=tag;
+    if(result.version.startsWith('v')||result.version.startsWith('V'))result.version.remove(0,1);
+    result.required=newer(result.version,current);if(!result.required)return result;
+    // A known newer release stays mandatory even if its asset metadata is broken.
+    const QString path="/"+QString(releasesRepo)+"/releases/download/"+tag+"/"+assetName;
+    for(const auto& value:root["assets"].toArray()){
+        const auto asset=value.toObject();if(asset["name"].toString()!=assetName)continue;
+        const QUrl url(asset["browser_download_url"].toString());
+        if(url.scheme()!="https"||url.host()!="github.com"||url.path()!=path||!url.userInfo().isEmpty()||
+           (url.port()!=-1&&url.port()!=443)||url.hasQuery()||url.hasFragment())return result;
+        result.asset=url;result.digest=validHash(asset["digest"].toString().toLatin1());break;
+    }
+    return result;
+}
+inline void checkLatest(QNetworkAccessManager* network,QObject* owner,const QString& current,
+                        std::function<void(Release)> finished,const QUrl& endpoint=QUrl(latestApi)){
+    auto query=request(endpoint);query.setRawHeader("Accept","application/vnd.github+json");query.setTransferTimeout(8000);
+    auto* reply=network->get(query);reply->setReadBufferSize(256*1024);
+    auto bytes=std::make_shared<QByteArray>();auto tooLarge=std::make_shared<bool>(false);
+    const auto consume=[reply,bytes,tooLarge]{bytes->append(reply->readAll());if(bytes->size()>1024*1024){*tooLarge=true;reply->abort();}};
+    QObject::connect(reply,&QNetworkReply::readyRead,owner,consume);
+    QTimer::singleShot(8000,reply,[reply]{if(!reply->isFinished())reply->abort();});
+    QObject::connect(reply,&QNetworkReply::finished,owner,[reply,current,finished,consume,bytes,tooLarge]{
+        if(!*tooLarge)consume();
+        const bool ok=!*tooLarge&&reply->error()==QNetworkReply::NoError&&reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()==200;
+        const auto result=ok?releaseFromJson(*bytes,current):Release{};reply->deleteLater();finished(result);
+    });
 }
 }

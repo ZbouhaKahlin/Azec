@@ -75,7 +75,7 @@ def run_http(parent, slow=False):
         # Session credentials must never be uploaded as verification artifacts.
         (folder / 'phone-info.json').unlink(missing_ok=True)
 
-def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,console=False,browser=False,jobs=2,interaction_motion=False,startup=False,startup_timing=False):
+def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,console=False,browser=False,jobs=2,interaction_motion=False,startup=False,startup_timing=False,startup_update=False):
     started = time.monotonic()
     parent = ROOT / '.build' / 'verification'
     parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +91,7 @@ def run(ui=False,ui_only=False,qr_scan=False,full=False,slow=False,console=False
             env = os.environ.copy()
             env['QT_SCALE_FACTOR'] = scale
             run_hidden([str(CHECKS), '--ui-self-test']
+                       + (['--startup-update-only'] if startup_update else [])
                        + (['--startup-only'] if startup else [])
                        + (['--startup-timing-only'] if startup_timing else [])
                        + (['--interaction-motion-only'] if interaction_motion else [])
@@ -161,6 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--interaction-motion-only',action='store_true',help='Only check desktop switches, confirmation returns and move/resize corners')
     parser.add_argument('--startup-only',action='store_true',help='Only check and capture the loader, expansion, reveal and startup cancellation')
     parser.add_argument('--startup-timing-only',action='store_true',help='Measure native startup frame timing without frame capture overhead')
+    parser.add_argument('--startup-update-only',action='store_true',help='Check compact startup update progress, offline launch, verification and retry with a local server')
     parser.add_argument('--qr-scan', action='store_true', help='Decode UI QR captures (requires opencv-python-headless)')
     parser.add_argument('--full', action='store_true', help='Include 150%% UI scaling, all UI languages, and real-time HTTP expiry')
     parser.add_argument('--slow', action='store_true', help='Include real-time HTTP expiry without expanding the UI matrix')
@@ -169,7 +171,9 @@ if __name__ == '__main__':
     parser.add_argument('--suite',action='store_true',help='Run console, behavior, desktop and browser coverage without extended matrices')
     parser.add_argument('--jobs',type=int,choices=(1,2),default=2,help='Concurrent independent groups; default 2')
     args=parser.parse_args()
-    if args.startup_timing_only:
+    if args.startup_update_only:
+        run(ui=True,ui_only=True,startup_update=True)
+    elif args.startup_timing_only:
         run(ui=True,ui_only=True,startup=True,startup_timing=True)
     elif args.startup_only:
         run(ui=True,ui_only=True,startup=True)

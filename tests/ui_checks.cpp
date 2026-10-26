@@ -1,11 +1,13 @@
 #include "../src/main_window.hpp"
 #include "../src/profile_transfer.hpp"
 #include <QBackingStore>
+#include "startup_update_checks.hpp"
 
 QJsonObject MainWindow::selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
         // Pause global hotkey polling; fixture actions call production handlers directly.
         poll_.stop();
+        if(QCoreApplication::arguments().contains("--startup-update-only"))return startupUpdateChecks(output,this);
         if(QCoreApplication::arguments().contains("--startup-only")){
             const bool timingOnly=QCoreApplication::arguments().contains("--startup-timing-only");
             QJsonObject checks;QJsonArray frames;const QRect finalGeometry=geometry();const QSize finalMinimum=minimumSize();const auto handle=winId();
@@ -36,7 +38,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
             }
             recording.stop();for(const auto& image:captured)image.second.save(output+"/"+image.first);captured.clear();
             checks["sequence_completes_and_calls_back_once"]=!startup_view_&&completed==1;
-            checks["all_six_loading_messages_are_shown"]=steps.size()==6;
+            checks["exactly_three_loading_subjects_are_shown"]=steps.size()==3;
             checks["progress_and_expansion_only_move_forward"]=progressForward&&smoothGrowth;
             checks["expands_on_the_same_native_window"]=sameHandle;
             checks["window_keeps_its_center_while_expanding"]=centered;
@@ -44,6 +46,21 @@ QJsonObject MainWindow::selfTest(const QString& output){
             checks["hands_off_to_the_original_live_interface"]=!content_->isHidden()&&content_->grab().toImage()==contentBefore;
             wait(100);capture(output+"/startup-ready.png");
             checks["temporary_animation_and_snapshots_are_removed"]=findChild<QWidget*>("startupPresentation")==nullptr;
+            {
+                const QSize size(128,128);QPixmap flat(size);flat.fill(QColor(40,80,120,200));
+                const QRect bounds(QPoint(),size);
+                StartupView sample(flat,{{bounds,0,810}},bounds,bounds,QRectF(-10000,-10000,1,1),1,this,[](const QRect&){},[]{});sample.resize(size);
+                bool steady=true;int previous=0;QJsonArray opacitySamples;
+                for(int time=0;time<=810;time+=27){
+                    sample.seekForVerification(StartupView::revealStart+time);
+                    QPixmap rendered(size);rendered.fill(Qt::transparent);sample.render(&rendered,QPoint(),QRegion(),QWidget::DrawChildren);
+                    const int opacity=rendered.toImage().pixelColor(64,64).alpha();
+                    const qreal t=std::clamp(qreal(time)/810/.65,qreal(0),qreal(1));const int expected=qRound(200*t*t*(3-2*t));
+                    steady&=opacity+2>=previous&&qAbs(opacity-expected)<=3;previous=opacity;
+                    opacitySamples.append(QJsonObject{{"time",time},{"alpha",opacity},{"expected",expected}});
+                }
+                checks["reveal_opacity_stays_smooth_between_blur_frames"]=steady;timings["opacitySamples"]=opacitySamples;
+            }
             hide();show();wait(80);checks["showing_the_window_again_does_not_replay_startup"]=!startup_view_&&geometry()==finalGeometry;
             bool cancellation=true;
             for(int time:{100,StartupView::loadingDuration+180}){prepareStartup({},true);wait(time);hide();wait(30);cancellation&=!startup_view_&&!content_->isHidden()&&geometry()==finalGeometry&&minimumSize()==finalMinimum&&!glass_lightweight_;show();wait(30);}

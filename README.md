@@ -97,7 +97,7 @@ Change bindings in **Settings → Shortcuts**. Show/hide, Recoil, and weapon bin
 
 The download is a single-file installer. Program files normally live in `%LOCALAPPDATA%\Programs\Azec`; profiles, preferences, logs, and driver files live separately in `%LOCALAPPDATA%\Azec`. Use Azec from Start after installation; the downloaded EXE can then be deleted.
 
-Open **Settings → General → Updates → Check for updates** to look for a newer release. Installation asks for confirmation, verifies the download's SHA-256, and preserves the data folder.
+Azec checks for updates in the small startup window. If a newer release is available, the bar smoothly resets, shows download progress, and Azec installs the verified update and restarts before opening the main interface. Your saved settings are preserved. If the check cannot reach the server, a brief message appears and the app opens offline. If a confirmed update cannot be downloaded or verified, choose **Retry**. Automatic updates happen only at startup; **Settings → General → Updates → Check for updates** remains available for a manual check, with confirmation before installation.
 
 For a first installation from a portable copy, put the new EXE beside the existing portable settings and `runtime` folder and run it after closing the old app. Settings are copied only when the installed store is empty; originals are retained. Use Profile backup for later transfers.
 

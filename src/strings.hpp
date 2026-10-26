@@ -185,9 +185,15 @@ enum class UiText {
     StartupOperators,
     StartupControls,
     StartupWorkspace,
-    StartupReady,
+    StartupInterface,
+    StartupLoading,
+    StartupCheckingUpdates,
+    StartupDownloading,
+    StartupRestarting,
+    StartupCheckUnavailable,
+    StartupDownloadFailed,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::StartupReady)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::StartupDownloadFailed)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"
