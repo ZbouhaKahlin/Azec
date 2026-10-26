@@ -124,7 +124,7 @@ The setup script installs the pinned Qt kit in its standard location. Set `NEON_
 
 These commands do not run tests by default. The `test` argument includes the installer smoke test; `AZEC_SKIP_TESTS=1` still skips it.
 
-Publication requires an authenticated GitHub CLI, uploads only **Azec.exe** to [Azec-releases](https://github.com/Azec-Zuckerberg/Azec-releases), and runs `verify-release.ps1`. Verification matches the release version and GitHub asset digest with the local EXE and fresh anonymous downloads, including the stable download link. Source remains in the private Azec repository. Agents follow the complete [release workflow](AGENTS.md#releasing), including the source commit and push.
+Publication requires an authenticated GitHub CLI, uploads only **Azec.exe** to [Azec-releases](https://github.com/Azec-Zuckerberg/Azec-releases), and runs `verify-release.ps1`. Verification matches the release version and GitHub asset digest with the local EXE and fresh anonymous downloads, including the stable download link. Source remains in the private Azec repository. Agents follow the complete [release workflow](AGENTS.md#releasing), including the source commit and push, followed by publishing the identical EXE and version to the private Azec repository and verifying its digest and authenticated download.
 
 `package-release.ps1` creates the optional `dist/Azec-portable.zip` with an adjacent runtime. Both package formats exclude personal configuration, logs, pairing captures, stale executable backups, and verification executables.
 
