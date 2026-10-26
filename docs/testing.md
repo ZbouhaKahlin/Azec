@@ -40,7 +40,7 @@ These commands run from the repository root in PowerShell. Desktop-backed runner
 | Complete suite: console, behavior, desktop UI and headless phone browser | `.\build.cmd test --suite` |
 | Repeat the complete suite against current binaries | `python tests/run_checks.py --suite` |
 | Repeat behavior checks against an already current build | `python tests/run_checks.py` |
-| Switch motion, Save/Copy returns, and native corners after move/resize | `python tests/run_checks.py --interaction-motion-only` |
+| Switch motion, Save/Copy returns, glass clipping and move/resize corners | `python tests/run_checks.py --interaction-motion-only` |
 | Phone switch and Save return motion | `python tests/phone_browser_test.py --interaction-motion-only` |
 | Desktop checks at 100% | `python tests/run_checks.py --ui-only` |
 | Startup loading, expansion, content reveal, and interruption captures | `python tests/run_checks.py --startup-only` |

@@ -20,6 +20,7 @@
 #include "app_paths.hpp"
 #include "startup_view.hpp"
 #include "startup_update.hpp"
+#include "window_backdrop.hpp"
 #include <windows.h>
 #include <shellapi.h>
 #include <dwmapi.h>
@@ -73,6 +74,7 @@ class MainWindow final : public QWidget {
     bool favorites_shown_=false;
     QVector<QWidget*> preference_categories_;int preference_category_=0;
     bool glass_active_=false,glass_applied_=false,glass_lightweight_=false;
+    WindowBackdrop window_backdrop_;
     QVariantAnimation theme_motion_;
     QPointer<PageSnapshot> theme_snapshot_;
     QVariantAnimation operator_transition_;
@@ -875,8 +877,7 @@ class MainWindow final : public QWidget {
     }
 protected:
     void updateWindowShape(){
-        // Painting a curve alone leaves the native acrylic rectangle behind it.
-        // A Qt mask also clips the HWND's blur and child surfaces on Windows 10.
+        // The HWND region clips controls; the composition clip shapes the glass.
         QRegion region;
         if(!isMaximized()&&!isFullScreen()){
             const qreal radius=startup_view_?startup_view_->cornerRadius():16;
@@ -887,6 +888,11 @@ protected:
         // QWidget skips identical masks, even if a native material/move reset
         // the HWND region. QWindow reapplies it without briefly clearing it.
         if(auto* native=windowHandle())native->setMask(region);
+        syncWindowBackdrop();
+    }
+    void syncWindowBackdrop(){
+        const qreal radius=isMaximized()||isFullScreen()?0:startup_view_?startup_view_->cornerRadius():16;
+        window_backdrop_.sync(float(radius*devicePixelRatioF()),glass_active_&&!glass_lightweight_&&isVisible());
     }
     void paintEvent(QPaintEvent*) override {
         if(capturing_startup_)return;
@@ -906,11 +912,17 @@ protected:
         struct AttributeData{DWORD attribute;PVOID data;SIZE_T size;};
         static const auto setComposition=reinterpret_cast<BOOL(WINAPI*)(HWND,AttributeData*)>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
         if(!setComposition)return false;
-        // ACCENT_ENABLE_BLURBEHIND (3) uses flag 2; acrylic (4) uses flag 0.
+        const auto windows=QOperatingSystemVersion::current();
+        const bool windows10=windows.majorVersion()==10&&windows.microVersion()<22000;
+        const bool clipped=windows10&&!lightweight&&window_backdrop_.create(HWND(winId()));
+        // Whole-window acrylic on Windows 10 ignores the rounded HWND region.
+        // Its clipped host backdrop lives below Qt; retain blur while moving
+        // and as the fallback if composition is unavailable.
+        const DWORD material=lightweight||windows10&&!clipped?3u:clipped?0u:4u;
         // Leave the system tint nearly empty; Qt paints the inset shell.
         // Both themes keep glass active. Theme changes only repaint the tint,
         // avoiding the clear frame caused by disabling/re-enabling acrylic.
-        AccentPolicy policy{lightweight?3u:4u,lightweight?2u:0u,0x01000000u,0};
+        AccentPolicy policy{material,material==3?2u:0u,0x01000000u,0};
         AttributeData helper{19,reinterpret_cast<PVOID>(&policy),sizeof(policy)}; // WCA_ACCENT_POLICY
         if(!setComposition(HWND(winId()),&helper))return false;
         const bool wasActive=glass_active_;
@@ -935,6 +947,7 @@ protected:
         if(!startup_update_pending_)finishStartup();
         settleThemeTransition();
         if(glass_lightweight_)applyWindowGlass(false);
+        window_backdrop_.hide();
         if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);
     }
     // The one Save / Discard / Cancel prompt for leaving with unsaved edits,
@@ -1002,6 +1015,7 @@ protected:
     }
     bool nativeEvent(const QByteArray& type,void* message,qintptr* result) override {
         auto* msg=static_cast<MSG*>(message);
+        if(msg->message==WM_WINDOWPOSCHANGED)syncWindowBackdrop();
         if(msg->message==WM_ENTERSIZEMOVE&&glass_active_){
             // Windows 10 acrylic stalls native dragging. Plain blur keeps the
             // background translucent without that material's movement cost.
@@ -1021,6 +1035,7 @@ protected:
             if(top&&left)*result=HTTOPLEFT;else if(top&&right)*result=HTTOPRIGHT;else if(bottom&&left)*result=HTBOTTOMLEFT;else if(bottom&&right)*result=HTBOTTOMRIGHT;else if(left)*result=HTLEFT;else if(right)*result=HTRIGHT;else if(top)*result=HTTOP;else if(bottom)*result=HTBOTTOM;else return QWidget::nativeEvent(type,message,result);return true;}return QWidget::nativeEvent(type,message,result);
     }
 public:
+    ~MainWindow() override {poll_.stop();paint_.stop();qApp->removeEventFilter(this);window_backdrop_.reset();}
     explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path,bool waitForUpdate=false):engine_(engine),config_path_(std::move(config_path)),startup_update_pending_(waitForUpdate){
         kbtheme::initialize(uiprefs::lightTheme(config_path_));
         theme_motion_.setDuration(160);theme_motion_.setStartValue(0.0);theme_motion_.setEndValue(1.0);theme_motion_.setEasingCurve(monoEase());

@@ -196,6 +196,28 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 DeleteObject(region);return result;
             };
             checks["window_starts_with_native_rounded_corners"]=rounded();
+            const auto windows=QOperatingSystemVersion::current();
+            if(windows.majorVersion()==10&&windows.microVersion()>=18362&&windows.microVersion()<22000){
+                const HWND backdrop=window_backdrop_.handle();
+                const auto visible=[&]{return (GetWindowLongPtrW(backdrop,GWL_STYLE)&WS_VISIBLE)!=0;};
+                const auto aligned=[&]{RECT a{},b{};GetWindowRect(hwnd,&a);GetWindowRect(backdrop,&b);return EqualRect(&a,&b)&&GetWindow(backdrop,GW_HWNDPREV)==hwnd;};
+                checks["stationary_glass_has_a_real_composition_corner_clip"]=backdrop&&visible()&&window_backdrop_.clipMatchesOwner(float(16*devicePixelRatioF()));
+                checks["glass_is_behind_and_aligned_with_the_content"]=backdrop&&aligned();
+                const auto styles=GetWindowLongPtrW(backdrop,GWL_EXSTYLE);
+                checks["glass_has_no_activation_input_or_taskbar_surface"]=backdrop&&(styles&WS_EX_NOACTIVATE)&&(styles&WS_EX_TRANSPARENT)&&(styles&WS_EX_TOOLWINDOW)&&SendMessageW(backdrop,WM_NCHITTEST,0,0)==HTTRANSPARENT;
+                const auto active=GetActiveWindow();SendMessageW(hwnd,WM_ENTERSIZEMOVE,0,0);wait(20);
+                checks["dragging_uses_native_blur_without_a_second_backdrop"]=glass_lightweight_&&!visible();
+                SendMessageW(hwnd,WM_EXITSIZEMOVE,0,0);wait(40);
+                checks["release_restores_clipped_glass_without_activation"]=!glass_lightweight_&&visible()&&GetActiveWindow()==active&&window_backdrop_.clipMatchesOwner(float(16*devicePixelRatioF()));
+                const auto originalSize=size();resize(width()+24,height()+12);wait(30);
+                checks["glass_clip_tracks_resizing"]=aligned()&&window_backdrop_.clipMatchesOwner(float(16*devicePixelRatioF()));resize(originalSize);wait(30);
+                showMaximized();wait(60);checks["maximized_glass_clip_is_square"]=window_backdrop_.clipMatchesOwner(0);
+                showNormal();wait(60);checks["restoring_recovers_the_glass_corner_clip"]=aligned()&&window_backdrop_.clipMatchesOwner(float(16*devicePixelRatioF()));
+                hide();wait(20);checks["hiding_content_hides_the_glass"]=!visible();
+                show();wait(40);checks["reopening_restores_the_same_clipped_glass"]=window_backdrop_.handle()==backdrop&&visible()&&aligned()&&window_backdrop_.clipMatchesOwner(float(16*devicePixelRatioF()));
+                const bool originalLight=kbtheme::light;setLightTheme(!originalLight);wait(180);
+                checks["theme_change_preserves_the_glass_clip"]=window_backdrop_.handle()==backdrop&&visible()&&window_backdrop_.clipMatchesOwner(float(16*devicePixelRatioF()));setLightTheme(originalLight);wait(180);
+            }
             SendMessageW(hwnd,WM_ENTERSIZEMOVE,0,0);SetWindowRgn(hwnd,nullptr,TRUE);
             checks["native_region_reset_leaves_the_cached_qt_mask"]=!rounded()&&!mask().isEmpty();
             SendMessageW(hwnd,WM_EXITSIZEMOVE,0,0);wait(40);
