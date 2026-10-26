@@ -64,8 +64,8 @@ public:
         const qreal ratio=frame.devicePixelRatio();const QSize tile(qCeil((word_width_+24)*ratio),qCeil((text_height_+24)*ratio));
         for(const auto& word:words){
             QPixmap sharp(tile);sharp.setDevicePixelRatio(ratio);sharp.fill(Qt::transparent);
-            {QPainter p(&sharp);p.setFont(loading_font_);p.setPen(kbtheme::muted);p.drawText(QRectF(12,12,word_width_,text_height_),Qt::AlignVCenter|(rtl_?Qt::AlignRight:Qt::AlignLeft),word);}
-            words_.append({blur(sharp,10),blur(sharp,4),sharp});
+            {QPainter p(&sharp);p.setFont(loading_font_);p.setPen(kbtheme::muted);p.drawText(QRectF(12,12,word_width_,text_height_),Qt::AlignTop|(rtl_?Qt::AlignRight:Qt::AlignLeft),word);}
+            words_.append({blur(sharp,4),blur(sharp,1.5),sharp});
         }
         word_blend_=QImage(tile,QImage::Format_ARGB32_Premultiplied);word_blend_.setDevicePixelRatio(ratio);
         int revealDuration=0;
@@ -135,16 +135,17 @@ protected:
         const qreal entry=previous_status_.isEmpty()?1:smooth(qreal(time_)/240);
         if(entry<1){painter.setOpacity((1-exit)*(1-entry));painter.drawText(QRectF(center-174,barY+17,348,28),Qt::AlignHCenter|Qt::AlignTop|Qt::TextWordWrap,previous_status_);}
         painter.setOpacity((1-exit)*entry);
-        const qreal left=center-(label_width_+6+word_width_)/2,top=barY+17+(22-text_height_)/2.0;
+        // Share the update status's top alignment through the handoff and every subject.
+        const qreal left=center-(label_width_+6+word_width_)/2,top=barY+17;
         const qreal wordX=rtl_?left:left+label_width_+6;
-        painter.drawText(QRectF(rtl_?left+word_width_+6:left,top,label_width_,text_height_),Qt::AlignVCenter|(rtl_?Qt::AlignRight:Qt::AlignLeft),loading_label_);
+        painter.drawText(QRectF(rtl_?left+word_width_+6:left,top,label_width_,text_height_),Qt::AlignTop|(rtl_?Qt::AlignRight:Qt::AlignLeft),loading_label_);
         const qreal phase=std::fmod(qreal(qMin(time_,loadingDuration-1)),loadingStepDuration);
-        const qreal transition=smooth(phase/420);const int step=loadingStep();
-        const auto drawWord=[&](int index,qreal clarity,qreal opacity,qreal offset){
+        const qreal transition=smooth(phase/300);const int step=loadingStep();
+        const auto drawWord=[&](int index,qreal clarity,qreal opacity){
             interpolate(word_blend_,words_[index],clarity);painter.setOpacity((1-exit)*entry*opacity);
-            painter.drawImage(QPointF(wordX-12,top-12+offset),word_blend_);
+            painter.drawImage(QPointF(wordX-12,top-12),word_blend_);
         };
-        if(step>0&&transition<1)drawWord(step-1,1-transition,1-transition,-3*transition);
-        drawWord(step,step==0?1:transition,step==0?1:transition,step==0?0:3*(1-transition));
+        if(step>0&&transition<1)drawWord(step-1,1-transition,1-transition);
+        drawWord(step,step==0?1:transition,step==0?1:transition);
     }
 };
