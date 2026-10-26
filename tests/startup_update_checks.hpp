@@ -15,7 +15,18 @@ public:
     explicit StartupUpdateNetwork(const QUrl& origin):origin_(origin){}
 };
 
-inline QJsonObject startupUpdateChecks(const QString& output,QWidget* parent){
+class StartupHostEvents final : public QObject {
+public:
+    int shows=0,hides=0,nativeChanges=0;
+    bool eventFilter(QObject*,QEvent* event) override{
+        if(event->type()==QEvent::Show)++shows;
+        if(event->type()==QEvent::Hide)++hides;
+        if(event->type()==QEvent::WinIdChange)++nativeChanges;
+        return false;
+    }
+};
+
+inline QJsonObject startupUpdateChecks(const QString& output,std::function<QJsonObject(QNetworkAccessManager*)> handoff={}){
     using Phase=StartupUpdateWindow::Phase;
     QJsonObject checks;QTcpServer server;
     if(!server.listen(QHostAddress::LocalHost,0))return {{"passed",false},{"error","local fixture server"}};
@@ -56,11 +67,11 @@ inline QJsonObject startupUpdateChecks(const QString& output,QWidget* parent){
         StartupUpdateWindow window(1,target,[&]{++ready;},[&](const QString& path){
             ++installed;QFile file(path);verified=file.open(QIODevice::ReadOnly)&&QCryptographicHash::hash(file.readAll(),QCryptographicHash::Sha256).toHex()==digest;
             return scenario!="launch-failed";
-        },&network,parent);
+        },&network);
         window.show();window.start();qreal last=window.progress();QElapsedTimer clock;clock.start();
         while(clock.elapsed()<7000&&!ready&&window.phase()!=Phase::Retry&&!(installed&&scenario!="launch-failed")){
             compactWindow&=window.width()<=400&&window.height()<=232;const auto progress=window.progress();smooth&=qAbs(progress-last)<.22;last=progress;
-            if(window.phase()==Phase::Offline){offlineSeen=true;window.grab().save(output+"/startup-update-offline.png");}
+            if(window.phase()==Phase::Offline&&!offlineSeen){offlineSeen=true;window.grab().save(output+"/startup-update-offline.png");}
             if(window.phase()==Phase::Resetting)resetSeen=true;
             if(window.phase()==Phase::Downloading){downloadSeen=true;if(!QFileInfo::exists(output+"/startup-update-downloading.png"))window.grab().save(output+"/startup-update-downloading.png");}
             wait(16);
@@ -89,6 +100,7 @@ inline QJsonObject startupUpdateChecks(const QString& output,QWidget* parent){
         }
         window.close();QFile::remove(target);
     }
+    if(handoff){mode="current";StartupUpdateNetwork network(origin);const auto result=handoff(&network);for(auto it=result.begin();it!=result.end();++it)checks[it.key()]=it.value();}
     bool passed=true;for(const auto& check:checks)passed&=check.toBool();
     return {{"passed",passed},{"checks",checks},{"metadataRequests",metadataRequests},{"assetRequests",assetRequests}};
 }

@@ -19,6 +19,7 @@
 #include "update_check.hpp"
 #include "app_paths.hpp"
 #include "startup_view.hpp"
+#include "startup_update.hpp"
 #include <windows.h>
 #include <shellapi.h>
 #include <dwmapi.h>
@@ -106,6 +107,8 @@ class MainWindow final : public QWidget {
     BrandLabel* brand_=nullptr;
     QWidget* content_=nullptr;
     QPointer<StartupView> startup_view_;
+    QPointer<StartupUpdateWindow> startup_updater_;
+    bool startup_update_pending_=false;
     QRect startup_geometry_;QSize startup_minimum_;
     std::function<void()> startup_finished_;
     bool capturing_startup_=false;
@@ -929,7 +932,7 @@ protected:
         updateWindowShape();
     }
     void hideEvent(QHideEvent* event) override {
-        finishStartup();
+        if(!startup_update_pending_)finishStartup();
         settleThemeTransition();
         if(glass_lightweight_)applyWindowGlass(false);
         if(pairing_qr_)pairing_qr_->conceal();engine_.menu_visible=false;QWidget::hideEvent(event);
@@ -958,7 +961,7 @@ protected:
         }
         finishStartup();if(tray_)tray_->hide();phone_->stop();engine_.stop();QWidget::closeEvent(event);
     }
-    void resizeEvent(QResizeEvent* event) override {settleThemeTransition();QWidget::resizeEvent(event);updateWindowShape();if(startup_view_)startup_view_->setGeometry(rect());else layoutNotice();}
+    void resizeEvent(QResizeEvent* event) override {settleThemeTransition();QWidget::resizeEvent(event);updateWindowShape();if(startup_view_)startup_view_->setGeometry(rect());else layoutNotice();if(startup_updater_)startup_updater_->setGeometry(rect());}
     void changeEvent(QEvent* event) override {
         QWidget::changeEvent(event);
         if(event->type()==QEvent::WindowStateChange)updateWindowShape();
@@ -1018,7 +1021,7 @@ protected:
             if(top&&left)*result=HTTOPLEFT;else if(top&&right)*result=HTTOPRIGHT;else if(bottom&&left)*result=HTBOTTOMLEFT;else if(bottom&&right)*result=HTBOTTOMRIGHT;else if(left)*result=HTLEFT;else if(right)*result=HTRIGHT;else if(top)*result=HTTOP;else if(bottom)*result=HTBOTTOM;else return QWidget::nativeEvent(type,message,result);return true;}return QWidget::nativeEvent(type,message,result);
     }
 public:
-    explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path):engine_(engine),config_path_(std::move(config_path)){
+    explicit MainWindow(r6::Engine& engine,std::filesystem::path config_path,bool waitForUpdate=false):engine_(engine),config_path_(std::move(config_path)),startup_update_pending_(waitForUpdate){
         kbtheme::initialize(uiprefs::lightTheme(config_path_));
         theme_motion_.setDuration(160);theme_motion_.setStartValue(0.0);theme_motion_.setEndValue(1.0);theme_motion_.setEasingCurve(monoEase());
         connect(&theme_motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){if(theme_snapshot_)theme_snapshot_->setProgress(value.toReal());});
@@ -1050,23 +1053,36 @@ public:
         connect(search_,&QLineEdit::textChanged,this,[this]{filterOperators();});
         operator_transition_.setDuration(120);operator_transition_.setStartValue(.35);operator_transition_.setEndValue(1.0);operator_transition_.setEasingCurve(QEasingCurve::InOutQuad);
         connect(&operator_transition_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){name_opacity_->setOpacity(value.toReal());icon_opacity_->setOpacity(value.toReal());});
-        phone_=new PhoneServer([this]{return mobileState();},[this](const QJsonObject& request){return mobileUpdate(request);},this);if(c.phone_enabled)phone_->start();
+        phone_=new PhoneServer([this]{return mobileState();},[this](const QJsonObject& request){return mobileUpdate(request);},this);if(c.phone_enabled&&!startup_update_pending_)phone_->start();
         phone_->onNetworkChanged([this]{updatePhoneDetails();});
         notice_timer_.setSingleShot(true);notice_timer_.setInterval(8000);connect(&notice_timer_,&QTimer::timeout,this,[this]{notice_bar_->hide();});
         buildPreferences();
-        if(c.phone_enabled&&!phone_->listening()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}
-        buildSettings();updateLanguage();applyStyle();buildTray();qApp->installEventFilter(this);
+        if(c.phone_enabled&&!startup_update_pending_&&!phone_->listening()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}
+        buildSettings();updateLanguage();applyStyle();if(!startup_update_pending_)buildTray();qApp->installEventFilter(this);
         auto* saveShortcut=new QShortcut(QKeySequence::Save,this);connect(saveShortcut,&QShortcut::activated,this,[this]{save(true);});
         auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{showOperators();search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();});
         auto* escapeShortcut=new QShortcut(QKeySequence(Qt::Key_Escape),this);connect(escapeShortcut,&QShortcut::activated,this,[this]{if(notice_bar_->isVisible()){notice_timer_.stop();notice_bar_->hide();}else if(pages_->currentWidget()==preferences_)showOperators();else if(!search_->text().isEmpty())search_->clear();});
-        clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});paint_.start();
+        for(auto* shortcut:findChildren<QShortcut*>())shortcut->setEnabled(!startup_update_pending_);
+        clock_.start();poll_.setInterval(8);connect(&poll_,&QTimer::timeout,this,[this]{pollKeys();});if(!startup_update_pending_)poll_.start();paint_.setInterval(50);connect(&paint_,&QTimer::timeout,this,[this]{if(isVisible()&&!isMinimized()){const auto current=mapFromGlobal(QCursor::pos());trackCursor(current);}});if(!startup_update_pending_)paint_.start();
     }
 
+    void checkStartupUpdates(const QString& target,std::function<bool(const QString&)> install,std::function<void()> ready={},QNetworkAccessManager* network=nullptr){
+        startup_updater_=new StartupUpdateWindow(engine_.snapshot().language,target,[this,ready]{
+            const auto status=startup_updater_->message();startup_updater_->hide();startup_updater_->deleteLater();
+            startup_update_pending_=false;content_->setEnabled(true);engine_.start();
+            if(engine_.snapshot().phone_enabled&&!phone_->start()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);notice_bar_->setProperty("phoneError",true);}
+            updatePhoneDetails();buildTray();poll_.start();paint_.start();for(auto* shortcut:findChildren<QShortcut*>())shortcut->setEnabled(true);
+            BOOL animations=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&animations,0);
+            if(startup_view_){startup_view_->show();startup_view_->raise();if(animations)startup_view_->start(status);else finishStartup();}
+            if(ready)ready();
+        },std::move(install),network,this);
+        startup_updater_->show();startup_updater_->raise();QTimer::singleShot(0,startup_updater_,&StartupUpdateWindow::start);
+    }
     void capture(const QString& file){grab().save(file);}
     void prepareStartup(std::function<void()> finished={},bool forceMotion=false){
         if(startup_view_)return;
         BOOL animations=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&animations,0);
-        if(!forceMotion&&!animations){if(finished)QTimer::singleShot(0,this,std::move(finished));return;}
+        if(!forceMotion&&!animations&&!startup_update_pending_){if(finished)QTimer::singleShot(0,this,std::move(finished));return;}
         startup_finished_=std::move(finished);startup_geometry_=geometry();startup_minimum_=minimumSize();
         ensurePolished();layout()->activate();content_->resize(size());
         // Rendering before hiding resolves all nested layout requests without
@@ -1096,12 +1112,13 @@ public:
         const QSize compactSize(qMin(400,width()),qMin(232,height()));const QRect compact(startup_geometry_.center()-QPoint(compactSize.width()/2,compactSize.height()/2),compactSize);
         startup_view_=new StartupView(frame,pieces,compact,startup_geometry_,bounds(brand_),engine_.snapshot().language,this,
             [this](const QRect& rectangle){if(geometry()!=rectangle)setGeometry(rectangle);},[this]{finishStartup();});
-        layout()->setEnabled(false);content_->hide();notice_bar_->setProperty("startupVisible",!notice_bar_->isHidden());notice_bar_->hide();
-        setMinimumSize(0,0);setGeometry(compact);startup_view_->setGeometry(rect());startup_view_->show();startup_view_->raise();
-        QTimer::singleShot(0,startup_view_,[view=startup_view_]{if(view)view->start();});
+        layout()->setEnabled(false);content_->hide();content_->setEnabled(!startup_update_pending_);notice_bar_->setProperty("startupVisible",!notice_bar_->isHidden());notice_bar_->hide();
+        setMinimumSize(0,0);setGeometry(compact);startup_view_->setGeometry(rect());
+        if(startup_update_pending_)startup_view_->hide();
+        else{startup_view_->show();startup_view_->raise();QTimer::singleShot(0,startup_view_,[view=startup_view_]{if(view)view->start();});}
     }
     void finishStartup(){
-        if(!startup_view_)return;
+        if(!startup_view_||startup_update_pending_)return;
         auto* view=startup_view_.data();startup_view_=nullptr;view->stop();
         setUpdatesEnabled(false);setGeometry(startup_geometry_);setMinimumSize(startup_minimum_);layout()->setEnabled(true);content_->show();layout()->activate();
         view->hide();view->deleteLater();layoutNotice();updateWindowShape();

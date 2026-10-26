@@ -37,30 +37,21 @@ int main(int argc,char** argv){
     }
     const auto captureFolder=azec_paths::argument("--capture-ui=");
     r6::Engine engine(dryrun);const auto recovery=loadConfiguration(engine,configPath);DesktopTranslator translator([&]{return engine.snapshot().language;});app.installTranslator(&translator);
-    std::unique_ptr<MainWindow> window;QPointer<StartupUpdateWindow> updater;
-    const auto openDesktop=[&]{
-        engine.start();window=std::make_unique<MainWindow>(engine,configPath);window->setStartupNotice(recovery.notice,recovery.blockSaving);instance.onActivate(window.get());
-        if(!selftest)window->prepareStartup([&]{if(dryrun&&!captureFolder.isEmpty())QTimer::singleShot(300,window.get(),[&]{window->captureDocumentation(captureFolder);});});
-        window->show();if(!phoneInfo.isEmpty())window->writePhoneInfo(phoneInfo);
-        if(updater){updater->hide();updater->deleteLater();}
+    if(dryrun)engine.start();
+    MainWindow window(engine,configPath,!dryrun);window.setStartupNotice(recovery.notice,recovery.blockSaving);instance.onActivate(&window);
+    if(!selftest)window.prepareStartup([&]{if(dryrun&&!captureFolder.isEmpty())QTimer::singleShot(300,&window,[&]{window.captureDocumentation(captureFolder);});});
+    // Checking and loading share this HWND; services stay paused until checking ends.
+    if(!dryrun)window.checkStartupUpdates(azec_paths::pendingUpdate(),[&](const QString& file){
+        QProcess process;process.setProgram(file);process.setArguments(azec_paths::updateArguments());
+        process.setWorkingDirectory(QFileInfo(azec_paths::launcher()).absolutePath());
+        if(!process.startDetached())return false;app.quit();return true;
+    },[&]{if(!phoneInfo.isEmpty())window.writePhoneInfo(phoneInfo);});
+    window.show();if(dryrun&&!phoneInfo.isEmpty())window.writePhoneInfo(phoneInfo);
 #ifdef AZEC_UI_TESTS
-        if(selftest)QTimer::singleShot(700,window.get(),[&]{const auto report=window->selfTest(output);QSaveFile file(output+"/ui-verification.json");const auto bytes=QJsonDocument(report).toJson();const bool written=file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();if(!written)diagnostic("verification report",file.errorString());testResult=written&&report["passed"].toBool()?0:2;QTimer::singleShot(150,window.get(),[&]{window->finishVerification();});});
+    if(selftest)QTimer::singleShot(700,&window,[&]{const auto report=window.selfTest(output);QSaveFile file(output+"/ui-verification.json");const auto bytes=QJsonDocument(report).toJson();const bool written=file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();if(!written)diagnostic("verification report",file.errorString());testResult=written&&report["passed"].toBool()?0:2;QTimer::singleShot(150,&window,[&]{window.finishVerification();});});
 #endif
-    };
-    // Dry-run fixtures never contact GitHub or execute an updater. The focused
-    // updater checks exercise this window with a local, scripted transport.
-    if(dryrun)openDesktop();
-    else{
-        updater=new StartupUpdateWindow(engine.snapshot().language,azec_paths::pendingUpdate(),openDesktop,[&](const QString& file){
-            QProcess process;process.setProgram(file);process.setArguments(azec_paths::updateArguments());
-            process.setWorkingDirectory(QFileInfo(azec_paths::launcher()).absolutePath());
-            if(!process.startDetached())return false;app.quit();return true;
-        });
-        instance.onActivate(updater);updater->show();QTimer::singleShot(0,updater,&StartupUpdateWindow::start);
-    }
-    if(duration>0)QTimer::singleShot(duration,&app,[&]{if(window)window->closeForTimeout();else if(updater)updater->close();});
+    if(duration>0)QTimer::singleShot(duration,&window,[&]{window.closeForTimeout();});
     result=app.exec();engine.stop();
-    if(updater)delete updater;
     }
     return selftest?testResult:result;
 }

@@ -7,7 +7,35 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
         // Pause global hotkey polling; fixture actions call production handlers directly.
         poll_.stop();
-        if(QCoreApplication::arguments().contains("--startup-update-only"))return startupUpdateChecks(output,this);
+        if(QCoreApplication::arguments().contains("--startup-update-only"))return startupUpdateChecks(output,[&](QNetworkAccessManager* network){
+            QJsonObject checks;const QString fixture=output+"/continuous-startup";QDir().mkpath(fixture);r6::Engine staged(true);
+            staged.edit([](r6::Config& config){config.language=1;config.phone_enabled=true;});
+            MainWindow host(staged,std::filesystem::path(fixture.toStdWString())/L"r6_config.bin",true);host.prepareStartup({},true);
+            const auto handle=host.winId();const QRect compact=host.geometry();StartupHostEvents events;host.installEventFilter(&events);
+            int ready=0,installs=0;host.checkStartupUpdates(fixture+"/Azec.new.exe",[&](const QString&){++installs;return false;},[&]{++ready;},network);host.show();
+            checks["update_check_has_no_separate_native_window"]=host.startup_updater_&&!host.startup_updater_->isWindow()&&!host.startup_updater_->testAttribute(Qt::WA_NativeWindow)&&host.startup_updater_->window()==&host;
+            checks["only_the_update_layer_draws_during_checking"]=host.startup_view_->isHidden()&&host.startup_updater_->isVisible();
+            checks["services_and_editing_stay_paused_during_check"]=!staged.running&&!host.phone_->listening()&&!host.poll_.isActive()&&!host.paint_.isActive()&&!host.tray_&&host.content_->isHidden()&&!host.content_->isEnabled();
+            bool shortcutsPaused=true;for(auto* shortcut:host.findChildren<QShortcut*>())shortcutsPaused&=!shortcut->isEnabled();checks["shortcuts_stay_paused_during_check"]=shortcutsPaused;
+            host.hide();wait(30);host.show();wait(30);checks["hiding_during_check_does_not_expose_the_desktop"]=host.geometry()==compact&&host.content_->isHidden()&&host.startup_update_pending_;
+            events.shows=events.hides=events.nativeChanges=0;QImage before;QElapsedTimer elapsed;elapsed.start();
+            while(!ready&&elapsed.elapsed()<4000){
+                if(host.startup_updater_&&host.startup_updater_->phase()==StartupUpdateWindow::Phase::Complete&&before.isNull())before=host.grab().toImage();
+                wait(8);
+            }
+            const QImage after=host.grab().toImage();
+            if(!before.isNull())before.save(output+"/startup-continuous-before.png");after.save(output+"/startup-continuous-after.png");
+            checks["check_to_loading_keeps_native_window_and_geometry"]=ready==1&&installs==0&&host.winId()==handle&&host.geometry()==compact&&host.isVisible()&&events.shows==0&&events.hides==0&&events.nativeChanges==0;
+            const auto sameRegion=[&](const QRect& region){return !before.isNull()&&before.copy(region)==after.copy(region);};
+            checks["logo_does_not_jump_between_checking_and_loading"]=sameRegion(QRect(106,43,188,66));
+            checks["bar_does_not_reset_when_no_update_is_needed"]=sameRegion(QRect(76,148,48,5))&&host.startup_view_&&host.startup_view_->loadingProgress()>=.25&&host.startup_view_->loadingProgress()<.251;
+            checks["services_resume_only_after_checking"]=staged.running&&host.phone_->listening()&&host.poll_.isActive()&&!host.startup_update_pending_;
+            host.poll_.stop();host.grab().save(output+"/startup-continuous-loading.png");
+            elapsed.restart();while(host.startup_view_&&elapsed.elapsed()<5500)wait(16);
+            checks["checking_loading_and_expansion_share_one_visible_window"]=!host.startup_view_&&host.winId()==handle&&host.isVisible()&&events.shows==0&&events.hides==0&&events.nativeChanges==0;
+            checks["live_controls_are_enabled_after_the_reveal"]=!host.content_->isHidden()&&host.content_->isEnabled();
+            host.removeEventFilter(&events);host.close();return checks;
+        });
         if(QCoreApplication::arguments().contains("--startup-only")){
             const bool timingOnly=QCoreApplication::arguments().contains("--startup-timing-only");
             QJsonObject checks;QJsonArray frames;const QRect finalGeometry=geometry();const QSize finalMinimum=minimumSize();const auto handle=winId();

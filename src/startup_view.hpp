@@ -16,6 +16,7 @@ private:
     QVector<Piece> pieces_;
     QRect compact_,expanded_;QRectF brand_target_;
     QString loading_label_;QFont loading_font_;QVector<std::array<QPixmap,3>> words_;QImage word_blend_;
+    QString previous_status_;
     qreal label_width_=0,word_width_=0;int text_height_=0;bool rtl_=false;QVariantAnimation timeline_;
     int time_=0,total_=0;std::function<void(const QRect&)> geometry_;std::function<void()> finished_;
 #ifdef AZEC_UI_TESTS
@@ -81,7 +82,8 @@ public:
         connect(&timeline_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){advance(value.toInt());});
         connect(&timeline_,&QVariantAnimation::finished,this,[this]{finished_();});
     }
-    void start(){
+    void start(const QString& previousStatus={}){
+        previous_status_=previousStatus;
 #ifdef AZEC_UI_TESTS
         timing_clock_.start();
 #endif
@@ -130,13 +132,16 @@ protected:
         const QRectF bar(center-124,barY,248,3);painter.setPen(Qt::NoPen);painter.setBrush(kbtheme::content(.09));painter.drawRoundedRect(bar,1.5,1.5);
         painter.setBrush(kbtheme::defaultAccent);QRectF fill=bar;fill.setWidth(bar.width()*loadingProgress());painter.drawRoundedRect(fill,1.5,1.5);
         painter.setFont(loading_font_);painter.setPen(kbtheme::muted);
+        const qreal entry=previous_status_.isEmpty()?1:smooth(qreal(time_)/240);
+        if(entry<1){painter.setOpacity((1-exit)*(1-entry));painter.drawText(QRectF(center-174,barY+17,348,28),Qt::AlignHCenter|Qt::AlignTop|Qt::TextWordWrap,previous_status_);}
+        painter.setOpacity((1-exit)*entry);
         const qreal left=center-(label_width_+6+word_width_)/2,top=barY+17+(22-text_height_)/2.0;
         const qreal wordX=rtl_?left:left+label_width_+6;
         painter.drawText(QRectF(rtl_?left+word_width_+6:left,top,label_width_,text_height_),Qt::AlignVCenter|(rtl_?Qt::AlignRight:Qt::AlignLeft),loading_label_);
         const qreal phase=std::fmod(qreal(qMin(time_,loadingDuration-1)),loadingStepDuration);
         const qreal transition=smooth(phase/420);const int step=loadingStep();
         const auto drawWord=[&](int index,qreal clarity,qreal opacity,qreal offset){
-            interpolate(word_blend_,words_[index],clarity);painter.setOpacity((1-exit)*opacity);
+            interpolate(word_blend_,words_[index],clarity);painter.setOpacity((1-exit)*entry*opacity);
             painter.drawImage(QPointF(wordX-12,top-12+offset),word_blend_);
         };
         if(step>0&&transition<1)drawWord(step-1,1-transition,1-transition,-3*transition);

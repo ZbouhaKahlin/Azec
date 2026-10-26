@@ -5,7 +5,7 @@
 #include "update_check.hpp"
 #include <windows.h>
 
-// Runs before the Engine workers, phone server, and editable desktop exist.
+// Covers the desktop while its workers, phone server, and controls are inactive.
 class StartupUpdateWindow final : public QWidget {
 public:
     enum class Phase {Checking,Resetting,Downloading,Restarting,Offline,Retry,Complete};
@@ -54,17 +54,17 @@ private:
 public:
     StartupUpdateWindow(int language,const QString& target,std::function<void()> ready,std::function<bool(const QString&)> install,
                         QNetworkAccessManager* network=nullptr,QWidget* parent=nullptr)
-        :QWidget(parent,Qt::Window|Qt::FramelessWindowHint),language_(language),network_(network?network:new QNetworkAccessManager(this)),
+        :QWidget(parent,parent?Qt::Widget:Qt::Window|Qt::FramelessWindowHint),language_(language),network_(network?network:new QNetworkAccessManager(this)),
          target_(target),ready_(std::move(ready)),install_(std::move(install)){
-        setObjectName("startupUpdate");setWindowTitle("Azec");setAccessibleName("Azec");setAttribute(Qt::WA_TranslucentBackground);
+        setObjectName("startupUpdate");setWindowTitle("Azec");setAccessibleName("Azec");setAttribute(parent?Qt::WA_NoSystemBackground:Qt::WA_TranslucentBackground);
         setWindowIcon(QIcon(":/ui/app-icon.svg"));setLayoutDirection(language==5||language==6?Qt::RightToLeft:Qt::LeftToRight);
-        const auto area=QGuiApplication::primaryScreen()->availableGeometry();resize(qMin(400,area.width()-32),qMin(232,area.height()-32));move(area.center()-rect().center());
-        setStyleSheet(applicationStyle(kbtheme::defaultAccent));
+        if(parent)setGeometry(parent->rect());
+        else{const auto area=QGuiApplication::primaryScreen()->availableGeometry();resize(qMin(400,area.width()-32),qMin(232,area.height()-32));move(area.center()-rect().center());setStyleSheet(applicationStyle(kbtheme::defaultAccent));}
         BOOL enabled=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0);motion_=enabled;
         retry_=new MonoButton(text(UiText::Retry));retry_->setParent(this);retry_->setObjectName("secondary");retry_->setGeometry(width()/2-45,height()-35,90,28);retry_->hide();
         connect(retry_,&QPushButton::clicked,this,[this]{start();});
         auto* close=new IconButton(":/ui/close.svg",[]{return kbtheme::defaultAccent;});close->setParent(this);close->setObjectName("closeControl");close->setAccessibleName(text(UiText::Close));close->setToolTip(text(UiText::Close));close->setGeometry(width()-38,6,32,32);
-        connect(close,&QPushButton::clicked,this,&QWidget::close);
+        connect(close,&QPushButton::clicked,this,[this]{if(parentWidget())parentWidget()->close();else this->close();});
         progress_motion_.setEasingCurve(QEasingCurve::InOutCubic);text_motion_.setEasingCurve(monoEase());
         connect(&progress_motion_,&QVariantAnimation::valueChanged,this,[this](const QVariant& value){progress_=value.toReal();update();});
         connect(&progress_motion_,&QVariantAnimation::finished,this,[this]{auto next=std::move(after_progress_);if(next)next();});
@@ -83,7 +83,8 @@ public:
     QString message() const{return message_;}
 protected:
     void showEvent(QShowEvent* event) override{
-        QWidget::showEvent(event);QPainterPath shape;shape.addRoundedRect(QRectF(rect()),24,24);const QRegion region(shape.toFillPolygon().toPolygon());setMask(region);
+        QWidget::showEvent(event);if(parentWidget())return;
+        QPainterPath shape;shape.addRoundedRect(QRectF(rect()),24,24);const QRegion region(shape.toFillPolygon().toPolygon());setMask(region);
         struct Policy{DWORD state,flags,color,animation;};struct Data{DWORD attribute;PVOID data;SIZE_T size;};
         static const auto apply=reinterpret_cast<BOOL(WINAPI*)(HWND,Data*)>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
         if(apply){Policy policy{4,0,0x01000000,0};Data data{19,&policy,sizeof(policy)};glass_=apply(HWND(winId()),&data);}
@@ -92,7 +93,7 @@ protected:
     void paintEvent(QPaintEvent*) override{
         QPainter painter(this);painter.setRenderHint(QPainter::Antialiasing);painter.setRenderHint(QPainter::SmoothPixmapTransform);
         QPainterPath shape;shape.addRoundedRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5),24,24);
-        painter.fillPath(shape,glass_?kbtheme::windowGlass:kbtheme::paper);if(glass_)painter.fillPath(shape,kbtheme::windowWash);
+        if(!parentWidget()){painter.fillPath(shape,glass_?kbtheme::windowGlass:kbtheme::paper);if(glass_)painter.fillPath(shape,kbtheme::windowWash);}
         BrandLabel::draw(painter,QRectF(width()/2.0-94,43,188,66),devicePixelRatioF());
         const QRectF bar(width()/2.0-124,height()*.64,248,3);painter.setPen(Qt::NoPen);painter.setBrush(kbtheme::content(.09));painter.drawRoundedRect(bar,1.5,1.5);
         auto fill=bar;fill.setWidth(bar.width()*progress_);painter.setBrush(kbtheme::defaultAccent);painter.drawRoundedRect(fill,1.5,1.5);
