@@ -29,6 +29,7 @@ echo Unknown argument: %~1
 goto usage
 :argumentsready
 if defined QUICK if defined DO_PUBLISH goto usage
+if defined DO_PUBLISH goto publishdispatch
 
 set "AZEC_SHARE_ROOT=%AZEC_SCRIPT_DIR%"
 rem Quick repackaging must retain the compiled app's version.
@@ -117,6 +118,8 @@ copy /y "%R6_CRT%\*.dll" "%PAYLOAD%\runtime\" > nul
 if errorlevel 1 exit /b 1
 xcopy /e /i /y "licenses" "%PAYLOAD%\licenses" > nul
 if errorlevel 1 exit /b 1
+copy /y "LICENSE" "%PAYLOAD%\LICENSE" > nul
+if errorlevel 1 exit /b 1
 
 rem ------------------------------------------------- pack and build one exe
 if exist .build\share-payload.zip del /q .build\share-payload.zip
@@ -145,27 +148,25 @@ if not defined RUN_TESTS (
 python tests\installation_test.py --smoke
 if errorlevel 1 exit /b 1
 
-rem ------------------------------------------------------------- publishing
+rem ----------------------------------------------------------- local record
 :publishing
-if not defined DO_PUBLISH goto report
-gh repo view Azec-Zuckerberg/Azec-releases > nul 2>&1
-if errorlevel 1 (
-    echo Creating the public releases repository Azec-Zuckerberg/Azec-releases ...
-    gh repo create Azec-Zuckerberg/Azec-releases --public --description "Azec portable release builds" --add-readme
-    if errorlevel 1 exit /b 1
-)
-gh release create "v%VERSION%" "dist\Azec.exe" --repo Azec-Zuckerberg/Azec-releases --title "Azec %VERSION%" --notes "Open Azec.exe to install and launch for your Windows user. Find Azec in Start afterward. Profiles are kept separately in LocalAppData\Azec and preserved by Settings - Updates."
-if errorlevel 1 exit /b 1
-powershell -NoProfile -File "%AZEC_SCRIPT_DIR%verify-release.ps1" -Version "%VERSION%"
+powershell -NoProfile -Command "$hash=(Get-FileHash -LiteralPath 'dist\Azec.exe' -Algorithm SHA256).Hash.ToLowerInvariant(); [IO.File]::WriteAllText((Join-Path (Get-Location) 'dist\SHA256SUMS.txt'),$hash+'  Azec.exe'+[Environment]::NewLine,[Text.Encoding]::ASCII)"
 if errorlevel 1 exit /b 1
 
 :report
 echo.
 echo Built dist\Azec.exe   (Azec %VERSION%)
 echo Send that single file. Your friend opens it, then finds Azec in Start.
-if defined DO_PUBLISH echo https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe
 endlocal
 exit /b 0
+
+:publishdispatch
+if defined RUN_TESTS (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%AZEC_SCRIPT_DIR%build-and-push.ps1" -Test
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%AZEC_SCRIPT_DIR%build-and-push.ps1"
+)
+exit /b %errorlevel%
 
 :help
 echo Usage: share.cmd [quick ^| publish] [test]

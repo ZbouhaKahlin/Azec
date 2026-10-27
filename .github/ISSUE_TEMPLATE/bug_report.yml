@@ -1,0 +1,31 @@
+name: Bug report
+description: Report an Azec problem with steps to reproduce it.
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities, use the Security tab's private report form. Do not include pairing codes, token links, revealed QR images, or personal profiles."
+  - type: input
+    id: environment
+    attributes:
+      label: Azec and Windows versions
+      placeholder: "Azec version, Windows 10/11 version, installer or source build"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: List the steps, including whether the desktop, tray, or phone is involved.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Relevant evidence
+      description: Include sanitized screenshots or error text if useful. Explain anything you could not check.

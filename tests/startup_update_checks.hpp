@@ -34,7 +34,7 @@ inline QJsonObject startupUpdateChecks(const QString& output,std::function<QJson
     QString mode="current";int metadataRequests=0,assetRequests=0;
     const auto metadata=[&]{
         const QString tag=mode=="current"?"v"+QCoreApplication::applicationVersion():"v2099.1.1";
-        const QJsonObject asset{{"name","Azec.exe"},{"browser_download_url","https://github.com/Azec-Zuckerberg/Azec-releases/releases/download/"+tag+"/Azec.exe"},
+        const QJsonObject asset{{"name","Azec.exe"},{"browser_download_url","https://github.com/Azec-Zuckerberg/Azec/releases/download/"+tag+"/Azec.exe"},
                                 {"digest",mode=="missing-hash"?QString():"sha256:"+QString::fromLatin1(digest)}};
         return QJsonDocument(QJsonObject{{"tag_name",tag},{"assets",QJsonArray{asset}}}).toJson(QJsonDocument::Compact);
     };

@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 foreach ($moduleName in @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')) {
     Import-Module (Join-Path $PSHOME "Modules\$moduleName\$moduleName.psd1") -ErrorAction Stop
 }
-$repo = 'Azec-Zuckerberg/Azec-releases'
+$repo = 'Azec-Zuckerberg/Azec'
 $tag = "v$Version"
 $localExe = Join-Path $PSScriptRoot 'dist\Azec.exe'
 $versionHeader = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\version.hpp') -Raw
@@ -24,16 +24,24 @@ $release = $null
 for ($attempt = 0; $attempt -lt 5; $attempt++) {
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tag" -Headers $headers -TimeoutSec 30
     $assets = @($release.assets)
-    if ($assets.Count -eq 1 -and $assets[0].digest -match '^sha256:[0-9a-fA-F]{64}$') { break }
+    if ($assets.Count -eq 2 -and @($assets | Where-Object { $_.digest -notmatch '^sha256:[0-9a-fA-F]{64}$' }).Count -eq 0) { break }
     if ($attempt -lt 4) { Start-Sleep -Seconds 2 }
 }
 if ($release.tag_name -cne $tag -or $release.draft -or $release.prerelease) {
     throw 'The uploaded release is not the expected stable tag.'
 }
-if ($assets.Count -ne 1 -or $assets[0].name -cne 'Azec.exe') {
-    throw 'The public release must contain only Azec.exe.'
+if ($assets.Count -ne 2 -or ((@($assets.name | Sort-Object) -join ',')) -cne 'Azec.exe,SHA256SUMS.txt') {
+    throw 'The public release must contain Azec.exe and SHA256SUMS.txt only.'
 }
-$asset = $assets[0]
+$asset = @($assets | Where-Object { $_.name -ceq 'Azec.exe' })[0]
+$checksumAsset = @($assets | Where-Object { $_.name -ceq 'SHA256SUMS.txt' })[0]
+$checksumFile = Join-Path $PSScriptRoot 'dist/SHA256SUMS.txt'
+$checksumHash = (Get-FileHash -LiteralPath $checksumFile -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($checksumAsset.digest -cne ('sha256:' + $checksumHash) -or (Get-Content -LiteralPath $checksumFile -Raw).Trim() -cne ($localHash + '  Azec.exe')) { throw 'Published checksum file does not match the installer record.' }
+$expectedCommit = & git -C $PSScriptRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve local source commit.' }
+$sourceCommit = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/commits/$tag" -Headers $headers -TimeoutSec 30
+if ($sourceCommit.sha -cne $expectedCommit.Trim()) { throw 'The release tag does not identify the built source commit.' }
 if ($asset.digest -notmatch '^sha256:([0-9a-fA-F]{64})$') { throw 'GitHub asset SHA-256 digest is missing.' }
 $publishedHash = $Matches[1].ToLowerInvariant()
 if ($publishedHash -cne $localHash) { throw 'GitHub asset digest differs from dist/Azec.exe.' }

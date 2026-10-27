@@ -1,10 +1,16 @@
 # Azec
 
-Azec uses the **MonoCode** design with Dark and Light themes. The redesign lives on `main`; the original interface is retained on the `goofy` branch.
+**Open-source Rainbow Six operator and weapon profiles for Windows**, built with C++17 and Qt 6.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Azec-Zuckerberg/Azec)](https://github.com/Azec-Zuckerberg/Azec/releases/latest)
+![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-555.svg)
+
+Azec uses the **MonoCode** design with Dark and Light themes. The current application lives on `main`; experimental editions remain on separate branches.
 
 A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 operators, independent primary and secondary weapon settings, and a companion phone interface on your local network.
 
-[Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec-releases/releases) · [Application reference](docs/reference.md)
+[Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec/releases) · [Application reference](docs/reference.md)
 
 ![Azec desktop and connected phone interface showing the same Ash profile](docs/showcase-11J.png)
 
@@ -124,11 +130,23 @@ The setup script installs the pinned Qt kit in its standard location. Set `NEON_
 
 These commands do not run tests by default. The `test` argument includes the installer smoke test; `AZEC_SKIP_TESTS=1` still skips it.
 
-Publication requires an authenticated GitHub CLI, uploads only **Azec.exe** to [Azec-releases](https://github.com/Azec-Zuckerberg/Azec-releases), and runs `verify-release.ps1`. Verification matches the release version and GitHub asset digest with the local EXE and fresh anonymous downloads, including the stable download link. Source remains in the private Azec repository. Agents follow the complete [release workflow](AGENTS.md#releasing), including the source commit and push, followed by publishing the identical EXE and version to the private Azec repository and verifying its digest and authenticated download.
+Source and releases live together in this public repository. From a clean `main` checkout with your intended changes committed, run `.\build-and-push.ps1` (or `.\share.cmd publish`). It builds the installer, records its SHA-256, commits the generated version, pushes `main`, and publishes `Azec.exe` and `SHA256SUMS.txt` under a version tag targeting that source commit. An authenticated GitHub CLI with repository write access is required. Tests remain opt-in: use `-Test` or `share.cmd publish test` for the isolated installer smoke check.
+
+`verify-release.ps1` checks the source tag, local installer, GitHub asset digests, and fresh anonymous downloads, including the stable latest-download link. If publication stops after building, use `build-and-push.ps1 -ResumeVersion <numeric-version>` with the original matching installer; existing assets are verified rather than replaced. See the complete [release workflow](AGENTS.md#releasing).
+
+The app checks this repository for updates at startup. Copies that point to the retired releases-only repository need to install the current download once to switch update locations. The `unknown-cheats` edition keeps its separate offline startup and manual-update policy.
 
 `package-release.ps1` creates the optional `dist/Azec-portable.zip` with an adjacent runtime. Both package formats exclude personal configuration, logs, pairing captures, stale executable backups, and verification executables.
 
-## Documentation and attribution
+## Contributing and security
+
+Start with [Contributing](CONTRIBUTING.md) for setup, a code map, and guidance for your first focused change. Report ordinary bugs in [Issues](https://github.com/Azec-Zuckerberg/Azec/issues), and report vulnerabilities privately using the [security policy](SECURITY.md).
+
+## License and attribution
+
+Azec's original code is available under the [MIT license](LICENSE). Bundled third-party code, assets, and Qt retain their own licenses and notices in [licenses](licenses/). The MIT license does not replace those terms. Azec is an independent project and is not affiliated with Ubisoft.
+
+## Documentation
 
 - [Application reference](docs/reference.md): detailed behavior, storage, and phone control.
 - [Agent instructions](AGENTS.md): project boundaries, compatibility, design, and delivery rules. [CLAUDE.md](CLAUDE.md) imports the same instructions.

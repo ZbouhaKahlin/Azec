@@ -1,5 +1,5 @@
 #pragma once
-// Update check against the public releases-only repository. Anonymous HTTPS only:
+// Update check against the public source-and-releases repository. Anonymous HTTPS only:
 // no account, no identifiers, no telemetry. Downloads are verified before use.
 #include <QString>
 #include <QStringList>
@@ -15,9 +15,9 @@
 #include <memory>
 
 namespace azec_update{
-inline constexpr const char* releasesRepo="Azec-Zuckerberg/Azec-releases";
-inline constexpr const char* releasePage="https://github.com/Azec-Zuckerberg/Azec-releases/releases/latest";
-inline constexpr const char* latestApi="https://api.github.com/repos/Azec-Zuckerberg/Azec-releases/releases/latest";
+inline constexpr const char* releasesRepo="Azec-Zuckerberg/Azec";
+inline constexpr const char* releasePage="https://github.com/Azec-Zuckerberg/Azec/releases/latest";
+inline constexpr const char* latestApi="https://api.github.com/repos/Azec-Zuckerberg/Azec/releases/latest";
 inline constexpr const char* assetName="Azec.exe";
 
 inline QByteArray validHash(QByteArray hash){

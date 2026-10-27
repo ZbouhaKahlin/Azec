@@ -29,6 +29,7 @@ New-Item -ItemType Directory -Path $Output | Out-Null
 Copy-Item -LiteralPath 'Azec.exe' -Destination $Output
 Copy-Item -LiteralPath 'Run.cmd' -Destination $Output
 Copy-Item -LiteralPath 'README.md' -Destination $Output
+Copy-Item -LiteralPath 'LICENSE' -Destination $Output
 Copy-Item -LiteralPath 'licenses' -Destination (Join-Path $Output 'licenses') -Recurse
 
 $runtime = Join-Path $Output 'runtime'
