@@ -25,6 +25,7 @@ if ($LASTEXITCODE -ne 0 -or $remote -notmatch '^https://github\.com/Azec-Zuckerb
 $status = & git status --porcelain
 if ($LASTEXITCODE -ne 0 -or $status) { throw 'Commit the intended source changes first; the release checkout must be clean.' }
 Invoke-Checked 'gh' @('auth', 'status')
+Invoke-Checked 'gh' @('repo', 'view', 'Azec-Zuckerberg/Azec-releases', '--json', 'nameWithOwner')
 Invoke-Checked 'git' @('fetch', 'origin', 'main')
 Invoke-Checked 'git' @('merge-base', '--is-ancestor', 'origin/main', 'HEAD')
 
@@ -58,22 +59,25 @@ $commit = & git rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the source commit.' }
 Invoke-Checked 'git' @('push', 'origin', 'main')
 $tag = "v$version"
-& gh release view $tag --repo $repo --json tagName *> $null
-if ($LASTEXITCODE -ne 0) {
-    $notes = Join-Path $PSScriptRoot '.build/release-notes.md'
-    @"
+$notes = Join-Path $PSScriptRoot '.build/release-notes.md'
+@"
 Install **Azec.exe** on Windows x64. Profiles remain in the existing Azec data folder across updates.
 
-Source: $commit. The tag and automatic source archives identify this build's source.
+Source: https://github.com/$repo/commit/$commit. The source repository's matching tag identifies this build.
 
-The regular edition checks this repository for updates. Copies that used the retired releases repository need this installer once to switch update locations.
+The same installer is published in Azec and Azec-releases. Existing installations using Azec-releases can update normally; this build checks Azec for future updates.
 
 SHA-256 (Azec.exe): $sha
 "@ | Set-Content -LiteralPath $notes -Encoding UTF8
-    Invoke-Checked 'gh' @('release', 'create', $tag, $exe, $checksum, '--repo', $repo, '--target', $commit, '--title', "Azec $version", '--notes-file', $notes, '--latest')
-} else {
-    Write-Host "Release $tag already exists; verifying it without replacing assets."
+foreach ($destination in @($repo, 'Azec-Zuckerberg/Azec-releases')) {
+    & gh release view $tag --repo $destination --json tagName *> $null
+    if ($LASTEXITCODE -ne 0) {
+        $target = if ($destination -ceq $repo) { $commit } else { 'main' }
+        Invoke-Checked 'gh' @('release', 'create', $tag, $exe, $checksum, '--repo', $destination, '--target', $target, '--title', "Azec $version", '--notes-file', $notes, '--latest')
+    } else {
+        Write-Host "Release $tag already exists in $destination; verifying without replacing assets."
+    }
+    Invoke-Checked 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'verify-release.ps1'), '-Version', $version, '-Repository', $destination)
 }
-Invoke-Checked 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'verify-release.ps1'), '-Version', $version)
 Write-Host "Published $tag from $commit"
 Write-Host "https://github.com/$repo/releases/latest/download/Azec.exe"

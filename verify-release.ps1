@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^\d+(\.\d+){3}$')]
     [string]$Version,
-    [string]$ResumeDirectory
+    [string]$ResumeDirectory,
+    [ValidateSet('Azec-Zuckerberg/Azec', 'Azec-Zuckerberg/Azec-releases')]
+    [string]$Repository = 'Azec-Zuckerberg/Azec'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 foreach ($moduleName in @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')) {
     Import-Module (Join-Path $PSHOME "Modules\$moduleName\$moduleName.psd1") -ErrorAction Stop
 }
-$repo = 'Azec-Zuckerberg/Azec'
+$repo = $Repository
 $tag = "v$Version"
 $localExe = Join-Path $PSScriptRoot 'dist\Azec.exe'
 $versionHeader = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'src\version.hpp') -Raw
@@ -30,7 +32,7 @@ for ($attempt = 0; $attempt -lt 5; $attempt++) {
 if ($release.tag_name -cne $tag -or $release.draft -or $release.prerelease) {
     throw 'The uploaded release is not the expected stable tag.'
 }
-if ($assets.Count -ne 2 -or ((@($assets.name | Sort-Object) -join ',')) -cne 'Azec.exe,SHA256SUMS.txt') {
+if ($assets.Count -ne 2 -or (@($assets.name | Sort-Object) -join ',') -cne 'Azec.exe,SHA256SUMS.txt') {
     throw 'The public release must contain Azec.exe and SHA256SUMS.txt only.'
 }
 $asset = @($assets | Where-Object { $_.name -ceq 'Azec.exe' })[0]
@@ -40,7 +42,7 @@ $checksumHash = (Get-FileHash -LiteralPath $checksumFile -Algorithm SHA256).Hash
 if ($checksumAsset.digest -cne ('sha256:' + $checksumHash) -or (Get-Content -LiteralPath $checksumFile -Raw).Trim() -cne ($localHash + '  Azec.exe')) { throw 'Published checksum file does not match the installer record.' }
 $expectedCommit = & git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve local source commit.' }
-$sourceCommit = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/commits/$tag" -Headers $headers -TimeoutSec 30
+$sourceCommit = Invoke-RestMethod -Uri "https://api.github.com/repos/Azec-Zuckerberg/Azec/commits/$tag" -Headers $headers -TimeoutSec 30
 if ($sourceCommit.sha -cne $expectedCommit.Trim()) { throw 'The release tag does not identify the built source commit.' }
 if ($asset.digest -notmatch '^sha256:([0-9a-fA-F]{64})$') { throw 'GitHub asset SHA-256 digest is missing.' }
 $publishedHash = $Matches[1].ToLowerInvariant()
@@ -80,4 +82,4 @@ Download-AnonymousRelease "https://github.com/$repo/releases/latest/download/Aze
 if ((Get-FileHash -LiteralPath $stableExe -Algorithm SHA256).Hash.ToLowerInvariant() -cne $publishedHash) {
     throw 'The anonymous stable download differs from the published EXE.'
 }
-Write-Host "Verified $tag : local EXE, GitHub digest, tagged download, and anonymous latest download match."
+Write-Host "Verified $repo $tag : source tag, local EXE, GitHub digest, tagged download, and anonymous latest download match."
