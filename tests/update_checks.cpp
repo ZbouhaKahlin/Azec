@@ -47,6 +47,9 @@ int main(int argc,char** argv){
     QJsonObject release{{"tag_name","v2026.10.25.10"},{"assets",QJsonArray{asset}}};
     const auto parse=[&](const QString& current="2026.10.24.1"){return azec_update::releaseFromJson(QJsonDocument(release).toJson(),current);};
     check("startup accepts the exact public release asset",parse().checked&&parse().downloadable()&&parse().digest==hash);
+    asset["browser_download_url"]="https://github.com/"+QString(azec_update::releasesRepo)+"-releases/releases/download/v2026.10.25.10/Azec.exe";release["assets"]=QJsonArray{asset};
+    check("updates cannot execute an asset from another repository",parse().required&&!parse().downloadable());
+    asset["browser_download_url"]="https://github.com/"+QString(azec_update::releasesRepo)+"/releases/download/v2026.10.25.10/Azec.exe";release["assets"]=QJsonArray{asset};
     check("startup does not downgrade",parse("2026.10.26.1").checked&&!parse("2026.10.26.1").required);
     release["tag_name"]="not-a-version";check("malformed version is not an update",!parse().checked);release["tag_name"]="v2026.10.25.10";
     release["draft"]=true;check("draft is not a release",!parse().checked);release.remove("draft");

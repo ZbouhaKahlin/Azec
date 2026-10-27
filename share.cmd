@@ -150,7 +150,7 @@ if errorlevel 1 exit /b 1
 
 rem ----------------------------------------------------------- local record
 :publishing
-powershell -NoProfile -Command "$hash=(Get-FileHash -LiteralPath 'dist\Azec.exe' -Algorithm SHA256).Hash.ToLowerInvariant(); [IO.File]::WriteAllText((Join-Path (Get-Location) 'dist\SHA256SUMS.txt'),$hash+'  Azec.exe'+[Environment]::NewLine,[Text.Encoding]::ASCII)"
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1') -ErrorAction Stop; $hash=(Get-FileHash -LiteralPath 'dist\Azec.exe' -Algorithm SHA256).Hash.ToLowerInvariant(); [IO.File]::WriteAllText([IO.Path]::GetFullPath('dist\SHA256SUMS.txt'),$hash+'  Azec.exe'+[Environment]::NewLine,[Text.Encoding]::ASCII)"
 if errorlevel 1 exit /b 1
 
 :report
