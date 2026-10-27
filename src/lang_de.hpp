@@ -189,4 +189,9 @@ inline const char* const lang_de[]={
     "Updates konnten nicht geprüft werden",
     "Das Update konnte nicht geladen werden. Versuche es erneut.",
     "Fehlerbericht kopieren",
+    "Schnellfeuermodus",
+    "Doppelklick",
+    "Gedrückt halten",
+    "Wählen Sie, wie Schnellfeuer auf die Maustaste reagiert.",
+    "Die Mauseingabe konnte nicht gestartet werden. Die Mausausgabe ist nicht verfügbar.",
 };

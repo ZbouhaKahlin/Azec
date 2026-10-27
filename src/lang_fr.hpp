@@ -189,4 +189,9 @@ inline const char* const lang_fr[]={
     "Impossible de vérifier les mises à jour",
     "Impossible de télécharger la mise à jour. Réessayez.",
     "Copier le rapport d’erreur",
+    "Mode de tir rapide",
+    "Double clic",
+    "Maintenir",
+    "Choisissez comment le tir rapide réagit au bouton de la souris.",
+    "Impossible de démarrer la lecture de la souris. La sortie souris est indisponible.",
 };

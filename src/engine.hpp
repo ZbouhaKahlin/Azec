@@ -1,5 +1,6 @@
 #pragma once
 #include "core.hpp"
+#include "physical_mouse.hpp"
 #include <QByteArray>
 #include <atomic>
 #include <condition_variable>
@@ -8,6 +9,7 @@
 #include <thread>
 
 namespace r6 {
+struct RapidSettings {Operator op;RapidMode mode;int profile;};
 struct Hotkeys {
     int menu=0, recoil=0, panic=0, primary=0, secondary=0;
 };
@@ -18,9 +20,11 @@ class Engine {
     std::condition_variable stop_condition_;
     std::thread recoil_, rapid_;
     bool dry_run_;
+    physical_mouse::Monitor physical_mouse_;
     void sleep(int ms);
     void input(unsigned long flags, int x=0, int y=0);
     std::pair<Operator,int> current_profile() const;
+    RapidSettings rapid_settings() const;
     void recoil_worker();
     void rapid_worker();
 public:
@@ -40,6 +44,7 @@ public:
     bool save(const std::filesystem::path& file,const QByteArray& uiPreferences={}) const;
     void start();
     void stop();
+    bool physical_mouse_ready() const{return physical_mouse_.ready();}
     bool dry_run() const { return dry_run_; }
 };
 }

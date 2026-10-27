@@ -43,6 +43,13 @@ Each operator has a primary profile and an optional secondary profile. Enabling 
 
 **Recoil** is a live switch shared by the desktop header, tray menu, and phone. It starts off when Azec opens. **Rapid fire** is saved per weapon profile, together with its shot delay. Switching weapons updates the displayed Rapid fire state. Shot delay ranges from 30 to 150 ms, with a slider and 5 ms adjustment buttons.
 
+Choose **Settings → General → Rapid-fire mode**:
+
+- **Double click:** one physical press produces one additional click. Holding does not repeat.
+- **Hold:** generated clicks repeat while the physical left button stays held. Releasing it cancels further generated downs; Shot delay controls repeat spacing.
+
+This mode is shared across weapon profiles and the phone Settings. Rapid fire activation and Shot delay remain independent per weapon. The mode defaults to Double click for older settings and backups, and stays pending until Save.
+
 **Only in Rainbow Six** is enabled by default. It limits mouse output to when the game is focused. **Only while aiming** adds the aiming requirement to output. The panic shortcut is ignored while Azec is active.
 
 Profile edits apply in memory immediately. Click **Save**, press **Ctrl+S**, or tap **Save changes** on the phone to keep them after restarting. Browsing operators does not mark profiles as edited. If saving fails, a persistent message explains the problem and your edits stay unsaved. Ordinary closing offers **Save / Discard / Cancel** when needed.

@@ -123,6 +123,65 @@ int main(int argc,char** argv){
     check(retained,"locked optional archive is retained without throwing");
     check(removeOptionalFile(archive)&&!fs::exists(archive)&&removeOptionalFile(archive),"optional archive cleanup succeeds when unlocked or already absent");
 
+    {
+        physical_mouse::Buttons physical;
+        physical.event(1,RI_MOUSE_LEFT_BUTTON_DOWN,0);const auto pressed=physical.snapshot();
+        physical.event(1,RI_MOUSE_LEFT_BUTTON_UP,physical_mouse::generated_marker);
+        physical.event(1,RI_MOUSE_LEFT_BUTTON_DOWN,physical_mouse::generated_marker);
+        check(pressed.down&&pressed.presses==1&&physical.snapshot().down&&physical.snapshot().presses==1,
+              "generated clicks neither release nor retrigger the physical hold");
+        physical.event(1,RI_MOUSE_LEFT_BUTTON_UP,0);physical.event(2,RI_MOUSE_LEFT_BUTTON_DOWN,0);physical.remove(2);
+        check(!physical.snapshot().down&&physical.snapshot().presses==2,"physical release and mouse removal end the hold");
+        physical.event(1,RI_MOUSE_LEFT_BUTTON_DOWN|RI_MOUSE_LEFT_BUTTON_UP,0);
+        check(!physical.snapshot().down&&physical.snapshot().presses==3,"a complete quick physical tap retains one press edge");
+        physical.event(1,RI_MOUSE_LEFT_BUTTON_DOWN,0);const auto serial=physical.snapshot().presses;physical.releaseAll();
+        check(!physical.snapshot().down&&physical.snapshot().presses==serial,"focus/gate resets release the physical latch without inventing a press");
+        r6::RapidSequence doubleClick;
+        doubleClick.step(0,false,0,true,r6::RapidMode::DoubleClick,0,50);
+        const int first=doubleClick.step(1,true,1,true,r6::RapidMode::DoubleClick,0,50);
+        const int second=doubleClick.step(6,false,1,true,r6::RapidMode::DoubleClick,0,50);
+        const int release=doubleClick.step(31,false,1,true,r6::RapidMode::DoubleClick,0,50);
+        check(first==0&&second==1&&release==0&&doubleClick.step(100,true,1,true,r6::RapidMode::DoubleClick,0,50)==-1,
+              "double click adds exactly one complete click per physical press and never repeats from a held button");
+        check(doubleClick.step(101,true,2,true,r6::RapidMode::DoubleClick,0,50)==0&&
+              doubleClick.step(106,false,2,true,r6::RapidMode::DoubleClick,0,50)==1,
+              "the next physical press starts a fresh double click");
+        check(doubleClick.step(107,false,2,false,r6::RapidMode::DoubleClick,0,50)==0&&
+              doubleClick.step(1000,false,2,false,r6::RapidMode::DoubleClick,0,50)==-1,
+              "permission loss cancels a pending double click and releases its generated down");
+        r6::RapidSequence hold;hold.step(0,false,0,true,r6::RapidMode::Hold,0,50);
+        check(hold.step(1,true,1,true,r6::RapidMode::Hold,0,50)==0&&
+              hold.step(2,false,1,true,r6::RapidMode::Hold,0,50)==-1&&
+              hold.step(100,false,1,true,r6::RapidMode::Hold,0,50)==-1,
+              "Hold release cancels the next down before the pulse begins");
+        check(hold.step(101,true,2,true,r6::RapidMode::Hold,0,50)==0&&hold.step(106,true,2,true,r6::RapidMode::Hold,0,50)==1&&
+              hold.step(107,false,2,true,r6::RapidMode::Hold,0,50)==0&&hold.step(1000,false,2,true,r6::RapidMode::Hold,0,50)==-1,
+              "Hold release ends an active pulse immediately without queued repeat clicks");
+        check(hold.step(1001,true,3,true,r6::RapidMode::Hold,0,50)==0&&hold.step(1006,true,3,true,r6::RapidMode::Hold,0,50)==1&&
+              hold.step(1031,true,3,true,r6::RapidMode::Hold,0,50)==0&&hold.step(1080,true,3,true,r6::RapidMode::Hold,0,50)==-1&&
+              hold.step(1081,true,3,true,r6::RapidMode::Hold,0,50)==0,
+              "Hold continues repeating after earlier taps and respects the configured shot delay");
+        check(hold.step(1082,false,3,true,r6::RapidMode::Hold,0,50)==-1&&
+              hold.step(2000,false,3,true,r6::RapidMode::Hold,0,50)==-1,
+              "releasing during a repeat delay cancels the scheduled pulse");
+        r6::Config modeConfig;const auto binary=modeConfig.bytes();modeConfig.rapid_mode=r6::RapidMode::Hold;
+        check(modeConfig.bytes()==binary&&binary.size()==3734,"rapid mode does not alter the compatible binary layout");
+        const auto modePath=path.parent_path()/L"mode"/L"r6_config.bin";QDir().mkpath(QString::fromStdWString(modePath.parent_path().wstring()));
+        r6::Engine modes(true),loadedModes(true);modes.edit([](r6::Config& c){c.rapid_mode=r6::RapidMode::Hold;c.secondary[0].rapid=true;c.secondary_initialized[0]=true;});
+        check(modes.save(modePath)&&loadedModes.load(modePath)&&loadedModes.snapshot().rapid_mode==r6::RapidMode::Hold&&loadedModes.snapshot().secondary[0].rapid,
+              "saved mode and independent secondary rapid fire survive restart");
+        auto modeBackup=makeBackup(modes.snapshot(),{},true,false);r6::Config modeImported;QSet<QString> modeFavorites;BackupOptions modeOptions;
+        check(parseBackup(modeBackup,modeImported,modeFavorites,modeOptions)&&modeImported.rapid_mode==r6::RapidMode::Hold,
+              "backup export and import retain the selected rapid mode");
+        auto settings=modeBackup["settings"].toObject();settings.remove("rapidMode");modeBackup["settings"]=settings;
+        check(parseBackup(modeBackup,modeImported,modeFavorites,modeOptions)&&modeImported.rapid_mode==r6::RapidMode::DoubleClick,
+              "older backups default to Double click");
+        settings["rapidMode"]=2;modeBackup["settings"]=settings;
+        check(!parseBackup(modeBackup,modeImported,modeFavorites,modeOptions),"unknown backup modes are rejected before applying profiles");
+        const auto redacted=errorReport("TEST-REPORT","Example",QDir::homePath()+"/private https://example.test/?token=secret token=secret code=123456");
+        check(!redacted.contains("secret")&&!redacted.contains("123456")&&redacted.contains(AZEC_VERSION),"copied error reports redact paths, links and credential-like fields");
+    }
+
     // Hold one extra module reference so retry ownership mistakes are observable.
     const auto stub=QCoreApplication::applicationDirPath()+"/Azec-driver-fixture.dll";
     const HMODULE heldModule=LoadLibraryW(reinterpret_cast<LPCWSTR>(stub.utf16()));

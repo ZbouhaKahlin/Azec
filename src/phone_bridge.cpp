@@ -9,7 +9,7 @@ QJsonObject MainWindow::mobileState() const {
         const QJsonObject appearance{{"scheme",kbtheme::paper.lightness()<128?"dark":"light"},{"colors",colors}};
         return {{"operators",operators},{"operatorId",c.selected},{"weaponSlot",c.active_slot()},{"profileSet",QString::fromStdString(c.active_profile_set)},{"dual",c.secondary_enabled[c.selected]},{"profile",profileJson(c.active_operator())},{"dirty",unsaved_},{"keys",keys},{"appearance",appearance},
             {"globals",QJsonObject{{"recoilActive",engine_.recoil_active.load()},{"rapidActive",c.active_operator().rapid!=0},
-                {"gameFocusOnly",engine_.game_focus_only.load()},{"adsOnly",engine_.ads_only.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()}}}};
+                {"rapidMode",int(c.rapid_mode)},{"gameFocusOnly",engine_.game_focus_only.load()},{"adsOnly",engine_.ads_only.load()},{"sound",bool(c.sound)},{"language",c.language},{"accent",accent().name()}}}};
     }
 QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
         const auto fail=[](const QString& message){return QJsonObject{{"error",message}};};
@@ -55,7 +55,8 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
                     else if(key=="gameFocusOnly")focus=value.toBool();
                     else if(key=="adsOnly")ads=value.toBool();
                     else {next.sound=value.toBool();rebuild=true;}
-                }else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
+                }else if(key=="rapidMode"&&validInteger(value,0,1)){next.rapid_mode=static_cast<r6::RapidMode>(value.toInt());}
+                else if(key=="language"&&validInteger(value,0,8)){next.language=value.toInt();rebuild=true;}
                 else if(key.startsWith("key")&&key.size()==4&&key[3]>='0'&&key[3]<='4'&&validInteger(value,0,255)){
                     const int index=key[3].digitValue(),chosen=value.toInt();
                     // The desktop capture never offers the left/right mouse
@@ -78,7 +79,7 @@ QJsonObject MainWindow::mobileUpdate(const QJsonObject& request){
                 auto& op=slot?next.secondary[id]:next.operators[id];
                 if((op.rapid!=0)!=rapid){op.rapid=rapid?1:0;rapidChanged=true;}
             }
-            const bool persistenceChanged=next.sound!=before.sound||next.language!=before.language||
+            const bool persistenceChanged=next.rapid_mode!=before.rapid_mode||next.sound!=before.sound||next.language!=before.language||
                 rapidChanged||focus!=engine_.game_focus_only||ads!=engine_.ads_only;
             engine_.edit([&](r6::Config& c){c=next;});engine_.recoil_active=active;engine_.game_focus_only=focus;engine_.ads_only=ads;
             if(close_prompt_&&values.contains("recoilActive"))close_recoil_changed_=true;

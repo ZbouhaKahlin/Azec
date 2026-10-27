@@ -34,7 +34,7 @@ inline QJsonObject makeBackup(const r6::Config& config,const QSet<QString>& favo
     return {{"application","Azec"},{"version",1},{"operators",operators},{"favorites",QJsonArray::fromStringList(names)},
         {"profileSets",profilesets::json(config)},{"activeProfileSet",QString::fromStdString(config.active_profile_set)},
         {"settings",QJsonObject{{"keys",keyArray},{"language",config.language},{"sound",bool(config.sound)},{"rapidMaster",bool(config.rapid_master)},
-            {"recoilMaster",true},{"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},
+            {"recoilMaster",true},{"perProfileRapid",true},{"rapidMode",int(config.rapid_mode)},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},
             {"phoneEnabled",config.phone_enabled},{"selected",config.selected},{"radius",130.0},
             {"sensitivity",config.sensitivity.valid()?QJsonValue(setup):QJsonValue(QJsonValue::Null)},
             {"accent",QJsonArray{114.0/255,72.0/255,215.0/255}}}}};
@@ -75,6 +75,8 @@ inline bool parseBackup(const QJsonObject& root,r6::Config& result,QSet<QString>
         auto setup=settings["sensitivity"].toObject();setup.remove("source");
         const auto parsed=sensitivity::fromJson(setup);if(!parsed)return false;next.sensitivity=*parsed;
     }
+    if(settings.contains("rapidMode")&&(!integer(settings["rapidMode"],0,1)))return false;
+    next.rapid_mode=static_cast<r6::RapidMode>(settings["rapidMode"].toInt(0));
     const auto keys=settings["keys"].toArray();const auto accent=settings["accent"].toArray();
     if(keys.size()!=6||accent.size()!=3)return false;
     int* destinations[]={&next.menu_key,&next.recoil_key,&next.rapid_key,&next.panic_key,&next.primary_key,&next.secondary_key};

@@ -8,6 +8,32 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
         // Pause global hotkey polling; fixture actions call production handlers directly.
         poll_.stop();
+        if(QCoreApplication::arguments().contains("--rapid-modes-only")){
+            QJsonObject checks;showPreferences();chooseSettingsCategory(0);
+            const auto before=engine_.snapshot();
+            checks["settings_offer_exactly_two_modes"]=rapid_mode_choice_&&rapid_mode_choice_->count()==2&&
+                rapid_mode_choice_->itemText(0)==text(UiText::DoubleClickMode)&&rapid_mode_choice_->itemText(1)==text(UiText::HoldMode);
+            rapid_mode_choice_->setCurrentIndex(1);
+            checks["settings_mode_is_pending_until_save"]=engine_.snapshot().rapid_mode==r6::RapidMode::Hold&&unsaved_&&!QFileInfo::exists(QString::fromStdWString(config_path_.wstring()));
+            checks["mode_saves_through_the_normal_transaction"]=save(false);
+            r6::Engine restored(true);checks["mode_survives_restart"]=restored.load(config_path_)&&restored.snapshot().rapid_mode==r6::RapidMode::Hold&&QFileInfo(QString::fromStdWString(config_path_.wstring())).size()==3734;
+            const auto changed=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"rapidMode",0}}}});
+            checks["phone_and_desktop_share_the_mode"]=!changed.contains("error")&&engine_.snapshot().rapid_mode==r6::RapidMode::DoubleClick&&rapid_mode_choice_->currentIndex()==0&&changed["globals"].toObject()["rapidMode"].toInt(-1)==0;
+            const auto invalid=mobileUpdate({{"action","setGlobal"},{"values",QJsonObject{{"rapidMode",2}}}});
+            checks["phone_rejects_invalid_modes"]=invalid.contains("error")&&engine_.snapshot().rapid_mode==r6::RapidMode::DoubleClick;
+            showNotice(UiText::DriverTestFailed,true,true,"DRV-TEST-RIGHT","DRV-SEND-MOVE; selected_mouse=12; send_win32=21");
+            const auto report=notice_report_;notice_copy_->click();wait(30);
+            checks["driver_report_copy_contains_current_failure"]=notice_code_->text()=="DRV-TEST-RIGHT"&&QApplication::clipboard()->text()==report&&report.contains(AZEC_VERSION)&&report.contains("selected_mouse=12");
+            showNotice(UiText::ConfigurationSaved);checks["routine_feedback_preserves_failure"]=notice_report_==report;
+            showNotice(UiText::CouldNotSaveConfiguration,true,true);const auto code=notice_code_->text();
+            engine_.edit([](r6::Config& c){c.language=2;});showNotice(UiText::CouldNotSaveConfiguration,true,true);
+            checks["error_codes_do_not_depend_on_language"]=code==notice_code_->text();
+            showNotice(UiText::DriverPlaceFailed,true,true,"DRV-DLL-PLACE","Fixture failure");notice_copy_->click();wait(20);
+            checks["new_errors_replace_old_report_details"]=QApplication::clipboard()->text()==notice_report_&&!notice_report_.contains("selected_mouse=12");
+            physical_mouse::Monitor monitor;checks["raw_input_monitor_starts_in_isolation"]=monitor.start()&&monitor.ready();monitor.stop();checks["raw_input_monitor_stops_cleanly"]=!monitor.ready();
+            engine_.edit([&](r6::Config& c){c=before;});
+            bool passed=true;for(const auto& value:checks)passed&=value.toBool();return {{"passed",passed},{"checks",checks}};
+        }
         if(QCoreApplication::arguments().contains("--error-report-only")){
             QJsonObject checks;
             const auto before=engine_.snapshot();const bool dirtyBefore=unsaved_;

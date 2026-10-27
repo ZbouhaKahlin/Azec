@@ -30,3 +30,5 @@ HEADERS += src/interaction_icons.hpp
 HEADERS += src/startup_view.hpp
 HEADERS += src/startup_update.hpp
 HEADERS += src/window_backdrop.hpp
+
+HEADERS += src/physical_mouse.hpp src/rapid_fire.hpp

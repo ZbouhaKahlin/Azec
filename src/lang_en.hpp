@@ -189,4 +189,9 @@ inline const char* const lang_en[]={
     "Couldn't check for updates",
     "Couldn't download the update. Try again.",
     "Copy error report",
+    "Rapid-fire mode",
+    "Double click",
+    "Hold",
+    "Choose how rapid fire responds to the mouse button.",
+    "Mouse input monitoring could not start. Mouse output is unavailable.",
 };

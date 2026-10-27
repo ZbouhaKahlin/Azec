@@ -80,11 +80,11 @@ bool Engine::save(const std::filesystem::path& file,const QByteArray& uiPreferen
     }
     return true;
 }
-void Engine::start(){if(running.exchange(true))return;recoil_=std::thread(&Engine::recoil_worker,this);rapid_=std::thread(&Engine::rapid_worker,this);}
+void Engine::start(){if(running.exchange(true))return;if(!dry_run_&&!physical_mouse_.start())diagnostic("INPUT-PHYSICAL-START","Physical mouse input could not be registered; rapid fire remains disabled");recoil_=std::thread(&Engine::recoil_worker,this);rapid_=std::thread(&Engine::rapid_worker,this);}
 void Engine::stop(){
     {std::lock_guard lock(stop_mutex_);running=false;}
     stop_condition_.notify_all();
-    if(recoil_.joinable())recoil_.join();if(rapid_.joinable())rapid_.join();
+    if(recoil_.joinable())recoil_.join();if(rapid_.joinable())rapid_.join();physical_mouse_.stop();
 }
 void Engine::sleep(int ms){std::unique_lock lock(stop_mutex_);stop_condition_.wait_for(lock,std::chrono::milliseconds(ms),[this]{return !running.load();});}
 void Engine::input(unsigned long flags,int x,int y){
@@ -98,6 +98,7 @@ void Engine::input(unsigned long flags,int x,int y){
     if(sent)++injected_events;
 }
 std::pair<Operator,int> Engine::current_profile() const {std::lock_guard lock(config_mutex_);return {config_.active_operator(),config_.selected*2+config_.active_slot()};}
+RapidSettings Engine::rapid_settings() const {std::lock_guard lock(config_mutex_);return {config_.active_operator(),config_.rapid_mode,config_.selected*2+config_.active_slot()};}
 void Engine::recoil_worker(){
     std::mt19937 random(std::random_device{}());std::uniform_int_distribution<int> jitter(-1,1);
     RecoilAccumulator accumulator;int previous_profile=-1;
@@ -106,42 +107,37 @@ void Engine::recoil_worker(){
         if(!recoil_active||!input_allowed||menu_visible){accumulator.reset();sleep(8);continue;}
         // ADS gate: aiming down sights means physically holding the right button.
         if(ads_only&&!(GetAsyncKeyState(VK_RBUTTON)&0x8000)){accumulator.reset();sleep(8);continue;}
-        if(!(GetAsyncKeyState(VK_LBUTTON)&0x8000)){accumulator.reset();sleep(4);continue;}
+        if(!physical_mouse_.snapshot().down){accumulator.reset();sleep(4);continue;}
         const auto movement=accumulator.step(op,op.humanize?jitter(random):0);
         input(MOUSEEVENTF_MOVE,movement.x,movement.y);sleep(recoil_interval(op.rapid!=0));
     }
 }
 void Engine::rapid_worker(){
-    bool released=false;HWND releaseWindow=nullptr;
-    const auto permitted=[&](HWND window){
-        return running.load()&&input_allowed.load()&&!menu_visible.load()&&window&&GetForegroundWindow()==window;
-    };
-    const auto handBack=[&]{
-        // Restore only a release we sent, while output is still permitted.
-        // Never restore a held press into the app or a changed foreground window.
-        if(released&&input_allowed.load()&&!menu_visible.load()&&
-           releaseWindow&&GetForegroundWindow()==releaseWindow&&(GetAsyncKeyState(VK_LBUTTON)&0x8000))input(MOUSEEVENTF_LEFTDOWN);
-        released=false;
-    };
+    RapidSequence sequence;HWND burstWindow=nullptr,lastForeground=nullptr;
+    const auto clock=[](){return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();};
     while(running){
-        const auto op=current_profile().first;
-        if(!op.rapid||!input_allowed||(ads_only&&!(GetAsyncKeyState(VK_RBUTTON)&0x8000))){
-            // Rapid fire stopped mid-burst: hand the trigger back to the player
-            // instead of leaving our injected release as the last button event.
-            // Never inject the hand-back into another application.
-            handBack();
-            sleep(50);continue;
-        }
-        if((GetAsyncKeyState(VK_LBUTTON)&0x8000)&&!menu_visible){
-            const HWND burstWindow=GetForegroundWindow();
-            if(!permitted(burstWindow)){sleep(4);continue;}
-            releaseWindow=burstWindow;input(MOUSEEVENTF_LEFTUP);released=true;sleep(5);if(!running)break;
-            if(!permitted(burstWindow)){released=false;continue;}
-            input(MOUSEEVENTF_LEFTDOWN);released=false;sleep(25);if(!running)break;
-            if(!permitted(burstWindow))continue;
-            releaseWindow=burstWindow;input(MOUSEEVENTF_LEFTUP);released=true;sleep(rapid_interval(op));
-        }else sleep(4);
+        const auto [op,mode,profile]=rapid_settings();
+        const HWND foreground=GetForegroundWindow();
+        // A release on another/secure desktop may not reach Raw Input. Require
+        // a fresh physical press after an output gate or foreground transition.
+        if(!input_allowed||menu_visible||!foreground||(lastForeground&&foreground!=lastForeground))physical_mouse_.releaseAll();
+        lastForeground=foreground;
+        const auto physical=physical_mouse_.snapshot();
+        const bool enabled=physical_mouse_.ready()&&op.rapid&&input_allowed&&!menu_visible&&
+            (!ads_only||(GetAsyncKeyState(VK_RBUTTON)&0x8000));
+        if(enabled&&!burstWindow)burstWindow=foreground;
+        const bool allowed=enabled&&foreground&&foreground==burstWindow;
+        const int stroke=sequence.step(clock(),physical.down,physical.presses,allowed,mode,profile,op.delay);
+        // Recheck the live physical state immediately before a generated down.
+        // No queued down survives a Hold release, permission loss or focus change.
+        if(stroke>=0&&burstWindow&&foreground==burstWindow&&input_allowed&&!menu_visible&&GetForegroundWindow()==foreground&&
+           (stroke==0||allowed)&&(stroke==0||mode!=RapidMode::Hold||physical_mouse_.snapshot().down))
+            input(stroke?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP);
+        if(!allowed)burstWindow=nullptr;
+        sleep(2);
     }
-    handBack();
+    const auto physical=physical_mouse_.snapshot();
+    const int release=sequence.step(clock(),physical.down,physical.presses,false,RapidMode::DoubleClick,-1,50);
+    if(release==0&&burstWindow&&GetForegroundWindow()==burstWindow&&input_allowed&&!menu_visible)input(MOUSEEVENTF_LEFTUP);
 }
 }

@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include "rapid_fire.hpp"
 
 namespace r6 {
 // Names below are analyst-assigned. Layout follows the executable's raw writes.
@@ -79,6 +80,7 @@ struct Config {
     std::array<bool, operator_count> secondary_enabled{}, secondary_initialized{};
     int weapon_slot = 0, primary_key = '1', secondary_key = '2';
     bool phone_enabled = true;
+    RapidMode rapid_mode = RapidMode::DoubleClick;
     SensitivitySetup sensitivity;
     std::vector<ProfileSet> profile_sets;
     std::string active_profile_set;

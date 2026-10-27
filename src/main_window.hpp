@@ -105,7 +105,7 @@ class MainWindow final : public QWidget {
     QPointer<QPushButton> phone_new_code_,phone_retry_;
     QPointer<QPushButton> update_button_;QNetworkAccessManager* network_=nullptr;bool update_in_progress_=false;
     QWidget* notice_bar_=nullptr;QLabel *notice_=nullptr,*notice_title_=nullptr,*notice_badge_=nullptr;QPushButton* notice_close_=nullptr;MonoButton* notice_copy_=nullptr;QLabel* notice_code_=nullptr;QString notice_report_;QScrollArea* notice_scroll_=nullptr;
-    QPointer<QComboBox> theme_choice_;
+    QPointer<QComboBox> theme_choice_,rapid_mode_choice_;
     BrandLabel* brand_=nullptr;
     QWidget* content_=nullptr;
     QPointer<StartupView> startup_view_;
@@ -576,6 +576,10 @@ class MainWindow final : public QWidget {
         theme_choice_=new LanguageComboBox(nullptr,QStringLiteral("themePopup"));theme_choice_->setObjectName("themeChoice");theme_choice_->setAccessibleName(text(UiText::Theme));
         theme_choice_->addItem(text(UiText::DarkTheme));theme_choice_->addItem(text(UiText::LightTheme));theme_choice_->setCurrentIndex(kbtheme::light?1:0);themeRow->addWidget(theme_choice_);
         connect(theme_choice_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){setLightTheme(index==1);});
+        auto* modeRow=settingRow(system,text(UiText::RapidFireMode),text(UiText::RapidFireModeHint));
+        rapid_mode_choice_=new LanguageComboBox;rapid_mode_choice_->setObjectName("rapidModeChoice");rapid_mode_choice_->setAccessibleName(text(UiText::RapidFireMode));
+        rapid_mode_choice_->addItem(text(UiText::DoubleClickMode));rapid_mode_choice_->addItem(text(UiText::HoldMode));rapid_mode_choice_->setCurrentIndex(int(c.rapid_mode));modeRow->addWidget(rapid_mode_choice_);
+        connect(rapid_mode_choice_,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index){if(refreshing_||index<0||index>1)return;engine_.edit([=](r6::Config& c){c.rapid_mode=static_cast<r6::RapidMode>(index);});dirty();});
         toggle(settingRow(system,text(UiText::FeedbackSound),text(UiText::SoundWhenClosingUnsaved)),"Feedback sound",c.sound,[this](bool on){engine_.edit([=](r6::Config& c){c.sound=on;});dirty();});
         game_focus_only_=toggle(settingRow(system,text(UiText::OnlyWhileGameIsActive),text(UiText::OnlyWhileGameIsActiveHint)),"Only in Rainbow Six",engine_.game_focus_only,[this](bool on){engine_.game_focus_only=on;dirty();});
         ads_only_=toggle(settingRow(system,text(UiText::OnlyWhileAiming),text(UiText::OnlyWhileAimingHint)),"Only while aiming",engine_.ads_only,[this](bool on){engine_.ads_only=on;dirty();});
@@ -752,7 +756,7 @@ class MainWindow final : public QWidget {
         updateSavePresentation(save_->property("saveState").toString());gear_->setToolTip(text(UiText::Settings));preferences_title_->setText(text(UiText::Settings));back_->setToolTip(text(UiText::BackToOperators));back_->setAccessibleName(text(UiText::BackToOperators));status_->setToolTip(text(UiText::ToggleRecoilActivity));save_->setAccessibleName(text(UiText::SaveConfiguration));rapid_status_->setToolTip(text(UiText::RapidFire));filterOperators();syncSelection();updateStatus();
     }
     void syncSelection(){
-        const auto c=engine_.snapshot();const auto& op=c.active_operator();refreshing_=true;operator_name_->setText(QString::fromUtf8(op.name));operator_icon_->setPixmap(operatorPixmap(QString::fromUtf8(op.name),44,devicePixelRatioF()));
+        const auto c=engine_.snapshot();const auto& op=c.active_operator();refreshing_=true;if(rapid_mode_choice_)rapid_mode_choice_->setCurrentIndex(int(c.rapid_mode));operator_name_->setText(QString::fromUtf8(op.name));operator_icon_->setPixmap(operatorPixmap(QString::fromUtf8(op.name),44,devicePixelRatioF()));
         dual_->syncChecked(c.secondary_enabled[c.selected]);secondary_->setEnabled(c.secondary_enabled[c.selected]);
         primary_->setText(text(UiText::Primary));secondary_->setText(text(UiText::Secondary));
         primary_->setChosen(c.active_slot()==0);secondary_->setChosen(c.active_slot()==1);
@@ -1092,6 +1096,7 @@ public:
         startup_updater_=new StartupUpdateWindow(engine_.snapshot().language,target,[this,ready]{
             const auto status=startup_updater_->message();startup_updater_->hide();startup_updater_->deleteLater();
             startup_update_pending_=false;content_->setEnabled(true);engine_.start();
+            if(!engine_.dry_run()&&!engine_.physical_mouse_ready())showNotice(UiText::PhysicalInputFailed,true,true,"INPUT-PHYSICAL-START");
             if(engine_.snapshot().phone_enabled&&!phone_->start()){showNotice(UiText::CouldNotStartPhoneServer,true,true);notice_bar_->setProperty("phoneError",true);}
             updatePhoneDetails();buildTray();poll_.start();paint_.start();for(auto* shortcut:findChildren<QShortcut*>())shortcut->setEnabled(true);
             BOOL animations=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&animations,0);

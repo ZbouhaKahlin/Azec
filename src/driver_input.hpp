@@ -4,6 +4,7 @@
 #include <string>
 #include "driver_setup.hpp"
 #include "diagnostics.hpp"
+#include "physical_mouse.hpp"
 
 // Optional Interception backend (github.com/oblitum/Interception).
 //
@@ -203,7 +204,7 @@ inline bool move(int dx,int dy){
 
 inline bool button(bool down){
     MouseStroke value{};
-    value.state=down?left_button_down:left_button_up;
+    value.state=down?left_button_down:left_button_up;value.information=physical_mouse::generated_marker;
     return detail::backend().stroke(value);
 }
 

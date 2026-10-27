@@ -189,4 +189,9 @@ inline const char* const lang_pt[]={
     "Não foi possível verificar atualizações",
     "Não foi possível baixar a atualização. Tente novamente.",
     "Copiar relatório de erro",
+    "Modo de disparo rápido",
+    "Clique duplo",
+    "Manter pressionado",
+    "Escolha como o disparo rápido responde ao botão do mouse.",
+    "Não foi possível iniciar a leitura do mouse. A saída do mouse está indisponível.",
 };

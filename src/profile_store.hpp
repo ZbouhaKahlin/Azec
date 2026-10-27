@@ -23,6 +23,10 @@ inline bool readWeaponProfiles(r6::Config& config,bool& gameFocusOnly,bool& adsO
     if(error.error!=QJsonParseError::NoError||!document.isObject()){diagnostic("load weapon profiles","Invalid JSON; ignored");return false;}
     const auto root=document.object();if(root["version"].toInt()!=1){diagnostic("load weapon profiles","Unsupported version; ignored");return false;}
     bool valid=true;
+    if(root.contains("rapidMode")&&(!root["rapidMode"].isDouble()||root["rapidMode"].toDouble()!=root["rapidMode"].toInt()||root["rapidMode"].toInt()<0||root["rapidMode"].toInt()>1)){
+        diagnostic("load rapid mode","Invalid rapid-fire mode; sidecar rejected");return false;
+    }
+    config.rapid_mode=static_cast<r6::RapidMode>(root["rapidMode"].toInt(0));
     if(const auto setup=sensitivity::fromJson(root["sensitivity"].toObject()))config.sensitivity=*setup;
     const auto validKey=[](const QJsonValue& value,int fallback){const int key=value.toInt(fallback);return r6::validHotkey(key)?key:fallback;};
     config.primary_key=validKey(root["primaryKey"],'1');config.secondary_key=validKey(root["secondaryKey"],'2');config.phone_enabled=root["phoneEnabled"].toBool(true);
@@ -62,7 +66,7 @@ inline QByteArray weaponProfilesBytes(const r6::Config& config,bool gameFocusOnl
     // Extension operators keep their primary profile and the live selection here.
     for(int id=r6::legacy_operator_count;id<r6::operator_count;++id){const auto& op=config.operators[id];primaries[QString::fromUtf8(config.operators[id].name)]=QJsonObject{{"vertical",op.vertical},{"horizontal",op.horizontal},{"rapid",bool(op.rapid)},{"humanize",bool(op.humanize)},{"delay",op.delay}};}
     return QJsonDocument(QJsonObject{{"version",1},{"primaryKey",config.primary_key},{"secondaryKey",config.secondary_key},{"phoneEnabled",config.phone_enabled},
-        {"perProfileRapid",true},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},{"recoilMaster",true},{"rapidMaster",bool(config.rapid_master)},
+        {"perProfileRapid",true},{"rapidMode",int(config.rapid_mode)},{"gameFocusOnly",gameFocusOnly},{"adsOnly",adsOnly},{"recoilMaster",true},{"rapidMaster",bool(config.rapid_master)},
         {"selected",config.selected},{"operators",profiles},{"primaryProfiles",primaries},
         {"profileSets",profilesets::json(config)},{"activeProfileSet",QString::fromStdString(config.active_profile_set)},
         {"sensitivity",config.sensitivity.valid()?QJsonValue(sensitivity::json(config.sensitivity)):QJsonValue(QJsonValue::Null)}}).toJson(QJsonDocument::Compact);

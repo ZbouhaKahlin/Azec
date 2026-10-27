@@ -193,8 +193,13 @@ enum class UiText {
     StartupCheckUnavailable,
     StartupDownloadFailed,
     CopyErrorReport,
+    RapidFireMode,
+    DoubleClickMode,
+    HoldMode,
+    RapidFireModeHint,
+    PhysicalInputFailed,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::CopyErrorReport)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::PhysicalInputFailed)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

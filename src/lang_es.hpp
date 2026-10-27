@@ -189,4 +189,9 @@ inline const char* const lang_es[]={
     "No se pudieron buscar actualizaciones",
     "No se pudo descargar la actualización. Inténtalo de nuevo.",
     "Copiar informe de error",
+    "Modo de disparo rápido",
+    "Doble clic",
+    "Mantener",
+    "Elige cómo responde el disparo rápido al botón del ratón.",
+    "No se pudo iniciar la lectura del ratón. La salida del ratón no está disponible.",
 };
