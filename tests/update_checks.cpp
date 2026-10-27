@@ -43,11 +43,11 @@ int main(int argc,char** argv){
     check("short payload rejected",!download("short",QCryptographicHash::hash("short",QCryptographicHash::Sha256).toHex())&&read()==payload);
     check("unwritable destination rejected",!download(payload,hash,200,false,temporary.path()+"/missing/Azec.exe"));
     check("versions compared numerically",azec_update::newer("2026.10.20.10","2026.10.19.2213")&&!azec_update::newer("2026.10.19.9","2026.10.19.10"));
-    QJsonObject asset{{"name","Azec.exe"},{"browser_download_url","https://github.com/Azec-Zuckerberg/Azec/releases/download/v2026.10.25.10/Azec.exe"},{"digest","sha256:"+QString::fromLatin1(hash)}};
+    QJsonObject asset{{"name","Azec.exe"},{"browser_download_url","https://github.com/ZbouhaKahlin/Azec/releases/download/v2026.10.25.10/Azec.exe"},{"digest","sha256:"+QString::fromLatin1(hash)}};
     QJsonObject release{{"tag_name","v2026.10.25.10"},{"assets",QJsonArray{asset}}};
     const auto parse=[&](const QString& current="2026.10.24.1"){return azec_update::releaseFromJson(QJsonDocument(release).toJson(),current);};
     check("startup accepts the exact public release asset",parse().checked&&parse().downloadable()&&parse().digest==hash);
-    asset["browser_download_url"]="https://github.com/"+QString(azec_update::releasesRepo)+"-releases/releases/download/v2026.10.25.10/Azec.exe";release["assets"]=QJsonArray{asset};
+    asset["browser_download_url"]="https://github.com/ZbouhaKahlin/Azec-releases/releases/download/v2026.10.25.10/Azec.exe";release["assets"]=QJsonArray{asset};
     check("updates cannot execute an asset from another repository",parse().required&&!parse().downloadable());
     asset["browser_download_url"]="https://github.com/"+QString(azec_update::releasesRepo)+"/releases/download/v2026.10.25.10/Azec.exe";release["assets"]=QJsonArray{asset};
     check("startup does not downgrade",parse("2026.10.26.1").checked&&!parse("2026.10.26.1").required);
@@ -55,7 +55,7 @@ int main(int argc,char** argv){
     release["draft"]=true;check("draft is not a release",!parse().checked);release.remove("draft");
     asset["browser_download_url"]="https://example.com/Azec.exe";release["assets"]=QJsonArray{asset};
     check("foreign executable URL cannot be installed",parse().required&&!parse().downloadable());
-    asset["browser_download_url"]="https://github.com/Azec-Zuckerberg/Azec/releases/download/v2026.10.25.10/Azec.exe";asset.remove("digest");release["assets"]=QJsonArray{asset};
+    asset["browser_download_url"]="https://github.com/ZbouhaKahlin/Azec/releases/download/v2026.10.25.10/Azec.exe";asset.remove("digest");release["assets"]=QJsonArray{asset};
     check("missing digest keeps the update required without executing",parse().required&&!parse().downloadable());
     if(app.arguments().contains("--live-github")){
         QNetworkAccessManager network;QEventLoop loop;

@@ -9,7 +9,7 @@ Azec uses the **MonoCode** design with Dark and Light themes. The current applic
 
 A Windows desktop app for Rainbow Six recoil and rapid-fire profiles, with 78 operators, independent primary and secondary weapon settings, and a companion phone interface on your local network.
 
-[Download Azec.exe](https://github.com/Azec-Zuckerberg/Azec/releases/latest/download/Azec.exe) · [Release history](https://github.com/Azec-Zuckerberg/Azec/releases) · [Application reference](docs/reference.md)
+[Download Azec.exe](https://github.com/ZbouhaKahlin/Azec/releases/latest/download/Azec.exe) · [Release history](https://github.com/ZbouhaKahlin/Azec/releases) · [Application reference](docs/reference.md)
 
 ![Azec desktop and connected phone interface showing the same Ash profile](docs/showcase-11J.png)
 
@@ -129,17 +129,17 @@ The setup script installs the pinned Qt kit in its standard location. Set `NEON_
 
 These commands do not run tests by default. The `test` argument includes the installer smoke test; `AZEC_SKIP_TESTS=1` still skips it.
 
-Source and releases live together in this public repository. From a clean `main` checkout with your intended changes committed, run `.\build-and-push.ps1` (or `.\share.cmd publish`). It builds the installer, records its SHA-256, commits the generated version, pushes `main`, and publishes `Azec.exe` and `SHA256SUMS.txt` under a version tag targeting that source commit. It also publishes and verifies the identical files under the same release version in [Azec-releases](https://github.com/Azec-Zuckerberg/Azec-releases), preserving updates for existing installations. An authenticated GitHub CLI with write access to both repositories is required. Tests remain opt-in: use `-Test` or `share.cmd publish test` for the isolated installer smoke check.
+Source and releases live together in this public repository. From a clean `main` checkout with your intended changes committed, run `.\build-and-push.ps1` (or `.\share.cmd publish`). It builds the installer, records its SHA-256, commits the generated version, pushes `main`, and publishes `Azec.exe` and `SHA256SUMS.txt` under a version tag targeting that source commit. Publication verifies the source tag, asset hashes, and anonymous downloads from this repository. An authenticated GitHub CLI with write access to this repository is required. Tests remain opt-in: use `-Test` or `share.cmd publish test` for the isolated installer smoke check.
 
 `verify-release.ps1` checks the source tag, local installer, GitHub asset digests, and fresh anonymous downloads, including the stable latest-download link. If publication stops after building, use `build-and-push.ps1 -ResumeVersion <numeric-version>` with the original matching installer; existing assets are verified rather than replaced. See the complete [release workflow](AGENTS.md#releasing).
 
-The app checks this repository for updates at startup. Older copies checking Azec-releases receive the same installer there and then follow this repository for future updates. Azec-releases remains available. The `unknown-cheats` edition keeps its separate offline startup and manual-update policy.
+The app checks this repository for updates at startup and through the manual Settings check, and downloads its verified installer. Copies pointing to the previous account need to install this repository's current download once to switch update locations; saved profiles are preserved. The `unknown-cheats` edition keeps its separate offline startup and manual-update policy.
 
 `package-release.ps1` creates the optional `dist/Azec-portable.zip` with an adjacent runtime. Both package formats exclude personal configuration, logs, pairing captures, stale executable backups, and verification executables.
 
 ## Contributing and security
 
-Start with [Contributing](CONTRIBUTING.md) for setup, a code map, and guidance for your first focused change. Report ordinary bugs in [Issues](https://github.com/Azec-Zuckerberg/Azec/issues), and report vulnerabilities privately using the [security policy](SECURITY.md).
+Start with [Contributing](CONTRIBUTING.md) for setup, a code map, and guidance for your first focused change. Report ordinary bugs in [Issues](https://github.com/ZbouhaKahlin/Azec/issues), and report vulnerabilities privately using the [security policy](SECURITY.md).
 
 ## License and attribution
 

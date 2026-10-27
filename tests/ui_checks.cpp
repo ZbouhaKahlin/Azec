@@ -595,7 +595,7 @@ QJsonObject MainWindow::selfTest(const QString& output){
                 "http://172.31.255.254:18764/#token=4bbdc4dca77d42e0a61f8da225ac028e",
                 "http://255.255.255.255:65535/#token=0123456789abcdef0123456789abcdef",
                 "http://192.168.1.23:18764/#token=0123456789abcdef0123456789abcdef&fixture=longer-link-with-alignment-markers",
-                "https://github.com/Azec-Zuckerberg/Azec"};
+                "https://github.com/ZbouhaKahlin/Azec"};
             int sampleIndex=0;bool samplesReady=true;
             for(const auto& link:sampleLinks){
                 PairingQr sample(QStringLiteral("Reveal QR"),QStringLiteral("Hide QR"));sample.setPairingLink(link);

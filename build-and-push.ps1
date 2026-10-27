@@ -9,7 +9,7 @@ foreach ($moduleName in @('Microsoft.PowerShell.Management', 'Microsoft.PowerShe
     Import-Module (Join-Path $PSHOME "Modules\$moduleName\$moduleName.psd1") -ErrorAction Stop
 }
 Set-Location $PSScriptRoot
-$repo = 'Azec-Zuckerberg/Azec'
+$repo = 'ZbouhaKahlin/Azec'
 
 function Invoke-Checked([string]$Program, [string[]]$Arguments) {
     & $Program @Arguments
@@ -19,13 +19,13 @@ function Invoke-Checked([string]$Program, [string[]]$Arguments) {
 $branch = & git branch --show-current
 if ($LASTEXITCODE -ne 0 -or $branch -cne 'main') { throw 'Release publication requires the main branch.' }
 $remote = & git remote get-url origin
-if ($LASTEXITCODE -ne 0 -or $remote -notmatch '^https://github\.com/Azec-Zuckerberg/Azec(?:\.git)?/?$|^git@github\.com:Azec-Zuckerberg/Azec(?:\.git)?$') {
-    throw 'origin must point to Azec-Zuckerberg/Azec.'
+if ($LASTEXITCODE -ne 0 -or $remote -notmatch '^https://github\.com/ZbouhaKahlin/Azec(?:\.git)?/?$|^git@github\.com:ZbouhaKahlin/Azec(?:\.git)?$') {
+    throw 'origin must point to ZbouhaKahlin/Azec.'
 }
 $status = & git status --porcelain
 if ($LASTEXITCODE -ne 0 -or $status) { throw 'Commit the intended source changes first; the release checkout must be clean.' }
 Invoke-Checked 'gh' @('auth', 'status')
-Invoke-Checked 'gh' @('repo', 'view', 'Azec-Zuckerberg/Azec-releases', '--json', 'nameWithOwner')
+Invoke-Checked 'gh' @('repo', 'view', 'ZbouhaKahlin/Azec', '--json', 'nameWithOwner')
 Invoke-Checked 'git' @('fetch', 'origin', 'main')
 Invoke-Checked 'git' @('merge-base', '--is-ancestor', 'origin/main', 'HEAD')
 
@@ -43,7 +43,7 @@ if ($ResumeVersion) {
         throw 'Unexpected source changes during packaging; nothing was staged or pushed.'
     }
     Invoke-Checked 'git' @('add', '--', 'src/version.hpp')
-    Invoke-Checked 'git' @('-c', 'user.name=Azec', '-c', 'user.email=113215843+Azec-Zuckerberg@users.noreply.github.com', 'commit', '-m', "Release Azec $version")
+    Invoke-Checked 'git' @('-c', 'user.name=Azec', '-c', 'user.email=293977364+ZbouhaKahlin@users.noreply.github.com', 'commit', '-m', "Release Azec $version")
 }
 
 $header = Get-Content -LiteralPath 'src/version.hpp' -Raw
@@ -65,19 +65,16 @@ Install **Azec.exe** on Windows x64. Profiles remain in the existing Azec data f
 
 Source: https://github.com/$repo/commit/$commit. The source repository's matching tag identifies this build.
 
-The same installer is published in Azec and Azec-releases. Existing installations using Azec-releases can update normally; this build checks Azec for future updates.
+This build checks and downloads future updates from this repository.
 
 SHA-256 (Azec.exe): $sha
 "@ | Set-Content -LiteralPath $notes -Encoding UTF8
-foreach ($destination in @($repo, 'Azec-Zuckerberg/Azec-releases')) {
-    & gh release view $tag --repo $destination --json tagName *> $null
-    if ($LASTEXITCODE -ne 0) {
-        $target = if ($destination -ceq $repo) { $commit } else { 'main' }
-        Invoke-Checked 'gh' @('release', 'create', $tag, $exe, $checksum, '--repo', $destination, '--target', $target, '--title', "Azec $version", '--notes-file', $notes, '--latest')
-    } else {
-        Write-Host "Release $tag already exists in $destination; verifying without replacing assets."
-    }
-    Invoke-Checked 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'verify-release.ps1'), '-Version', $version, '-Repository', $destination)
+& gh release view $tag --repo $repo --json tagName *> $null
+if ($LASTEXITCODE -ne 0) {
+    Invoke-Checked 'gh' @('release', 'create', $tag, $exe, $checksum, '--repo', $repo, '--target', $commit, '--title', "Azec $version", '--notes-file', $notes, '--latest')
+} else {
+    Write-Host "Release $tag already exists in $repo; verifying without replacing assets."
 }
+Invoke-Checked 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'verify-release.ps1'), '-Version', $version, '-Repository', $repo)
 Write-Host "Published $tag from $commit"
 Write-Host "https://github.com/$repo/releases/latest/download/Azec.exe"

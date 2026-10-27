@@ -81,7 +81,7 @@ evidence. Maintainers may request a smaller change or decline a direction.
 ## Security and releases
 
 Use [private security reporting](SECURITY.md) for vulnerabilities. Normal bug
-reports belong in [Issues](https://github.com/Azec-Zuckerberg/Azec/issues).
+reports belong in [Issues](https://github.com/ZbouhaKahlin/Azec/issues).
 
 Contributors should build and test locally. Release publication is a maintainer
 action on `main`; see [Releasing](AGENTS.md#releasing). Contributions are offered

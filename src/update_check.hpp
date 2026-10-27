@@ -15,9 +15,9 @@
 #include <memory>
 
 namespace azec_update{
-inline constexpr const char* releasesRepo="Azec-Zuckerberg/Azec";
-inline constexpr const char* releasePage="https://github.com/Azec-Zuckerberg/Azec/releases/latest";
-inline constexpr const char* latestApi="https://api.github.com/repos/Azec-Zuckerberg/Azec/releases/latest";
+inline constexpr const char* releasesRepo="ZbouhaKahlin/Azec";
+inline constexpr const char* releasePage="https://github.com/ZbouhaKahlin/Azec/releases/latest";
+inline constexpr const char* latestApi="https://api.github.com/repos/ZbouhaKahlin/Azec/releases/latest";
 inline constexpr const char* assetName="Azec.exe";
 
 inline QByteArray validHash(QByteArray hash){

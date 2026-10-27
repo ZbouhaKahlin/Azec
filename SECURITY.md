@@ -3,12 +3,12 @@
 ## Supported versions
 
 Security fixes target the latest stable release on
-[GitHub Releases](https://github.com/Azec-Zuckerberg/Azec/releases). Older
+[GitHub Releases](https://github.com/ZbouhaKahlin/Azec/releases). Older
 releases and experimental branches do not receive separate security updates.
 
 ## Report a vulnerability privately
 
-Use [Report a vulnerability](https://github.com/Azec-Zuckerberg/Azec/security/advisories/new)
+Use [Report a vulnerability](https://github.com/ZbouhaKahlin/Azec/security/advisories/new)
 in this repository's Security tab. Do not open a public issue containing an
 exploit, pairing credentials, a token link, personal profiles, or private logs.
 

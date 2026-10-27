@@ -3,8 +3,8 @@ param(
     [ValidatePattern('^\d+(\.\d+){3}$')]
     [string]$Version,
     [string]$ResumeDirectory,
-    [ValidateSet('Azec-Zuckerberg/Azec', 'Azec-Zuckerberg/Azec-releases')]
-    [string]$Repository = 'Azec-Zuckerberg/Azec'
+    [ValidateSet('ZbouhaKahlin/Azec')]
+    [string]$Repository = 'ZbouhaKahlin/Azec'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,7 +42,7 @@ $checksumHash = (Get-FileHash -LiteralPath $checksumFile -Algorithm SHA256).Hash
 if ($checksumAsset.digest -cne ('sha256:' + $checksumHash) -or (Get-Content -LiteralPath $checksumFile -Raw).Trim() -cne ($localHash + '  Azec.exe')) { throw 'Published checksum file does not match the installer record.' }
 $expectedCommit = & git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve local source commit.' }
-$sourceCommit = Invoke-RestMethod -Uri "https://api.github.com/repos/Azec-Zuckerberg/Azec/commits/$tag" -Headers $headers -TimeoutSec 30
+$sourceCommit = Invoke-RestMethod -Uri "https://api.github.com/repos/ZbouhaKahlin/Azec/commits/$tag" -Headers $headers -TimeoutSec 30
 if ($sourceCommit.sha -cne $expectedCommit.Trim()) { throw 'The release tag does not identify the built source commit.' }
 if ($asset.digest -notmatch '^sha256:([0-9a-fA-F]{64})$') { throw 'GitHub asset SHA-256 digest is missing.' }
 $publishedHash = $Matches[1].ToLowerInvariant()
