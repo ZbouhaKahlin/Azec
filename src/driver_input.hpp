@@ -33,18 +33,15 @@ inline constexpr unsigned short move_relative=0x000;
 inline constexpr unsigned short left_button_down=0x001;
 inline constexpr unsigned short left_button_up=0x002;
 
-// Interception reserves 1-10 for keyboards and numbers mice from 11
-// (INTERCEPTION_MOUSE(0) = INTERCEPTION_MAX_KEYBOARD + 0 + 1). Sending to 1
-// addresses a keyboard device, which silently produced no pointer movement.
+// Interception reserves 1-10 for keyboards and 11-20 for possible mouse slots.
+// A slot's number does not prove a mouse is connected; query its hardware ID.
 inline constexpr int first_mouse_device=11;
-inline constexpr int mouse_device=first_mouse_device;
 
 namespace detail {
 using CreateContext=void*(*)();
 using DestroyContext=void(*)(void*);
 using SendStrokes=int(*)(void*,int,const void*,unsigned int);
 using IsInvalidHandle=int(*)(void*);
-using IsMouse=int(*)(int);
 using HardwareId=unsigned int(*)(void*,int,void*,unsigned int);
 
 inline HMODULE loadModule(QString* failure=nullptr){
@@ -85,9 +82,8 @@ struct Backend {
     SendStrokes send=nullptr;
     DestroyContext destroy=nullptr;
     IsInvalidHandle invalid=nullptr;
-    IsMouse is_mouse=nullptr;
     HardwareId hardware_id=nullptr;
-    int device=mouse_device;
+    int device=0;
     std::mutex mutex;
     bool tried=false;
     QString failure_code,failure_detail;
@@ -97,11 +93,15 @@ struct Backend {
         if(failure_code!=code||failure_detail!=detail)diagnostic(code,detail);
         failure_code=code;failure_detail=detail;return false;
     }
+    bool connectedMouse(int candidate) const{
+        if(!context||!hardware_id)return false;
+        wchar_t buffer[512]{};
+        return hardware_id(context,candidate,buffer,sizeof(buffer))>0;
+    }
     QString deviceSummary(){
         QStringList present;
         if(hardware_id&&context)for(int candidate=first_mouse_device;candidate<first_mouse_device+10;++candidate){
-            wchar_t buffer[512]{};
-            if(hardware_id(context,candidate,buffer,sizeof(buffer)))present<<QString::number(candidate);
+            if(connectedMouse(candidate))present<<QString::number(candidate);
         }
         HANDLE token=nullptr;TOKEN_ELEVATION elevation{};DWORD size=0;
         bool known=OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token)!=FALSE;
@@ -112,8 +112,8 @@ struct Backend {
             "; invalid_handle_export="+QString(invalid?"yes":"no");
     }
 
-    // Resolves the exports and opens a context. The context only exists when the
-    // driver itself answered, so this doubles as the availability check.
+    // Opening the context and finding a connected mouse establish availability;
+    // only an actual send can establish whether that device accepts output.
     bool ensure(){
         if(tried)return context!=nullptr;
         tried=true;
@@ -124,9 +124,9 @@ struct Backend {
         send=reinterpret_cast<SendStrokes>(GetProcAddress(module,"interception_send"));
         destroy=reinterpret_cast<DestroyContext>(GetProcAddress(module,"interception_destroy_context"));
         invalid=reinterpret_cast<IsInvalidHandle>(GetProcAddress(module,"interception_is_invalid_handle"));
-        is_mouse=reinterpret_cast<IsMouse>(GetProcAddress(module,"interception_is_mouse"));
         hardware_id=reinterpret_cast<HardwareId>(GetProcAddress(module,"interception_get_hardware_id"));
-        if(!create||!send)return fail("DRV-DLL-EXPORT","create="+QString::number(create!=nullptr)+"; send="+QString::number(send!=nullptr));
+        if(!create||!send||!destroy||!hardware_id)return fail("DRV-DLL-EXPORT","create="+QString::number(create!=nullptr)+
+            "; send="+QString::number(send!=nullptr)+"; destroy="+QString::number(destroy!=nullptr)+"; hardware_id="+QString::number(hardware_id!=nullptr));
         SetLastError(ERROR_SUCCESS);
         context=create();
         const DWORD context_error=GetLastError();
@@ -135,8 +135,13 @@ struct Backend {
         // An invalid handle means the driver refused the open, usually because
         // the caller is not elevated.
         if(invalid&&invalid(context)){if(destroy)destroy(context);context=nullptr;refused=true;return fail("DRV-CONTEXT-REFUSED",deviceSummary());}
-        if(is_mouse)for(int candidate=first_mouse_device;candidate<first_mouse_device+10;++candidate)
-            if(is_mouse(candidate)){device=candidate;break;}
+        device=0;
+        for(int candidate=first_mouse_device;candidate<first_mouse_device+10;++candidate)
+            if(connectedMouse(candidate)){device=candidate;break;}
+        if(!device){
+            const auto summary=deviceSummary();destroy(context);context=nullptr;
+            return fail("DRV-MOUSE-NOT-FOUND",summary);
+        }
         return true;
     }
 
@@ -163,7 +168,7 @@ struct Backend {
 inline Backend& backend(){static Backend instance;return instance;}
 }
 
-// Ready: the driver answered and strokes can be sent.
+// Ready: the driver opened and a mouse slot exposes a hardware ID; sends are untested.
 // Refused: the driver is installed but rejected the open (usually no admin).
 // DriverMissing: the DLL loaded but the driver did not answer.
 // DllMissing: interception.dll could not be loaded at all.
