@@ -3,7 +3,6 @@
 **Open-source Rainbow Six operator and weapon profiles for Windows**, built with C++17 and Qt 6.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/Azec-Zuckerberg/Azec)](https://github.com/Azec-Zuckerberg/Azec/releases/latest)
 ![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-555.svg)
 
 Azec uses the **MonoCode** design with Dark and Light themes. The current application lives on `main`; experimental editions remain on separate branches.
