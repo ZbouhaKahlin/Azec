@@ -8,6 +8,29 @@ QJsonObject MainWindow::selfTest(const QString& output){
         const auto wait=[](int milliseconds){QEventLoop loop;QTimer::singleShot(milliseconds,&loop,&QEventLoop::quit);loop.exec();};
         // Pause global hotkey polling; fixture actions call production handlers directly.
         poll_.stop();
+        if(QCoreApplication::arguments().contains("--error-report-only")){
+            QJsonObject checks;
+            const auto before=engine_.snapshot();const bool dirtyBefore=unsaved_;
+            showNotice(UiText::DriverTestFailed,true,true,"DRV-TEST-RIGHT","DRV-SEND-MOVE; sent=0; send_win32=21; selected_mouse=11; hardware_id_slots=12");
+            checks["error_has_code_and_copy_action"]=notice_code_->isVisible()&&notice_code_->text()=="DRV-TEST-RIGHT"&&notice_copy_->isVisible();
+            const auto report=notice_report_;notice_copy_->click();wait(30);
+            checks["copy_returns_the_displayed_error_report"]=QApplication::clipboard()->text()==report&&report.contains(AZEC_VERSION)&&report.contains("hardware_id_slots=12");
+            showNotice(UiText::DriverFilesReady);
+            checks["routine_feedback_preserves_error_report"]=notice_report_==report&&notice_bar_->isVisible();
+            showNotice(UiText::CouldNotSaveConfiguration,true,true);const auto saveCode=notice_code_->text();
+            engine_.edit([](r6::Config& c){c.language=2;});showNotice(UiText::CouldNotSaveConfiguration,true,true);
+            checks["error_code_is_independent_of_language"]=saveCode==notice_code_->text()&&notice_copy_->text()==text(UiText::CopyErrorReport);
+            showNotice(UiText::DriverDownloadFailed,true,true,"DRV-ARCHIVE-HASH","Checksum mismatch");
+            notice_copy_->click();wait(30);
+            checks["later_error_replaces_old_copied_details"]=QApplication::clipboard()->text()==notice_report_&&!notice_report_.contains("hardware_id_slots");
+            notice_close_->click();showNotice(UiText::DriverTestSent);
+            checks["success_has_no_error_report_action"]=notice_copy_->isHidden()&&notice_code_->isHidden()&&notice_report_.isEmpty();
+            QFile log("azec.log");const auto bytes=log.open(QIODevice::ReadOnly)?log.readAll():QByteArray();
+            checks["error_log_records_distinct_stages"]=bytes.contains("DRV-TEST-RIGHT")&&bytes.contains("DRV-ARCHIVE-HASH")&&bytes.contains("send_win32=21");
+            engine_.edit([&](r6::Config& c){c=before;});
+            checks["reports_do_not_edit_or_save_profiles"]=unsaved_==dirtyBefore&&engine_.snapshot().bytes()==before.bytes();
+            bool passed=true;for(const auto& value:checks)passed&=value.toBool();return {{"passed",passed},{"checks",checks}};
+        }
         if(QCoreApplication::arguments().contains("--startup-update-only"))return startupUpdateChecks(output,[&](QNetworkAccessManager* network){
             QJsonObject checks;const QString fixture=output+"/continuous-startup";QDir().mkpath(fixture);r6::Engine staged(true);
             staged.edit([](r6::Config& config){config.language=1;config.phone_enabled=true;});

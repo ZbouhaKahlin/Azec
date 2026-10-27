@@ -188,4 +188,5 @@ inline const char* const lang_zh[]={
     "正在重启 Azec",
     "暂时无法检查更新",
     "无法下载更新，请重试。",
+    "复制错误报告",
 };

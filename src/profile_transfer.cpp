@@ -13,8 +13,8 @@ void MainWindow::exportProfiles(){
     const auto bytes=QJsonDocument(makeBackup(engine_.snapshot(),favorites_,engine_.game_focus_only.load(),
         engine_.ads_only.load())).toJson(QJsonDocument::Compact);QSaveFile file(path);
     if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){
-        diagnostic("export profiles",file.errorString());showNotice(text(UiText::CouldNotExportProfilesCheckTheDestinationPermissions),true,true);
-    }else showNotice(text(UiText::ProfilesExported));
+        diagnostic("export profiles",file.errorString());showNotice(UiText::CouldNotExportProfilesCheckTheDestinationPermissions,true,true,"BACKUP-EXPORT-WRITE",file.errorString());
+    }else showNotice(UiText::ProfilesExported);
 }
 bool MainWindow::applyBackup(const QByteArray& bytes){
     if(bytes.size()>1024*1024)return false;
@@ -44,11 +44,11 @@ void MainWindow::importProfiles(){
     const bool valid=file.error()==QFile::NoError&&document.isObject()&&parseBackup(document.object(),imported,favorites,options,&existing);file.close();
     if(!valid){
         diagnostic("import profiles",file.error()!=QFile::NoError?file.errorString():QStringLiteral("Invalid backup, unsupported version, or file exceeds 1 MiB"));
-        showNotice(text(UiText::ImportFailedCheckTheBackupFormatAndFilePermissionsExistingProfile),true,true);return;
+        showNotice(UiText::ImportFailedCheckTheBackupFormatAndFilePermissionsExistingProfile,true,true,file.error()!=QFile::NoError?"BACKUP-IMPORT-READ":"BACKUP-IMPORT-INVALID",file.error()!=QFile::NoError?file.errorString():QStringLiteral("Invalid backup, unsupported version, or file exceeds 1 MiB"));return;
     }
     const auto summary=text(UiText::ImportBackupPreview).arg(QFileInfo(path).fileName()).arg(document.object()["operators"].toArray().size());
     if(!confirmProfileAction(text(UiText::ImportBackup),summary,text(UiText::ImportBackup)))return;
     if(!applyBackup(bytes)){
-        showNotice(text(UiText::ImportFailedCheckTheBackupFormatAndFilePermissionsExistingProfile),true,true);
-    }else showNotice(text(UiText::ProfilesImportedSaveToKeepTheChanges));
+        showNotice(UiText::ImportFailedCheckTheBackupFormatAndFilePermissionsExistingProfile,true,true,"BACKUP-IMPORT-APPLY","Could not apply the validated backup; existing UI preferences could not be read.");
+    }else showNotice(UiText::ProfilesImportedSaveToKeepTheChanges);
 }

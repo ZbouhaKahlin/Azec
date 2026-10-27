@@ -9,3 +9,5 @@ HEADERS += ../src/sensitivity.hpp ../src/profile_store.hpp ../src/profile_transf
 DEFINES += NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS
 QMAKE_CXXFLAGS += /utf-8
 LIBS += -luser32
+
+LIBS += -ladvapi32

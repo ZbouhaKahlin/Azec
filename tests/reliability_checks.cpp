@@ -132,12 +132,26 @@ int main(int argc,char** argv){
     const auto destroys=reinterpret_cast<int(*)()>(GetProcAddress(heldModule,"fixture_destroys"));
     driver_input::detail::Backend backend;backend.module=LoadLibraryW(reinterpret_cast<LPCWSTR>(stub.utf16()));
     check(!backend.ensure()&&creates()==1,"driver fixture initially fails context creation");
+    check(backend.failure_code=="DRV-CONTEXT-ACCESS"&&backend.failure_detail.contains("context_win32=5"),"context report captures access denial before diagnostic calls");
     mode(1);check(!backend.ensure()&&creates()==1,"failed driver probe stays cached until explicitly retried");
     backend.retryInitialization();check(backend.ensure()&&creates()==2,"explicit retry opens a newly available driver context");
     backend.retryInitialization();check(backend.ensure()&&creates()==2,"retry leaves an already working context untouched");
     backend.destroy(backend.context);backend.context=nullptr;mode(2);backend.retryInitialization();
     check(!backend.ensure()&&backend.refused&&destroys()==2,"refused contexts are released before retry");
     mode(1);backend.retryInitialization();check(!backend.refused&&backend.ensure()&&creates()==4,"retry clears refusal and reopens without reloading the DLL");
+    driver_input::MouseStroke movement{};movement.x=40;
+    SetLastError(ERROR_INVALID_PARAMETER);
+    check(!backend.stroke(movement)&&backend.failure_code=="DRV-SEND-MOVE"&&backend.failure_detail.contains("send_win32=21")&&
+          backend.failure_detail.contains("selected_mouse=11")&&backend.failure_detail.contains("hardware_id_slots=12"),
+          "send report captures return value, fresh Windows error and actual populated slot without selecting it");
+    const auto logSize=QFileInfo("azec.log").size();
+    check(!backend.stroke(movement)&&QFileInfo("azec.log").size()==logSize,"identical worker failures do not flood the log");
+    movement.state=driver_input::left_button_down;
+    check(!backend.stroke(movement)&&backend.failure_code=="DRV-SEND-BUTTON","button and movement failures have different codes");
+    mode(3);check(backend.stroke(movement),"diagnostics preserve successful sends");
+    const auto redacted=errorReport("TEST-REPORT","Example",QDir::homePath()+"/private https://example.test/?token=secret token=secret code=123456");
+    check(!redacted.contains(QDir::homePath())&&!redacted.contains("secret")&&!redacted.contains("123456")&&redacted.contains(AZEC_VERSION),
+          "shareable reports contain the build version and redact home paths, links and credentials");
     backend.destroy(backend.context);FreeLibrary(backend.module);FreeLibrary(heldModule);
 
     QNetworkAccessManager network;

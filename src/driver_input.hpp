@@ -3,6 +3,7 @@
 #include <mutex>
 #include <string>
 #include "driver_setup.hpp"
+#include "diagnostics.hpp"
 
 // Optional Interception backend (github.com/oblitum/Interception).
 //
@@ -44,31 +45,38 @@ using DestroyContext=void(*)(void*);
 using SendStrokes=int(*)(void*,int,const void*,unsigned int);
 using IsInvalidHandle=int(*)(void*);
 using IsMouse=int(*)(int);
+using HardwareId=unsigned int(*)(void*,int,void*,unsigned int);
 
-inline HMODULE loadModule(){
+inline HMODULE loadModule(QString* failure=nullptr){
     const auto target=driver_setup::dllTarget();
-    const auto load=[](const QString& path)->HMODULE{
+    const auto load=[failure](const QString& path,const char* location)->HMODULE{
         driver_setup::VerifiedFile file;
-        if(!file.open(path,driver_setup::dllSha256()))return nullptr;
+        if(!file.open(path,driver_setup::dllSha256())){
+            if(failure)*failure+=QString::fromLatin1(location)+": "+file.error()+"; ";
+            return nullptr;
+        }
         // The pinned DLL only needs Windows dependencies. Never search its
         // writable directory for additional executable code.
-        return LoadLibraryExW(reinterpret_cast<LPCWSTR>(file.path().utf16()),nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
+        const auto module=LoadLibraryExW(reinterpret_cast<LPCWSTR>(file.path().utf16()),nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
+        const DWORD error=module?ERROR_SUCCESS:GetLastError();
+        if(failure)*failure+=QString::fromLatin1(location)+": verified-dll; load_win32="+QString::number(error)+"; ";
+        return module;
     };
-    if(const HMODULE module=load(target))return module;
+    if(const HMODULE module=load(target,"persistent"))return module;
     {
         const auto adjacent=QDir(QCoreApplication::applicationDirPath()).filePath("interception.dll");
         if(driver_setup::place(adjacent)){
-            if(const HMODULE module=load(target))return module;
+            if(const HMODULE module=load(target,"persistent"))return module;
         }
         const auto source=driver_setup::findDll(driver_setup::workRoot());
         if(!source.isEmpty()&&driver_setup::place(source)){
-            if(const HMODULE module=load(target))return module;
+            if(const HMODULE module=load(target,"persistent"))return module;
         }
-        if(const HMODULE module=load(adjacent))return module;
+        if(const HMODULE module=load(adjacent,"adjacent"))return module;
     }
     wchar_t directory[MAX_PATH]{};
     if(!GetSystemDirectoryW(directory,MAX_PATH))return nullptr;
-    return load(QString::fromWCharArray(directory)+QStringLiteral("/interception.dll"));
+    return load(QString::fromWCharArray(directory)+QStringLiteral("/interception.dll"),"system");
 }
 
 struct Backend {
@@ -78,28 +86,55 @@ struct Backend {
     DestroyContext destroy=nullptr;
     IsInvalidHandle invalid=nullptr;
     IsMouse is_mouse=nullptr;
+    HardwareId hardware_id=nullptr;
     int device=mouse_device;
     std::mutex mutex;
     bool tried=false;
+    QString failure_code,failure_detail;
+
+    bool fail(const QString& code,const QString& detail){
+        // Workers can retry thousands of times; log only a changed failure.
+        if(failure_code!=code||failure_detail!=detail)diagnostic(code,detail);
+        failure_code=code;failure_detail=detail;return false;
+    }
+    QString deviceSummary(){
+        QStringList present;
+        if(hardware_id&&context)for(int candidate=first_mouse_device;candidate<first_mouse_device+10;++candidate){
+            wchar_t buffer[512]{};
+            if(hardware_id(context,candidate,buffer,sizeof(buffer)))present<<QString::number(candidate);
+        }
+        HANDLE token=nullptr;TOKEN_ELEVATION elevation{};DWORD size=0;
+        bool known=OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token)!=FALSE;
+        if(known){known=GetTokenInformation(token,TokenElevation,&elevation,sizeof(elevation),&size)!=FALSE;CloseHandle(token);}
+        return "selected_mouse="+QString::number(device)+"; hardware_id_slots="+
+            (!hardware_id?QString("unavailable"):!context?QString("not-probed"):present.isEmpty()?QString("none"):present.join(','))+
+            "; elevated="+(!known?QString("unknown"):QString(elevation.TokenIsElevated?"yes":"no"))+
+            "; invalid_handle_export="+QString(invalid?"yes":"no");
+    }
 
     // Resolves the exports and opens a context. The context only exists when the
     // driver itself answered, so this doubles as the availability check.
     bool ensure(){
         if(tried)return context!=nullptr;
         tried=true;
-        if(!module)module=loadModule();
-        if(!module)return false;
+        QString loading;
+        if(!module)module=loadModule(&loading);
+        if(!module)return fail("DRV-DLL-LOAD",loading);
         const auto create=reinterpret_cast<CreateContext>(GetProcAddress(module,"interception_create_context"));
         send=reinterpret_cast<SendStrokes>(GetProcAddress(module,"interception_send"));
         destroy=reinterpret_cast<DestroyContext>(GetProcAddress(module,"interception_destroy_context"));
         invalid=reinterpret_cast<IsInvalidHandle>(GetProcAddress(module,"interception_is_invalid_handle"));
         is_mouse=reinterpret_cast<IsMouse>(GetProcAddress(module,"interception_is_mouse"));
-        if(!create||!send)return false;
+        hardware_id=reinterpret_cast<HardwareId>(GetProcAddress(module,"interception_get_hardware_id"));
+        if(!create||!send)return fail("DRV-DLL-EXPORT","create="+QString::number(create!=nullptr)+"; send="+QString::number(send!=nullptr));
+        SetLastError(ERROR_SUCCESS);
         context=create();
-        if(!context)return false;
+        const DWORD context_error=GetLastError();
+        if(!context)return fail(context_error==ERROR_ACCESS_DENIED?"DRV-CONTEXT-ACCESS":"DRV-CONTEXT-OPEN",
+            "context_win32="+QString::number(context_error)+"; "+deviceSummary());
         // An invalid handle means the driver refused the open, usually because
         // the caller is not elevated.
-        if(invalid&&invalid(context)){if(destroy)destroy(context);context=nullptr;refused=true;return false;}
+        if(invalid&&invalid(context)){if(destroy)destroy(context);context=nullptr;refused=true;return fail("DRV-CONTEXT-REFUSED",deviceSummary());}
         if(is_mouse)for(int candidate=first_mouse_device;candidate<first_mouse_device+10;++candidate)
             if(is_mouse(candidate)){device=candidate;break;}
         return true;
@@ -109,12 +144,19 @@ struct Backend {
 
     // Keep the loaded library reference, but reopen a failed driver context on
     // an explicit retry. A working context is never interrupted.
-    void retryInitialization(){if(!context){tried=false;refused=false;}}
+    void retryInitialization(){if(!context){tried=false;refused=false;failure_code.clear();failure_detail.clear();}}
 
     bool stroke(MouseStroke& value){
         std::lock_guard lock(mutex);
         if(!ensure())return false;
-        return send(context,device,&value,1)>0;
+        SetLastError(ERROR_SUCCESS);
+        const int sent=send(context,device,&value,1);
+        const DWORD error=GetLastError();
+        if(sent>0)return true;
+        const QString code=value.state?"DRV-SEND-BUTTON":"DRV-SEND-MOVE";
+        const QString prefix="sent="+QString::number(sent)+"; send_win32="+QString::number(error)+"; ";
+        if(failure_code==code&&failure_detail.startsWith(prefix))return false;
+        return fail(code,prefix+deviceSummary()+"; Windows error is the DLL call's last error, not a confirmed cause");
     }
 };
 
@@ -139,6 +181,9 @@ inline State state(){
 
 inline bool available(){return state()==State::Ready;}
 
+inline QString failureCode(){auto& b=detail::backend();std::lock_guard lock(b.mutex);return b.failure_code;}
+inline QString failureDetail(){auto& b=detail::backend();std::lock_guard lock(b.mutex);return b.failure_detail;}
+
 inline void retryInitialization(){
     auto& backend=detail::backend();std::lock_guard lock(backend.mutex);
     backend.retryInitialization();
@@ -159,9 +204,13 @@ inline bool button(bool down){
 
 // Short right/left sweep for the Settings test button: the cursor visibly moves
 // when the driver path works, independently of any game.
-inline bool test(){
+inline bool test(QString* failedPhase=nullptr){
+    if(failedPhase)*failedPhase="DRV-TEST-RIGHT";
     if(!move(40,0))return false;
     Sleep(60);
-    return move(-40,0);
+    if(failedPhase)*failedPhase="DRV-TEST-RETURN";
+    const bool sent=move(-40,0);
+    if(sent&&failedPhase)failedPhase->clear();
+    return sent;
 }
 } // namespace driver_input

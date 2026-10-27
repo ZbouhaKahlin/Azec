@@ -104,7 +104,7 @@ class MainWindow final : public QWidget {
     QPointer<MonoButton> copy_link_,copy_code_;
     QPointer<QPushButton> phone_new_code_,phone_retry_;
     QPointer<QPushButton> update_button_;QNetworkAccessManager* network_=nullptr;bool update_in_progress_=false;
-    QWidget* notice_bar_=nullptr;QLabel *notice_=nullptr,*notice_title_=nullptr,*notice_badge_=nullptr;QPushButton* notice_close_=nullptr;QScrollArea* notice_scroll_=nullptr;
+    QWidget* notice_bar_=nullptr;QLabel *notice_=nullptr,*notice_title_=nullptr,*notice_badge_=nullptr;QPushButton* notice_close_=nullptr;MonoButton* notice_copy_=nullptr;QLabel* notice_code_=nullptr;QString notice_report_;QScrollArea* notice_scroll_=nullptr;
     QPointer<QComboBox> theme_choice_;
     BrandLabel* brand_=nullptr;
     QWidget* content_=nullptr;
@@ -213,7 +213,7 @@ class MainWindow final : public QWidget {
     void setFavorite(int id,bool enabled){
         if(id<0||id>=r6::operator_count)return;const auto name=QString::fromUtf8(engine_.snapshot().operators[id].name);const auto previous=favorites_;
         if(enabled)favorites_.insert(name);else favorites_.remove(name);
-        if(!persistFavorites()){favorites_=previous;showNotice(text(UiText::CouldNotSaveFavorites),true,true);}
+        if(!persistFavorites()){favorites_=previous;showNotice(UiText::CouldNotSaveFavorites,true,true);}
         refreshFavorites();
     }
     void showOperatorMenu(QListWidget* list,const QPoint& position){
@@ -280,7 +280,7 @@ class MainWindow final : public QWidget {
         const bool error=notice_bar_->property("error").toBool();
         const QColor badge=error?QColor(244,63,94,38):QColor(69,155,247,32);
         const QColor badgeInk=error?kbtheme::danger:kbtheme::purple;
-        notice_title_->setText(text(error?UiText::NoticeErrorTitle:UiText::NoticeTitle));notice_close_->setText(text(UiText::Understood));
+        notice_title_->setText(text(error?UiText::NoticeErrorTitle:UiText::NoticeTitle));notice_close_->setText(text(UiText::Understood));if(notice_copy_)notice_copy_->setText(text(UiText::CopyErrorReport));
         notice_badge_->setText(error?QStringLiteral("!"):QStringLiteral("i"));
         notice_bar_->setStyleSheet(QString("QWidget#noticeBar{background:%1;border:1px solid %2;border-radius:14px;}"
             "QLabel#noticeBadge{background:%3;color:%4;border:0;border-radius:17px;font-size:17px;font-weight:600;}"
@@ -299,7 +299,7 @@ class MainWindow final : public QWidget {
         if(light==kbtheme::light)return;
         if(!uiprefs::update(config_path_,[=](QJsonObject& root){root["theme"]=light?"light":"dark";})){
             if(theme_choice_){QSignalBlocker blocked(theme_choice_.data());theme_choice_->setCurrentIndex(kbtheme::light?1:0);}
-            showNotice(text(UiText::CouldNotSaveTheme),true,true);return;
+            showNotice(UiText::CouldNotSaveTheme,true,true);return;
         }
         pages_->settle();
         const QPixmap previous=isVisible()?(theme_snapshot_?theme_snapshot_->frame():grab()):QPixmap();
@@ -450,10 +450,11 @@ class MainWindow final : public QWidget {
         resolveInstaller();refreshOutputStatus();
     }
     void testDriver(){
-        if(engine_.dry_run()){showNotice(text(UiText::DriverTestFailed),true);return;}
+        if(engine_.dry_run()){showNotice(UiText::DriverTestFailed,true,true,"DRV-TEST-DRY-RUN","Mouse output is disabled in this fixture.");return;}
         // A visible 40 px sweep proves the driver path without the game.
-        if(driver_input::test())showNotice(text(UiText::DriverTestSent));
-        else{diagnostic("driver test","interception_send rejected the test move");showNotice(text(UiText::DriverTestFailed),true,true);}
+        QString phase;
+        if(driver_input::test(&phase))showNotice(UiText::DriverTestSent);
+        else showNotice(UiText::DriverTestFailed,true,true,phase,driver_input::failureCode()+"; "+driver_input::failureDetail());
     }
     // The Interception device only answers an elevated caller, so a refused
     // context offers a one-click relaunch that keeps the current arguments.
@@ -477,8 +478,8 @@ class MainWindow final : public QWidget {
         launch.lpParameters=parameters.empty()?nullptr:parameters.c_str();launch.nShow=SW_SHOWNORMAL;
         if(!ShellExecuteExW(&launch)){
             const auto error=GetLastError();
-            if(error==ERROR_CANCELLED)showNotice(text(UiText::AdministratorRestartCancelled));
-            else{diagnostic("restart as administrator","Windows error "+QString::number(error));showNotice(text(UiText::AdministratorRestartFailed),true,true);}
+            if(error==ERROR_CANCELLED)showNotice(UiText::AdministratorRestartCancelled);
+            else{diagnostic("restart as administrator","Windows error "+QString::number(error));showNotice(UiText::AdministratorRestartFailed,true,true,"DRV-ADMIN-LAUNCH","launch_win32="+QString::number(error));}
             return;
         }
         force_close_=true;close();
@@ -501,18 +502,18 @@ class MainWindow final : public QWidget {
             if(!found.isEmpty()){
                 QString error;
                 if(driver_setup::place(found,&error)){
-                    showNotice(text(UiText::DriverPlaced));
+                    showNotice(UiText::DriverPlaced);
                     driver_input::retryInitialization();current=driver_input::state();
                 }else{
                     diagnostic("driver place",error);
-                    showNotice(text(UiText::DriverPlaceFailed),true,true);
+                    showNotice(UiText::DriverPlaceFailed,true,true,"DRV-DLL-PLACE",error);
                 }
             }
         }
         resolveInstaller();
         refreshOutputStatus();
-        if(current==driver_input::State::Ready){showNotice(text(UiText::DriverFound));return;}
-        showNotice(text(current==driver_input::State::Refused?UiText::DriverBlocked:UiText::DriverMissing),true);
+        if(current==driver_input::State::Ready){showNotice(UiText::DriverFound);return;}
+        showNotice(current==driver_input::State::Refused?UiText::DriverBlocked:UiText::DriverMissing,true,true,driver_input::failureCode(),driver_input::failureDetail());
     }
     void downloadDriver(){
         if(!network_)network_=new QNetworkAccessManager(this);
@@ -523,7 +524,7 @@ class MainWindow final : public QWidget {
             // a captive portal fails before anything touches the disk.
             if(!error.isEmpty()||!driver_setup::verify(payload)){
                 diagnostic("driver download",error.isEmpty()?QStringLiteral("Archive checksum mismatch"):error);
-                showNotice(text(UiText::DriverDownloadFailed),true,true);return;
+                showNotice(UiText::DriverDownloadFailed,true,true,error.isEmpty()?QStringLiteral("DRV-ARCHIVE-HASH"):QStringLiteral("DRV-ARCHIVE-DOWNLOAD"),error.isEmpty()?QStringLiteral("Archive checksum mismatch"):error);return;
             }
             const auto root=driver_setup::workRoot();
             const auto archive=root+QStringLiteral("/Interception.zip");
@@ -531,22 +532,22 @@ class MainWindow final : public QWidget {
             QFile file(archive);
             if(!file.open(QIODevice::WriteOnly)||file.write(payload)!=payload.size()){
                 diagnostic("driver download","could not write "+archive);
-                showNotice(text(UiText::DriverDownloadFailed),true,true);return;
+                showNotice(UiText::DriverDownloadFailed,true,true,"DRV-ARCHIVE-WRITE",file.errorString());return;
             }
             file.close();
             driver_setup::VerifiedFile verifiedArchive;
             if(!verifiedArchive.open(archive,driver_setup::sha256())||!driver_setup::extract(archive,root,&error)){
                 diagnostic("driver extract",error);
-                showNotice(text(UiText::DriverDownloadFailed),true,true);return;
+                showNotice(UiText::DriverDownloadFailed,true,true,"DRV-ARCHIVE-EXTRACT",error.isEmpty()?verifiedArchive.error():error);return;
             }
             const auto found=driver_setup::findDll(root);
-            if(found.isEmpty()){diagnostic("driver extract","library/x64/interception.dll not found");showNotice(text(UiText::DriverDownloadFailed),true,true);return;}
+            if(found.isEmpty()){diagnostic("driver extract","library/x64/interception.dll not found");showNotice(UiText::DriverDownloadFailed,true,true,"DRV-ARCHIVE-DLL-MISSING","Verified x64 DLL not found after extraction.");return;}
             if(!driver_setup::place(found,&error)){
                 diagnostic("driver place",error);
-                showNotice(text(UiText::DriverPlaceFailed),true,true);return;
+                showNotice(UiText::DriverPlaceFailed,true,true,"DRV-DLL-PLACE",error);return;
             }
             driver_input::retryInitialization();resolveInstaller();refreshOutputStatus();
-            showNotice(text(UiText::DriverFilesReady));
+            showNotice(UiText::DriverFilesReady);
         });
     }
     // The driver is the only output backend, so the card reports its state
@@ -605,7 +606,7 @@ class MainWindow final : public QWidget {
         phone_enabled_=toggle(settingRow(phoneSection,text(UiText::EnablePhoneAccess)),"Enable phone access",c.phone_enabled,[this](bool enabled){
             engine_.edit([&](r6::Config& c){c.phone_enabled=enabled;});
             if(pairing_qr_)pairing_qr_->conceal();
-            if(enabled){if(!phone_->start()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}}
+            if(enabled){if(!phone_->start()){showNotice(UiText::CouldNotStartPhoneServer,true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}}
             else phone_->stop();
             updatePhoneDetails();phone_details_->setExpanded(enabled);dirty();
         });
@@ -615,7 +616,7 @@ class MainWindow final : public QWidget {
             auto* addressRow=new QHBoxLayout;addressRow->setSpacing(8);
             auto* address=label({},"phoneAddress");phone_address_=address;address->setWordWrap(true);address->setMinimumWidth(0);address->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);address->setTextInteractionFlags(Qt::TextSelectableByMouse);addressRow->addWidget(address,1);
             phone_retry_=new MonoButton(text(UiText::Retry));phone_retry_->setObjectName("secondary");phone_retry_->setAccessibleName(text(UiText::Retry));addressRow->addWidget(phone_retry_);
-            connect(phone_retry_,&QPushButton::clicked,this,[this]{if(!phone_->start()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}else if(notice_bar_&&notice_bar_->property("phoneError").toBool()){notice_bar_->setProperty("phoneError",false);notice_timer_.stop();notice_bar_->hide();}updatePhoneDetails();});
+            connect(phone_retry_,&QPushButton::clicked,this,[this]{if(!phone_->start()){showNotice(UiText::CouldNotStartPhoneServer,true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}else if(notice_bar_&&notice_bar_->property("phoneError").toBool()){notice_bar_->setProperty("phoneError",false);notice_timer_.stop();notice_bar_->hide();}updatePhoneDetails();});
             connectionLayout->addLayout(addressRow);
             auto* pair=new QHBoxLayout;pair->setSpacing(7);pair->addWidget(label(text(UiText::PairingCode),"hint"));
             phone_code_=new QLabel(phone_->code());phone_code_->setObjectName("pairingCode");phone_code_->setTextInteractionFlags(Qt::TextSelectableByMouse);pair->addWidget(phone_code_);pair->addStretch();
@@ -625,7 +626,7 @@ class MainWindow final : public QWidget {
             copy_link_=new MonoButton(text(UiText::CopyLink));copy_link_->setObjectName("secondary");copy_link_->setInteractionIcon(InteractionIcon::Copy);pairActions->addWidget(copy_link_);
             connect(copy_link_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(phone_->pairingLink());if(engine_.snapshot().sound)sound::playCopy();copy_link_->setToolTip(text(UiText::Copied));copy_link_->confirmCopy();});
             phone_new_code_=new MonoButton(text(UiText::NewCode));phone_new_code_->setObjectName("secondary");pairActions->addWidget(phone_new_code_);
-            connect(phone_new_code_,&QPushButton::clicked,this,[this]{phone_->rotate();if(pairing_qr_)pairing_qr_->conceal();updatePhoneDetails();showNotice(text(UiText::NewCodeCreated));});
+            connect(phone_new_code_,&QPushButton::clicked,this,[this]{phone_->rotate();if(pairing_qr_)pairing_qr_->conceal();updatePhoneDetails();showNotice(UiText::NewCodeCreated);});
             pairActions->addStretch();connectionLayout->addLayout(pairActions);
             auto* note=label(text(UiText::OpenThisAddressInSafariOnTheSameWiFi),"hint");note->setWordWrap(true);connectionLayout->addWidget(note);
             pairing_qr_=new PairingQr(text(UiText::ClickToRevealQR),text(UiText::ClickToHideQR));
@@ -658,7 +659,7 @@ class MainWindow final : public QWidget {
             if(notice_->text().contains(message))return;
             message=notice_->text()+"\n\n"+message;
         }
-        showNotice(message,true,true);notice_bar_->setProperty("saveError",true);
+        showNotice(message,true,true,"UPDATE-PENDING-EDITS");notice_bar_->setProperty("saveError",true);
     }
     void checkForUpdates(){
         if(!update_button_||update_in_progress_)return;
@@ -672,11 +673,11 @@ class MainWindow final : public QWidget {
             reply->deleteLater();
             setUpdating(false);
             const auto payload=reply->readAll();
-            if(reply->error()!=QNetworkReply::NoError){showNotice(text(UiText::UpdateCheckFailed),true,true);return;}
+            if(reply->error()!=QNetworkReply::NoError){showNotice(UiText::UpdateCheckFailed,true,true,"UPDATE-CHECK-NETWORK","network_error="+QString::number(reply->error())+"; "+reply->errorString());return;}
             const auto root=QJsonDocument::fromJson(payload).object();
             QString latest=root["tag_name"].toString();
             if(latest.startsWith('v')||latest.startsWith('V'))latest.remove(0,1);
-            if(latest.isEmpty()){showNotice(text(UiText::UpdateCheckFailed),true,true);return;}
+            if(latest.isEmpty()){showNotice(UiText::UpdateCheckFailed,true,true,"UPDATE-CHECK-RESPONSE","Release response has no version.");return;}
             const QString current=QCoreApplication::applicationVersion();
             if(!azec_update::newer(latest,current)){QMessageBox::information(this,"Azec",text(UiText::UpToDate)+"\n\nAzec "+current);return;}
             if(engine_.snapshot().sound)sound::playArrival();
@@ -693,12 +694,12 @@ class MainWindow final : public QWidget {
     }
     void downloadUpdate(const QString& url,const QByteArray& digest){
         if(!network_)network_=new QNetworkAccessManager(this);
-        if(!url.startsWith("https://")||digest.isEmpty()){showNotice(text(UiText::UpdateCheckFailed),true,true);return;}
+        if(!url.startsWith("https://")||digest.isEmpty()){showNotice(UiText::UpdateCheckFailed,true,true,"UPDATE-ASSET-METADATA","Missing HTTPS asset or valid SHA-256.");return;}
         setUpdating(true);
         const auto target=azec_paths::pendingUpdate();
         azec_update::downloadVerified(network_,this,QUrl(url),digest,target,[this,target](bool ok){
             setUpdating(false);
-            if(!ok){showNotice(text(UiText::UpdateCheckFailed),true,true);return;}
+            if(!ok){showNotice(UiText::UpdateCheckFailed,true,true,"UPDATE-DOWNLOAD-VERIFY");return;}
             applyDownloadedUpdate(target);
         });
     }
@@ -712,7 +713,7 @@ class MainWindow final : public QWidget {
         process->setWorkingDirectory(QFileInfo(loader).absolutePath());
         const bool started=process->startDetached();
         process->deleteLater();
-        if(!started){showNotice(text(UiText::UpdateCheckFailed),true,true);return;}
+        if(!started){showNotice(UiText::UpdateCheckFailed,true,true,"UPDATE-INSTALL-LAUNCH");return;}
         force_close_=true;close();
     }
     void updatePhoneDetails(){
@@ -800,7 +801,7 @@ class MainWindow final : public QWidget {
         if(imported_ui_pending_){
             QJsonObject root;
             if(!uiprefs::readDocument(uiprefs::filePath(config_path_),root)){
-                updateSavePresentation("error");save_feedback_.stop();showNotice(text(UiText::CouldNotSaveConfiguration),true,true);notice_bar_->setProperty("saveError",true);return false;
+                updateSavePresentation("error");save_feedback_.stop();showNotice(UiText::CouldNotSaveConfiguration,true,true);notice_bar_->setProperty("saveError",true);return false;
             }
             QStringList names(favorites_.begin(),favorites_.end());names.sort(Qt::CaseInsensitive);
             root["favorites"]=QJsonArray::fromStringList(names);
@@ -816,7 +817,7 @@ class MainWindow final : public QWidget {
             if(notice_bar_&&notice_bar_->property("saveError").toBool()){notice_bar_->setProperty("saveError",false);notice_timer_.stop();notice_bar_->hide();}
         }else{
             updateSavePresentation("error");save_feedback_.stop();
-            showNotice(text(UiText::CouldNotSaveConfiguration),true,true);
+            showNotice(UiText::CouldNotSaveConfiguration,true,true);
             if(notice_bar_)notice_bar_->setProperty("saveError",true);
         }
         return saved;
@@ -827,7 +828,7 @@ class MainWindow final : public QWidget {
         const auto c=engine_.snapshot();
         if(!save_blocked_&&persistHotkeys(config_path_,c.menu_key,c.recoil_key,c.panic_key,c.primary_key,c.secondary_key))return true;
         diagnostic("save shortcuts",save_blocked_?"Saving is blocked":"Could not update the binding files");
-        unsaved_=true;updateSavePresentation("error");save_feedback_.stop();showNotice(text(UiText::CouldNotSaveConfiguration),true,true);
+        unsaved_=true;updateSavePresentation("error");save_feedback_.stop();showNotice(UiText::CouldNotSaveConfiguration,true,true);
         if(notice_bar_)notice_bar_->setProperty("saveError",true);
         return false;
     }
@@ -1061,7 +1062,10 @@ public:
         notice_scroll_=new QScrollArea;notice_scroll_->setWidgetResizable(true);notice_scroll_->setFrameShape(QFrame::NoFrame);notice_scroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);notice_scroll_->setWidget(notice_);noticeLayout->addWidget(notice_scroll_);FadingScrollBar::install(notice_scroll_);
         notice_close_=new MonoButton;notice_close_->setObjectName("secondary");notice_close_->setMinimumHeight(40);
         connect(notice_close_,&QPushButton::clicked,this,[this]{notice_timer_.stop();notice_bar_->hide();});
-        noticeLayout->addWidget(notice_close_);auto* noticeShadow=new QGraphicsDropShadowEffect(notice_bar_);noticeShadow->setBlurRadius(0);noticeShadow->setOffset(3,4);notice_bar_->setGraphicsEffect(noticeShadow);notice_bar_->hide();
+        notice_code_=label({},"rowHint");notice_code_->setTextInteractionFlags(Qt::TextSelectableByMouse);notice_code_->hide();noticeLayout->addWidget(notice_code_);
+        notice_copy_=new MonoButton(text(UiText::CopyErrorReport));notice_copy_->setObjectName("secondary");notice_copy_->setAccessibleName(text(UiText::CopyErrorReport));notice_copy_->setInteractionIcon(InteractionIcon::Copy);notice_copy_->hide();
+        connect(notice_copy_,&QPushButton::clicked,this,[this]{QApplication::clipboard()->setText(notice_report_);notice_copy_->confirmCopy();if(engine_.snapshot().sound)sound::playCopy();});
+        noticeLayout->addWidget(notice_copy_);noticeLayout->addWidget(notice_close_);auto* noticeShadow=new QGraphicsDropShadowEffect(notice_bar_);noticeShadow->setBlurRadius(0);noticeShadow->setOffset(3,4);notice_bar_->setGraphicsEffect(noticeShadow);notice_bar_->hide();
         buildDesktopLayout(layout);
         const auto c=engine_.snapshot();for(int i=0;i<r6::operator_count;++i){const QString name=QString::fromUtf8(c.operators[i].name);auto* item=new QListWidgetItem(operatorIcon(name),name);item->setData(Qt::UserRole,i);operators_->addItem(item);QSvgRenderer renderer(":/operators/"+operatorAssetName(name)+".svg");if(!renderer.isValid())icon_failures_<<name;}
         operators_->setCurrentRow(c.selected);
@@ -1075,7 +1079,7 @@ public:
         phone_->onNetworkChanged([this]{updatePhoneDetails();});
         notice_timer_.setSingleShot(true);notice_timer_.setInterval(8000);connect(&notice_timer_,&QTimer::timeout,this,[this]{notice_bar_->hide();});
         buildPreferences();
-        if(c.phone_enabled&&!startup_update_pending_&&!phone_->listening()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}
+        if(c.phone_enabled&&!startup_update_pending_&&!phone_->listening()){showNotice(UiText::CouldNotStartPhoneServer,true,true);if(notice_bar_)notice_bar_->setProperty("phoneError",true);}
         buildSettings();updateLanguage();applyStyle();if(!startup_update_pending_)buildTray();qApp->installEventFilter(this);
         auto* saveShortcut=new QShortcut(QKeySequence::Save,this);connect(saveShortcut,&QShortcut::activated,this,[this]{save(true);});
         auto* findShortcut=new QShortcut(QKeySequence::Find,this);connect(findShortcut,&QShortcut::activated,this,[this]{showOperators();search_->setFocus(Qt::ShortcutFocusReason);search_->selectAll();});
@@ -1088,7 +1092,7 @@ public:
         startup_updater_=new StartupUpdateWindow(engine_.snapshot().language,target,[this,ready]{
             const auto status=startup_updater_->message();startup_updater_->hide();startup_updater_->deleteLater();
             startup_update_pending_=false;content_->setEnabled(true);engine_.start();
-            if(engine_.snapshot().phone_enabled&&!phone_->start()){showNotice(text(UiText::CouldNotStartPhoneServer),true,true);notice_bar_->setProperty("phoneError",true);}
+            if(engine_.snapshot().phone_enabled&&!phone_->start()){showNotice(UiText::CouldNotStartPhoneServer,true,true);notice_bar_->setProperty("phoneError",true);}
             updatePhoneDetails();buildTray();poll_.start();paint_.start();for(auto* shortcut:findChildren<QShortcut*>())shortcut->setEnabled(true);
             BOOL animations=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&animations,0);
             if(startup_view_){startup_view_->show();startup_view_->raise();if(animations)startup_view_->start(status);else finishStartup();}
@@ -1151,11 +1155,20 @@ public:
     }
     void writePhoneInfo(const QString& path) const {if(!engine_.dry_run())return;QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"port",int(phone_->port())},{"address",phone_->address()},{"token",phone_->token()},{"code",phone_->code()},{"pid",int(QCoreApplication::applicationPid())},{"dryRun",true},{"interface",QStringLiteral("monocode")}}).toJson());}
     void closeUsingControl(){close_->click();}
-    void showNotice(const QString& message,bool error=false,bool persistent=false){
+    void showNotice(UiText key,bool error=false,bool persistent=false,const QString& code={},const QString& detail={}){
+        const auto stable=QStringLiteral("APP-")+QString::fromLatin1(QCryptographicHash::hash(uiText(key,1).toUtf8(),QCryptographicHash::Sha256).toHex().left(8)).toUpper();
+        showNotice(text(key),error,persistent,code.isEmpty()?stable:code,detail);
+    }
+    void showNotice(const QString& message,bool error=false,bool persistent=false,const QString& code={},const QString& detail={}){
         if(!notice_bar_||!notice_)return;
         // Routine feedback must not erase a recovery notice or unresolved error.
         if(!error&&(!notice_bar_->isHidden()||notice_bar_->property("startupVisible").toBool())&&notice_bar_->property("persistent").toBool())return;
         notice_bar_->setProperty("saveError",false);notice_bar_->setProperty("phoneError",false);
+        notice_report_.clear();notice_copy_->clearCopyFeedback();notice_copy_->setVisible(error);notice_code_->setVisible(error);
+        if(error){
+            const auto id=code.isEmpty()?QStringLiteral("APP-NOTICE"):code;
+            notice_report_=errorReport(id,message,detail);notice_code_->setText(id);diagnostic(id,notice_report_);
+        }
         notice_bar_->setProperty("persistent",persistent||error);
         notice_bar_->setProperty("error",error);notice_->setText(message);styleNotice();
         notice_timer_.stop();layoutNotice();notice_scroll_->verticalScrollBar()->setValue(0);
@@ -1175,8 +1188,8 @@ public:
     void setStartupNotice(const QString& message,bool blockSaving){
         save_blocked_=blockSaving;
         updateSavePresentation(save_->property("saveState").toString());
-        if(!message.isEmpty())showNotice(message,blockSaving,true);
-        else if(!uniqueHotkeys(engine_.snapshot()))showNotice(text(UiText::ConflictingHotkeys),true,false);
+        if(!message.isEmpty())showNotice(message,blockSaving,true,"CONFIG-RECOVERY-BLOCKED");
+        else if(!uniqueHotkeys(engine_.snapshot()))showNotice(UiText::ConflictingHotkeys,true,false);
     }
     void closeForTimeout(){if(engine_.dry_run())force_close_=true;close();}
 #ifdef AZEC_UI_TESTS

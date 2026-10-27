@@ -36,7 +36,7 @@ Open **Settings → General → Interception driver** and follow the guide:
 3. **Restart as administrator** relaunches Azec with the access required by the driver.
 4. **Check driver** refreshes its status. **Test driver** sends a short cursor movement to the right and back, allowing you to check output before opening the game.
 
-The driver files remain under `%LOCALAPPDATA%\Azec\interception` across app updates. If setup fails, expand **If something fails** in the same guide.
+The driver files remain under `%LOCALAPPDATA%\Azec\interception` across app updates. If setup fails, expand **If something fails** in the same guide. Error notices show an error code and **Copy error report**. Send that report when asking for help; a failed driver test includes the failed direction, selected mouse slot, slots exposing hardware IDs, administrator status, and the DLL's Windows error when available. **Driver detected** confirms the connection opened; use **Test driver** to check movement. Errors are also recorded locally in `azec.log` in the data folder.
 
 ## Profiles and output
 

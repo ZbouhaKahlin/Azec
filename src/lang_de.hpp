@@ -188,4 +188,5 @@ inline const char* const lang_de[]={
     "Azec wird neu gestartet",
     "Updates konnten nicht geprüft werden",
     "Das Update konnte nicht geladen werden. Versuche es erneut.",
+    "Fehlerbericht kopieren",
 };

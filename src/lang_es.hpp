@@ -188,4 +188,5 @@ inline const char* const lang_es[]={
     "Reiniciando Azec",
     "No se pudieron buscar actualizaciones",
     "No se pudo descargar la actualización. Inténtalo de nuevo.",
+    "Copiar informe de error",
 };

@@ -188,4 +188,5 @@ inline const char* const lang_fr[]={
     "Redémarrage d’Azec",
     "Impossible de vérifier les mises à jour",
     "Impossible de télécharger la mise à jour. Réessayez.",
+    "Copier le rapport d’erreur",
 };

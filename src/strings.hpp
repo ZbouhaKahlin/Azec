@@ -192,8 +192,9 @@ enum class UiText {
     StartupRestarting,
     StartupCheckUnavailable,
     StartupDownloadFailed,
+    CopyErrorReport,
 };
-inline constexpr int UiTextCount=static_cast<int>(UiText::StartupDownloadFailed)+1;
+inline constexpr int UiTextCount=static_cast<int>(UiText::CopyErrorReport)+1;
 
 // One table per language, listed in exactly the enum order above.
 #include "lang_en.hpp"

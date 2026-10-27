@@ -188,4 +188,5 @@ inline const char* const lang_en[]={
     "Restarting Azec",
     "Couldn't check for updates",
     "Couldn't download the update. Try again.",
+    "Copy error report",
 };
